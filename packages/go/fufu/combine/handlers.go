@@ -19,15 +19,8 @@ func (a *App) handleAuth(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "请求格式错误"})
 		return
 	}
-	hash := sha256Hex(p.Password)
-	var matched Role
-	for _, item := range a.passwords {
-		if item.Hash == hash {
-			matched = item.Role
-			break
-		}
-	}
-	if matched == "" {
+	matched, ok := matchRoleByPassword(a.passwords, p.Password)
+	if !ok {
 		time.Sleep(time.Second)
 		writeJSON(w, 401, map[string]string{"error": "密码错误"})
 		return
