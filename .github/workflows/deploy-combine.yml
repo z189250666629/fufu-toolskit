@@ -126,7 +126,7 @@ jobs:
       COMPOSE_SERVICE_NAME: fufu-combine
       CONTAINER_NAME: ${{ vars.FUFU_COMBINE_CONTAINER_NAME || 'fufu-combine' }}
       HOST_BIND: ${{ vars.FUFU_COMBINE_HOST_BIND || vars.HOST_BIND || '0.0.0.0' }}
-      HOST_PORT: ${{ vars.FUFU_COMBINE_HOST_PORT || '3456' }}
+      HOST_PORT: ${{ vars.FUFU_COMBINE_HOST_PORT || '33147' }}
       FUFU_COMBINE_API_URL: ${{ vars.FUFU_COMBINE_API_URL || vars.NEWAPI_API_SITE_URL }}
       FUFU_COMBINE_API_TOKEN: ${{ secrets.FUFU_COMBINE_API_TOKEN || secrets.NEWAPI_API_SITE_TOKEN }}
       FUFU_COMBINE_USER_ID: ${{ vars.FUFU_COMBINE_USER_ID || '1' }}

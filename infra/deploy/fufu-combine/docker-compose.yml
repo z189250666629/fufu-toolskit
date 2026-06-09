@@ -4,7 +4,7 @@ services:
     container_name: ${CONTAINER_NAME:-fufu-combine}
     restart: unless-stopped
     ports:
-      - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-3456}:3456"
+      - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-33147}:3456"
     environment:
       PORT: 3456
     volumes:

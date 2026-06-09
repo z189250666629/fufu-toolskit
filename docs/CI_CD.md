@@ -17,7 +17,7 @@
 
 | Workflow | 目录 | 镜像 | 默认远端路径 | 默认端口 | Directive |
 | --- | --- | --- | --- | ---: | --- |
-| `deploy-combine` | `apps/fufu-combine` | `ghcr.io/<owner>/<repo>-fufu-combine` | `/data/docker/fufu-combine` | `3456` | `[deploy combine]` / `[deploy fufu-combine]` |
+| `deploy-combine` | `apps/fufu-combine` | `ghcr.io/<owner>/<repo>-fufu-combine` | `/data/docker/fufu-combine` | `33147` | `[deploy combine]` / `[deploy fufu-combine]` |
 | `deploy-act` | `apps/fufu-act` | `ghcr.io/<owner>/<repo>-fufu-act` | `/data/docker/fufu-act` | `18820` | `[deploy act]` / `[deploy activity]` / `[deploy fufu-act]` |
 | `deploy-network` | `apps/network-detect` | `ghcr.io/<owner>/<repo>-network-detect` | `/data/docker/network-detect` | `38473` | `[deploy network]` / `[deploy network-detect]` / `[deploy network_detect]` |
 
@@ -101,7 +101,7 @@ scripts/deploy-docker-app.sh
 | Name | 默认值 |
 | --- | --- |
 | `FUFU_COMBINE_DEPLOY_PATH` | `/data/docker/fufu-combine` |
-| `FUFU_COMBINE_HOST_PORT` | `3456` |
+| `FUFU_COMBINE_HOST_PORT` | `33147` |
 | `FUFU_ACT_DEPLOY_PATH` | `/data/docker/fufu-act` |
 | `FUFU_ACT_HOST_PORT` | `18820` |
 | `NETWORK_DETECT_DEPLOY_PATH` | `/data/docker/network-detect` |
