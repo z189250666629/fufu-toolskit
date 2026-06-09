@@ -37,6 +37,7 @@ import {
 import {
   activateModelSiteState,
   activatePanelState,
+  createInitialAppState,
   selectTokenGroupState
 } from './app_state.js';
 
@@ -44,35 +45,7 @@ const app = document.getElementById('app');
 let filterRenderTimer = null;
 let renderMotion = '';
 
-const state = {
-  loading: false,
-  initialized: false,
-  modelFilter: '',
-  selectedModelSite: '次数fufu',
-  selectedTokenGroup: '',
-  groupSelectOpen: false,
-  modelTestMessage: '',
-  activePanel: 'url',
-  modelStatus: null,
-  testingCells: new Set(),
-  client: null,
-  targets: [],
-  connectivity: {
-    running: false,
-    mode: 'pending',
-    tone: '',
-    icon: '?',
-    title: '等待测试',
-    text: '页面会从当前用户浏览器发起请求，因此结果代表当前用户网络环境。测试会自动访问全部固定 Base URL。',
-    progress: 0,
-    progressText: '尚未开始测试',
-    currentUrl: '尚未开始测试',
-    success: '-',
-    testedAt: '-',
-    results: []
-  },
-  error: ''
-};
+const state = createInitialAppState();
 
 function targetGroups() {
   return normalizeTargetGroups(state.targets);
