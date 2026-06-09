@@ -1,13 +1,11 @@
 {
-  "name": "network-detact",
-  "version": "1.1.0",
-  "type": "module",
+  "name": "network-detect",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
-    "start": "node backend/server.js",
-    "test": "node --check backend/server.js && node --check frontend/app.js"
-  },
-  "engines": {
-    "node": ">=20"
+    "dev": "go run .",
+    "start": "go run .",
+    "build": "go build -o network-detect .",
+    "test": "go test ./..."
   }
 }

@@ -1,8 +1,7 @@
 services:
-  network-detact:
-    # APP_IMAGE and APP_TAG are written by the deploy job into DEPLOY_PATH/.compose.env.
+  network-detect:
     image: ${APP_IMAGE:?APP_IMAGE is required}:${APP_TAG:?APP_TAG is required}
-    container_name: ${CONTAINER_NAME:-network-detact}
+    container_name: ${CONTAINER_NAME:-network-detect}
     restart: unless-stopped
     ports:
       - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-8080}:8080"
@@ -16,12 +15,10 @@ services:
       NEWAPI_TOKEN_SITE_URL: ${NEWAPI_TOKEN_SITE_URL:-}
       CONNECTIVITY_API_URLS: ${CONNECTIVITY_API_URLS:-}
       CONNECTIVITY_TOKEN_URLS: ${CONNECTIVITY_TOKEN_URLS:-}
+    volumes:
+      - ./data:/app/data
     healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/health"]
       interval: 15s
       timeout: 5s
       retries: 5

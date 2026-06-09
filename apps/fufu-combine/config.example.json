@@ -1,7 +1,0 @@
-{
-  "name": "次数fufu",
-  "url": "https://api.example.com",
-  "token": "REPLACE_WITH_API_TOKEN",
-  "userId": "1",
-  "quotaUnit": 500000
-}
