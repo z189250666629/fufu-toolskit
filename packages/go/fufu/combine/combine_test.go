@@ -1,6 +1,11 @@
 package combine
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestEvaluatePublicMergeEligibility(t *testing.T) {
 	ok := evaluatePublicMergeEligibility([]ResolvedToken{{RemainQuota: 1, UsedQuota: 0, IntervalUnit: publicSourceUnit, Status: 1}, {RemainQuota: 1, UsedQuota: 0, IntervalUnit: publicSourceUnit, Status: 1}})
@@ -62,5 +67,40 @@ func TestMajorityGroupAndUniqueIDs(t *testing.T) {
 	ids := uniqueIDs(tokens)
 	if len(ids) != 3 || ids[0] != 3 || ids[1] != 1 || ids[2] != 2 {
 		t.Fatalf("uniqueIDs = %#v", ids)
+	}
+}
+
+func TestPublicAPIRoutes(t *testing.T) {
+	for _, path := range []string{"/api/auth", "/api/search-keys", "/api/public-merge", "/api/merge-status/job-1"} {
+		if !isPublicAPI(path) {
+			t.Fatalf("%s should be public", path)
+		}
+	}
+	if isPublicAPI("/api/session") {
+		t.Fatalf("session endpoint should require authentication")
+	}
+}
+
+func TestHandleAuthCreatesSession(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	app.passwords = map[string]struct {
+		Hash string
+		Role Role
+	}{
+		"admin": {Hash: sha256Hex("test-admin"), Role: RoleAdmin},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/auth", strings.NewReader(`{"password":"test-admin"}`))
+	w := httptest.NewRecorder()
+
+	app.handleAuth(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"role":"admin"`) {
+		t.Fatalf("auth body=%s", w.Body.String())
+	}
+	if len(app.sessions) != 1 {
+		t.Fatalf("sessions = %#v", app.sessions)
 	}
 }
