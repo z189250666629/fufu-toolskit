@@ -31,6 +31,13 @@ import {
   fetchJson,
   postJson
 } from './api.js';
+import {
+  bindTabKeyboard,
+  copyText,
+  formatNetworkType,
+  getCopyUrl,
+  showCopiedFeedback
+} from './dom.js';
 
 const app = document.getElementById('app');
 let filterRenderTimer = null;
@@ -1019,16 +1026,6 @@ function getFixedTargetUrls() {
   return new Set(targetGroups().flatMap((group) => group.urls));
 }
 
-function getCopyUrl(button) {
-  const candidates = [
-    button.value,
-    button.getAttribute('data-copy-value'),
-    button.querySelector('.url-text')?.textContent?.trim()
-  ];
-  const allowed = getFixedTargetUrls();
-  return candidates.find((value) => allowed.has(value)) || '';
-}
-
 async function copyText(value) {
   if (!value) throw new Error('没有可复制的 URL');
 
@@ -1052,29 +1049,6 @@ async function copyText(value) {
   const copied = document.execCommand('copy');
   textarea.remove();
   if (!copied) throw new Error('复制失败');
-}
-
-function showCopiedFeedback(button, text = '已复制') {
-  const tip = button.querySelector('.copy-tip');
-  if (tip) tip.textContent = text;
-  document.querySelectorAll('.url-copy.copied').forEach((item) => item.classList.remove('copied'));
-  button.classList.add('copied');
-  window.clearTimeout(button._copiedTimer);
-  button._copiedTimer = window.setTimeout(() => button.classList.remove('copied'), 1200);
-}
-
-function formatNetworkType() {
-  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if (!connection) return '浏览器未提供';
-
-  const parts = [
-    connection.type,
-    connection.effectiveType,
-    Number.isFinite(connection.downlink) ? `${connection.downlink} Mbps` : '',
-    Number.isFinite(connection.rtt) ? `${connection.rtt} ms RTT` : ''
-  ].filter(Boolean);
-
-  return parts.length ? [...new Set(parts)].join(' / ') : '未知';
 }
 
 function updateModelCell(siteName, model, cell) {
@@ -1134,25 +1108,6 @@ function activateModelSiteTab(siteName, focusAfterRender = false) {
   if (focusAfterRender) {
     requestAnimationFrame(() => document.querySelector(`[data-model-site="${CSS.escape(siteName)}"]`)?.focus());
   }
-}
-
-function bindTabKeyboard(button, selector, activate) {
-  button.addEventListener('keydown', (event) => {
-    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const tabList = button.closest('[role="tablist"]') || document;
-    const tabs = [...tabList.querySelectorAll(selector)];
-    if (!tabs.length) return;
-    const currentIndex = Math.max(0, tabs.indexOf(button));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? tabs.length - 1
-        : (currentIndex + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
-    const nextTab = tabs[nextIndex];
-    nextTab?.focus();
-    activate(nextTab);
-  });
 }
 
 function bindEvents() {
@@ -1252,7 +1207,7 @@ function bindEvents() {
     if (!button) return;
 
     try {
-      await copyText(getCopyUrl(button));
+      await copyText(getCopyUrl(button, getFixedTargetUrls()));
       showCopiedFeedback(button);
     } catch {
       showCopiedFeedback(button, '复制失败');
