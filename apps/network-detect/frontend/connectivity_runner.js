@@ -5,9 +5,7 @@ import {
   fetchErrorText,
   fetchWithTimeout
 } from './connectivity.js';
-import {
-  average,
-} from './utils.js';
+import { summarizeProbeAttempts } from './connectivity_probe.js';
 import {
   buildConnectivityCompletionState,
   buildConnectivityErrorState,
@@ -61,13 +59,7 @@ export async function probeNoCors(url, onSample, deps = {}) {
     }
   }
 
-  const okAttempts = attempts.filter((item) => item.ok);
-  return {
-    ok: okAttempts.length > 0,
-    successRate: okAttempts.length / attempts.length,
-    averageMs: average(okAttempts.map((item) => item.ms)),
-    lastError: attempts.at(-1)?.error || ''
-  };
+  return summarizeProbeAttempts(attempts);
 }
 
 export async function testConnectivityTarget({
