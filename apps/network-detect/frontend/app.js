@@ -23,6 +23,13 @@ import {
 import {
   runModelCellTest
 } from './model_test_runner.js';
+import {
+  animateTabIndicators,
+  captureRenderScroll,
+  captureTabIndicatorRects,
+  motionClass as tabMotionClass,
+  restoreRenderScroll
+} from './ui_motion.js';
 
 const app = document.getElementById('app');
 let filterRenderTimer = null;
@@ -92,72 +99,11 @@ async function loadModelStatus(refresh = false, options = {}) {
 }
 
 function motionClass(...types) {
-  return types.includes(renderMotion) ? ' motion-enter' : '';
-}
-
-function captureTabIndicatorRects() {
-  const rects = new Map();
-  document.querySelectorAll('.tabs__list > .tab-indicator').forEach((indicator) => {
-    const tabList = indicator.closest('[role="tablist"]');
-    const key = tabList?.dataset.tabMotionKey || tabList?.getAttribute('aria-label') || '';
-    if (key) rects.set(key, indicator.getBoundingClientRect());
-  });
-  return rects;
-}
-
-function animateTabIndicators(previousRects) {
-  if (!previousRects?.size) return;
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-
-  document.querySelectorAll('.tabs__list > .tab-indicator').forEach((indicator) => {
-    const tabList = indicator.closest('[role="tablist"]');
-    const key = tabList?.dataset.tabMotionKey || tabList?.getAttribute('aria-label') || '';
-    const previous = previousRects.get(key);
-    if (!previous) return;
-
-    const next = indicator.getBoundingClientRect();
-    const horizontal = tabList?.dataset.orientation !== 'vertical';
-    const dx = previous.left - next.left;
-    const dy = horizontal ? 0 : previous.top - next.top;
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-
-    indicator.style.transition = 'none';
-    indicator.style.transform = `translate(calc(var(--indicator-x) + ${dx}px), calc(var(--indicator-y) + ${dy}px))`;
-    indicator.getBoundingClientRect();
-
-    requestAnimationFrame(() => {
-      indicator.style.transition = 'transform 260ms var(--ease-out-fluid), width 260ms var(--ease-out-fluid), height 260ms var(--ease-out-fluid)';
-      indicator.style.transform = '';
-      window.setTimeout(() => {
-        indicator.style.transition = '';
-      }, 280);
-    });
-  });
-}
-
-function captureRenderScroll() {
-  const tableWrap = document.querySelector('.availability-wrap');
-  return {
-    activePanel: state.activePanel,
-    windowX: window.scrollX,
-    windowY: window.scrollY,
-    tableTop: tableWrap?.scrollTop || 0,
-    tableLeft: tableWrap?.scrollLeft || 0
-  };
-}
-
-function restoreRenderScroll(snapshot) {
-  if (!snapshot || snapshot.activePanel !== state.activePanel) return;
-  const tableWrap = document.querySelector('.availability-wrap');
-  if (tableWrap) {
-    tableWrap.scrollTop = snapshot.tableTop;
-    tableWrap.scrollLeft = snapshot.tableLeft;
-  }
-  window.scrollTo(snapshot.windowX, snapshot.windowY);
+  return tabMotionClass(renderMotion, ...types);
 }
 
 function render() {
-  const scrollSnapshot = captureRenderScroll();
+  const scrollSnapshot = captureRenderScroll(state.activePanel);
   document.title = 'fufu API 状态面板';
   app.innerHTML = `
     ${renderHeader({ modelStatus: state.modelStatus, client: state.client })}
@@ -178,7 +124,7 @@ function render() {
   `;
 
   bindEvents();
-  restoreRenderScroll(scrollSnapshot);
+  restoreRenderScroll(scrollSnapshot, state.activePanel);
 }
 
 function renderWithMotion(motion) {
