@@ -20,6 +20,9 @@ import {
 import {
   runConnectivityTests as runConnectivityTestSequence
 } from './connectivity_runner.js';
+import {
+  runModelCellTest
+} from './model_test_runner.js';
 
 const app = document.getElementById('app');
 let filterRenderTimer = null;
@@ -202,34 +205,15 @@ function getFixedTargetUrls() {
   return new Set(targetGroups().flatMap((group) => group.urls));
 }
 
-function updateModelCell(siteName, model, cell) {
-  const row = state.modelStatus?.models?.find((item) => item.model === model);
-  if (!row?.perSite || !cell) return;
-  row.perSite[siteName] = cell;
-}
-
 async function testModelCell(siteName, model, group = '') {
-  if (!siteName || !model) return;
-  const key = `${siteName}\u0000${model}`;
-  if (state.testingCells.has(key)) return;
-
-  state.testingCells.add(key);
-  state.modelTestMessage = '';
-  render();
-
-  try {
-    const result = await postJson('/api/newapi/model-status/test', { siteName, model, group });
-    updateModelCell(siteName, model, result.cell);
-    state.modelTestMessage = `${siteName} / ${model} 测试完成：${result.test?.message || '测试完成'}`;
-  } catch (error) {
-    const row = state.modelStatus?.models?.find((item) => item.model === model);
-    const cell = row?.perSite?.[siteName];
-    if (cell && error.data?.nextAllowedAt) cell.nextTestAllowedAt = error.data.nextAllowedAt;
-    state.modelTestMessage = `${siteName} / ${model} 测试失败：${error.message}`;
-  } finally {
-    state.testingCells.delete(key);
-    render();
-  }
+  await runModelCellTest({
+    state,
+    siteName,
+    model,
+    group,
+    postJsonImpl: postJson,
+    render
+  });
 }
 
 function activatePanelTab(nextPanel, focusAfterRender = false) {
