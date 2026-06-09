@@ -195,15 +195,12 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 		update(MergeJobPatch{Current: intp(i + 1)})
 	}
 	if len(deleteFailures) > 0 {
-		failed := strings.Join(deleteFailures, "、")
+		var rb *rollbackState
 		if oldDeleted == 0 {
-			rb := attemptRollback("旧卡删除失败")
-			if rb.succeeded {
-				return MergeResult{}, fmt.Errorf("旧卡删除失败：%s。未删除任何旧卡，已回滚新卡。", failed)
-			}
-			return MergeResult{}, fmt.Errorf("旧卡删除失败：%s。新卡回滚失败，请立即人工检查。%s", failed, rb.note)
+			state := attemptRollback("旧卡删除失败")
+			rb = &state
 		}
-		return MergeResult{}, fmt.Errorf("旧卡删除不完整：%s。已保留新卡以避免额度丢失，请立即人工清理剩余旧卡。", failed)
+		return MergeResult{}, formatMergeDeletionFailure(deleteFailures, oldDeleted, rb)
 	}
 
 	result = MergeResult{Success: true, NewCard: NewCardResult{Key: ensureFullKey(getString(newCard, "key")), Name: getString(newCard, "name"), RemainQuota: int64OrDefault(toInt64(newCard["remain_quota"]), target.Quota), IntervalUnit: intOrDefault(toInt(newCard["interval_unit"]), p.IntervalUnit), Group: stringOrDefault(getString(newCard, "group"), target.Group)}, DeleteResults: deleteResults}
