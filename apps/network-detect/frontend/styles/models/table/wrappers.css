@@ -1,0 +1,33 @@
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sage-surface);
+}
+
+.availability-wrap {
+  max-height: 620px;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.availability-wrap::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.availability-table {
+  min-width: 900px;
+}
+
+.log-table {
+  min-width: 1040px;
+}
+
+.empty-inline {
+  margin-top: 12px;
+  padding: 16px;
+  box-shadow: none;
+  font-size: 13px;
+  text-align: center;
+}

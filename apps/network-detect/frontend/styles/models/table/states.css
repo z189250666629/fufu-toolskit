@@ -1,0 +1,14 @@
+.availability-table tbody tr.is-manual-ok {
+  --model-row-bg: color-mix(in oklch, var(--success-bg) 54%, var(--sage-surface));
+}
+
+.availability-table tbody tr.is-manual-bad {
+  --model-row-bg: color-mix(in oklch, var(--danger-bg) 48%, var(--sage-surface));
+}
+
+.availability-table tbody tr.is-manual-ok td,
+.availability-table tbody tr.is-manual-bad td,
+.availability-table tbody tr.is-manual-ok td.sticky-col,
+.availability-table tbody tr.is-manual-bad td.sticky-col {
+  background: var(--model-row-bg);
+}
