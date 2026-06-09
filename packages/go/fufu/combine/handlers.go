@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -149,11 +147,11 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "请求格式错误"})
 		return
 	}
-	if p.Count < 1 || p.Count > 100 || p.Quota <= 0 || p.IntervalUnit == 0 {
+	if !validateGenerateParams(p.Count, p.Quota, p.IntervalUnit) {
 		writeJSON(w, 400, map[string]string{"error": "参数无效"})
 		return
 	}
-	totalQuota := int64(math.Round(p.Quota * float64(a.quotaUnit)))
+	totalQuota := generateTotalQuota(p.Quota, a.quotaUnit)
 	group := normalizeGenerateGroup(p.Group)
 	keys := []string{}
 	errs := []string{}
@@ -178,7 +176,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		card := cloneMap(token.Raw)
-		card["name"] = strconv.FormatFloat(p.Quota, 'f', -1, 64)
+		card["name"] = generateTokenFinalName(p.Quota)
 		if res, _, err := a.updateTokenRaw(r.Context(), card); err != nil {
 			errs = append(errs, fmt.Sprintf("#%d: %s", i+1, err))
 			continue

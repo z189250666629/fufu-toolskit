@@ -24,3 +24,44 @@ func TestBuildGeneratedTokenCreateBody(t *testing.T) {
 		t.Fatalf("time fields = %#v", body)
 	}
 }
+
+func TestValidateGenerateParams(t *testing.T) {
+	validCases := []struct {
+		count        int
+		quota        float64
+		intervalUnit int
+	}{
+		{count: 1, quota: 0.1, intervalUnit: 60},
+		{count: 100, quota: 1, intervalUnit: -1},
+	}
+	for _, tc := range validCases {
+		if !validateGenerateParams(tc.count, tc.quota, tc.intervalUnit) {
+			t.Fatalf("expected valid params: %#v", tc)
+		}
+	}
+
+	invalidCases := []struct {
+		count        int
+		quota        float64
+		intervalUnit int
+	}{
+		{count: 0, quota: 1, intervalUnit: 60},
+		{count: 101, quota: 1, intervalUnit: 60},
+		{count: 1, quota: 0, intervalUnit: 60},
+		{count: 1, quota: 1, intervalUnit: 0},
+	}
+	for _, tc := range invalidCases {
+		if validateGenerateParams(tc.count, tc.quota, tc.intervalUnit) {
+			t.Fatalf("expected invalid params: %#v", tc)
+		}
+	}
+}
+
+func TestGenerateQuotaAndFinalName(t *testing.T) {
+	if got := generateTotalQuota(1.25, 500000); got != 625000 {
+		t.Fatalf("generateTotalQuota = %d", got)
+	}
+	if got := generateTokenFinalName(1.2500); got != "1.25" {
+		t.Fatalf("generateTokenFinalName = %q", got)
+	}
+}
