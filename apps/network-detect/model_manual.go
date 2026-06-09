@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"fufu/config"
 	"fufu/newapi"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 )
@@ -66,13 +64,7 @@ func testModel(siteName, model, group string) (map[string]any, error) {
 	if errMsg != "" {
 		return nil, &httpError{Status: 502, Message: errMsg}
 	}
-	candidates := []Channel{}
-	for _, ch := range channels {
-		if ch.Status == channelStatusEnabled && contains(ch.Models, model) && (group == "" || contains(ch.Groups, group)) {
-			candidates = append(candidates, ch)
-		}
-	}
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].ResponseTime < candidates[j].ResponseTime })
+	candidates := selectModelTestChannels(channels, model, group)
 	if len(candidates) == 0 {
 		return nil, &httpError{Status: 400, Message: "当前单元格没有启用通道可测试"}
 	}
@@ -81,11 +73,7 @@ func testModel(siteName, model, group string) (map[string]any, error) {
 	stream := supportsStream(model)
 	var res apiResult
 	for _, ch := range candidates {
-		ep := fmt.Sprintf("/api/channel/test/%d?model=%s", ch.ID, url.QueryEscape(model))
-		if stream {
-			ep += "&stream=true"
-		}
-		res = newAPIGet(context.Background(), *site, ep, 45*time.Second)
+		res = newAPIGet(context.Background(), *site, channelTestEndpoint(ch.ID, model, stream), 45*time.Second)
 		if res.OK {
 			break
 		}
