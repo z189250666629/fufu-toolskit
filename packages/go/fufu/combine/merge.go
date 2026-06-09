@@ -41,7 +41,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 			return rollbackState{rollbackAttempted, rollbackSucceeded, rollbackNote}
 		}
 		rollbackAttempted = true
-		update(MergeJobPatch{Status: strp("rollback"), StepText: strp("回滚新卡中..."), Total: intp(1), Current: intp(0)})
+		update(buildMergePhasePatch("rollback", "回滚新卡中...", 1))
 		a.setTraceStatus(context.Background(), mergeID, "rollback")
 		ok, res, delErr := a.deleteToken(context.Background(), createdID)
 		rollbackSucceeded = ok && delErr == nil
@@ -88,7 +88,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 	}
 	defer a.releaseMergeLock(ids)
 	verified := []ResolvedToken{}
-	update(MergeJobPatch{Status: strp("verifying"), StepText: strp("校验额度中..."), Total: intp(len(ids)), Current: intp(0)})
+	update(buildMergePhasePatch("verifying", "校验额度中...", len(ids)))
 	a.setTraceStatus(ctx, mergeID, "verifying")
 	for i, id := range ids {
 		t, e := a.fetchVerifiedToken(ctx, id)
@@ -117,7 +117,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 	uniqueName := fmt.Sprintf("merge-%d-%s", time.Now().UnixMilli(), randomBase36(6))
 	a.setTraceFinal(ctx, mergeID, target.Quota, target.Name, target.Group)
 
-	update(MergeJobPatch{Status: strp("creating"), StepText: strp("创建新卡中..."), Total: intp(1), Current: intp(0)})
+	update(buildMergePhasePatch("creating", "创建新卡中...", 1))
 	a.setTraceStatus(ctx, mergeID, "creating")
 	res, _, e := a.createToken(ctx, buildNewMergeTokenBody(uniqueName, target, p.IntervalUnit))
 	if e != nil {
@@ -128,7 +128,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 	}
 	update(MergeJobPatch{Current: intp(1)})
 
-	update(MergeJobPatch{Status: strp("renaming"), StepText: strp("整理新卡信息中..."), Total: intp(1), Current: intp(0)})
+	update(buildMergePhasePatch("renaming", "整理新卡信息中...", 1))
 	a.setTraceStatus(ctx, mergeID, "renaming")
 	token, e := a.searchTokenByName(ctx, uniqueName)
 	if e != nil {
@@ -155,7 +155,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 	}
 	update(MergeJobPatch{Current: intp(1)})
 
-	update(MergeJobPatch{Status: strp("deleting"), StepText: strp("删卡中..."), Total: intp(len(verified)), Current: intp(0)})
+	update(buildMergePhasePatch("deleting", "删卡中...", len(verified)))
 	a.setTraceStatus(ctx, mergeID, "deleting")
 	a.setTraceDeleteStarted(ctx, mergeID)
 	deletionStarted = true
