@@ -1,0 +1,222 @@
+@media (max-width: 1080px) {
+  .url-monitor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .control-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .button.primary {
+    width: 100%;
+  }
+
+  .metric-grid,
+  .site-grid,
+  .model-site-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+@media (max-width: 680px) {
+  .app-shell {
+    width: min(100% - 20px, 1320px);
+    padding-top: 16px;
+  }
+
+  .brand-block {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .brand-mark {
+    width: 44px;
+    height: 44px;
+    font-size: 12px;
+  }
+
+  h1 {
+    font-size: 32px;
+    line-height: 1.06;
+  }
+
+  .app-header,
+  .section-head,
+  .group-head,
+  .site-head,
+  .site-foot,
+  .model-site-head,
+  .model-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .monitor-head {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .verdict-card {
+    grid-template-columns: 1fr;
+  }
+
+  .connectivity-metrics,
+  .result-row {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-toggle {
+    justify-self: stretch;
+    width: 100%;
+    grid-template-columns: repeat(var(--tab-count), minmax(0, 1fr));
+  }
+
+  .header-meta {
+    width: 100%;
+    text-align: left;
+  }
+
+  .control-bar,
+  .metric-grid,
+  .site-grid,
+  .site-metrics,
+  .model-site-grid,
+  .model-site-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .model-status-counts {
+    justify-content: flex-start;
+  }
+
+  .model-scope-tabs {
+    width: 100%;
+    grid-template-columns: repeat(var(--tab-count), minmax(0, 1fr));
+  }
+
+  .model-scope-content {
+    display: grid;
+    gap: 12px;
+  }
+
+  .model-scope-bar {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+    min-height: 0;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .model-scope-group-slot {
+    width: 100%;
+    min-height: 0;
+  }
+
+  .model-scope-group-slot.is-placeholder {
+    display: none;
+  }
+
+  .availability-wrap {
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .availability-table,
+  .availability-table tbody,
+  .availability-table tr,
+  .availability-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .availability-table {
+    border-spacing: 0;
+  }
+
+  .availability-table thead {
+    display: none;
+  }
+
+  .availability-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .availability-table tbody tr {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--sage-surface);
+  }
+
+  .availability-table td,
+  .availability-table td.sticky-col {
+    position: static;
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    border-top: 1px solid var(--line);
+    padding: 10px 12px;
+    box-shadow: none;
+  }
+
+  .availability-table td:first-child {
+    border-top: 0;
+  }
+
+  .availability-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.2;
+  }
+
+  .availability-table .model-name {
+    max-width: none;
+    align-items: start;
+    overflow-wrap: anywhere;
+  }
+
+  .availability-table .model-name::before {
+    padding-top: 2px;
+  }
+
+  .availability-table .price-cell {
+    min-width: 0;
+  }
+
+  .model-action {
+    min-width: 0;
+  }
+
+  .model-action .button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  h1 {
+    font-size: 30px;
+  }
+
+  .app-shell {
+    width: min(100% - 16px, 1320px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}

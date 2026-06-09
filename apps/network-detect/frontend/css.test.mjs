@@ -1,0 +1,29 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+test('styles.css is a small ordered partial manifest', () => {
+  const expected = [
+    'styles/tokens.css',
+    'styles/base.css',
+    'styles/layout.css',
+    'styles/connectivity.css',
+    'styles/models.css',
+    'styles/responsive.css'
+  ];
+  const css = readFileSync(join(here, 'styles.css'), 'utf8');
+  const imports = [...css.matchAll(/@import url\("\.\/(styles\/[^"]+)"\);/g)].map((match) => match[1]);
+
+  assert.deepEqual(imports, expected);
+  assert.ok(css.split(/\r?\n/).filter(Boolean).length <= expected.length + 1);
+
+  for (const partial of expected) {
+    const path = join(here, partial);
+    assert.equal(existsSync(path), true, `${partial} should exist`);
+    assert.ok(readFileSync(path, 'utf8').trim().length > 0, `${partial} should not be empty`);
+  }
+});
