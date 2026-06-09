@@ -6,6 +6,10 @@ import {
   postJson
 } from './api.js';
 import {
+  loadModelStatusState,
+  loadStaticContextState
+} from './app_data.js';
+import {
   bindTabKeyboard,
   copyText,
   formatNetworkType,
@@ -75,32 +79,16 @@ function targetGroups() {
 }
 
 async function loadStaticContext() {
-  const [client, targets] = await Promise.all([
-    fetchJson('/api/client').catch(() => null),
-    fetchJson('/api/connectivity/targets').catch(() => ({ groups: [] }))
-  ]);
-  state.client = client;
-  state.targets = targets.groups || [];
+  await loadStaticContextState(state, fetchJson);
 }
 
 async function loadModelStatus(refresh = false, options = {}) {
-  state.loading = true;
-  state.error = '';
-  state.modelTestMessage = '';
-  if (options.renderStart !== false) render();
-
-  try {
-    state.modelStatus = await fetchJson(`/api/newapi/model-status${refresh ? '?refresh=1' : ''}`);
-    state.initialized = true;
-  } catch (error) {
-    state.error = error.message;
-    if (error.data && typeof error.data === 'object' && Number.isFinite(Number(error.data.generatedAt))) {
-      state.modelStatus = error.data;
-    }
-  } finally {
-    state.loading = false;
-    render();
-  }
+  await loadModelStatusState(state, {
+    refresh,
+    renderStart: options.renderStart !== false,
+    fetchJsonImpl: fetchJson,
+    render
+  });
 }
 
 function motionClass(...types) {
