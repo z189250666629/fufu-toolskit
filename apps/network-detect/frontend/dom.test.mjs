@@ -59,3 +59,60 @@ test('bindTabKeyboard moves focus and activates the next tab', () => {
   assert.deepEqual(focused, ['prevented', 'third']);
   assert.deepEqual(activated, ['third']);
 });
+
+test('bindTabKeyboard wraps focus and handles home and end keys', () => {
+  const focused = [];
+  const activated = [];
+  const tabs = ['first', 'second', 'third'].map((name) => ({
+    name,
+    focus: () => focused.push(name)
+  }));
+  const button = tabs[0];
+  button.closest = () => ({
+    querySelectorAll: () => tabs
+  });
+  const listeners = {};
+  button.addEventListener = (type, handler) => {
+    listeners[type] = handler;
+  };
+
+  bindTabKeyboard(button, '[role="tab"]', (nextTab) => activated.push(nextTab.name));
+  listeners.keydown({
+    key: 'ArrowLeft',
+    preventDefault: () => focused.push('prevented-left')
+  });
+  listeners.keydown({
+    key: 'Home',
+    preventDefault: () => focused.push('prevented-home')
+  });
+  listeners.keydown({
+    key: 'End',
+    preventDefault: () => focused.push('prevented-end')
+  });
+
+  assert.deepEqual(focused, ['prevented-left', 'third', 'prevented-home', 'first', 'prevented-end', 'third']);
+  assert.deepEqual(activated, ['third', 'first', 'third']);
+});
+
+test('bindTabKeyboard ignores unsupported keys', () => {
+  const focused = [];
+  const activated = [];
+  const button = {
+    addEventListener: (type, handler) => {
+      button[type] = handler;
+    },
+    closest: () => ({
+      querySelectorAll: () => [button]
+    }),
+    focus: () => focused.push('focused')
+  };
+
+  bindTabKeyboard(button, '[role="tab"]', (nextTab) => activated.push(nextTab));
+  button.keydown({
+    key: 'Enter',
+    preventDefault: () => focused.push('prevented')
+  });
+
+  assert.deepEqual(focused, []);
+  assert.deepEqual(activated, []);
+});

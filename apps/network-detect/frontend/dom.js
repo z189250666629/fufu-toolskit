@@ -1,3 +1,13 @@
+import {
+  nextKeyboardNavigationIndex
+} from './app_event_keys.js';
+
+const TAB_NAVIGATION = {
+  forwardKeys: ['ArrowRight', 'ArrowDown'],
+  backwardKeys: ['ArrowLeft', 'ArrowUp'],
+  wrap: true
+};
+
 export function getCopyUrl(button, allowedUrls) {
   const candidates = [
     button.value,
@@ -68,17 +78,12 @@ export function formatNetworkType(navigatorLike = globalThis.navigator) {
 
 export function bindTabKeyboard(button, selector, activate, documentLike = globalThis.document) {
   button.addEventListener('keydown', (event) => {
-    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
     const tabList = button.closest('[role="tablist"]') || documentLike;
     const tabs = [...tabList.querySelectorAll(selector)];
-    if (!tabs.length) return;
     const currentIndex = Math.max(0, tabs.indexOf(button));
-    const nextIndex = event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? tabs.length - 1
-        : (currentIndex + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
+    const nextIndex = nextKeyboardNavigationIndex(event.key, currentIndex, tabs.length, TAB_NAVIGATION);
+    if (nextIndex === null) return;
+    event.preventDefault();
     const nextTab = tabs[nextIndex];
     nextTab?.focus();
     activate(nextTab);

@@ -3,16 +3,14 @@ import assert from 'node:assert/strict';
 
 import {
   bindAppEvents,
-  nextTokenGroupOptionIndex
+  nextTokenGroupOptionIndex as nextTokenGroupOptionIndexFromAppEvents
 } from './app_events.js';
+import {
+  nextTokenGroupOptionIndex
+} from './app_event_keys.js';
 
-test('nextTokenGroupOptionIndex maps keyboard navigation within bounds', () => {
-  assert.equal(nextTokenGroupOptionIndex('ArrowDown', 0, 3), 1);
-  assert.equal(nextTokenGroupOptionIndex('ArrowUp', 0, 3), 0);
-  assert.equal(nextTokenGroupOptionIndex('End', 0, 3), 2);
-  assert.equal(nextTokenGroupOptionIndex('Home', 2, 3), 0);
-  assert.equal(nextTokenGroupOptionIndex('Enter', 1, 3), null);
-  assert.equal(nextTokenGroupOptionIndex('ArrowDown', 0, 0), null);
+test('app events re-exports token group option navigation helper', () => {
+  assert.equal(nextTokenGroupOptionIndexFromAppEvents, nextTokenGroupOptionIndex);
 });
 
 test('bindAppEvents lets token group options move focus with arrow keys', () => {
