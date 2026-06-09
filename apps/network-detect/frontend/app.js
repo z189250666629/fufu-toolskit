@@ -19,34 +19,22 @@ import {
   statusFromSummary,
   successRate
 } from './utils.js';
+import {
+  SAMPLE_COUNT,
+  TIMEOUT_MS,
+  addCacheBust,
+  fetchErrorText,
+  fetchWithTimeout,
+  normalizeTargetGroups
+} from './connectivity.js';
+import {
+  fetchJson,
+  postJson
+} from './api.js';
 
 const app = document.getElementById('app');
 let filterRenderTimer = null;
 let renderMotion = '';
-
-const SAMPLE_COUNT = 4;
-const TIMEOUT_MS = 8000;
-
-const DEFAULT_TARGET_GROUPS = [
-  {
-    id: 'api',
-    name: 'API 次数站',
-    urls: [
-      'https://api.fufuapi.top',
-      'https://api.fufuapi.online',
-      'https://api.fufuflower.top'
-    ]
-  },
-  {
-    id: 'token',
-    name: 'Token 站',
-    urls: [
-      'https://token.fufuapi.top',
-      'https://token.fufuapi.online',
-      'https://token.fufuflower.top'
-    ]
-  }
-];
 
 const state = {
   loading: false,
@@ -79,55 +67,7 @@ const state = {
 };
 
 function targetGroups() {
-  const groups = state.targets?.length ? state.targets : DEFAULT_TARGET_GROUPS;
-  return groups
-    .map((group) => ({
-      id: String(group.id || group.name || ''),
-      name: String(group.name || group.id || 'URL 组'),
-      urls: Array.isArray(group.urls) ? group.urls.map(String).filter(Boolean) : []
-    }))
-    .filter((group) => group.urls.length);
-}
-
-function addCacheBust(url) {
-  const next = new URL(url, window.location.href);
-  next.searchParams.set('_fufu_connect_test', `${Date.now()}_${Math.random().toString(16).slice(2)}`);
-  return next.toString();
-}
-
-function fetchWithTimeout(url, options, timeoutMs) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal })
-    .finally(() => window.clearTimeout(timer));
-}
-
-function fetchErrorText(error) {
-  if (error?.name === 'AbortError') return '请求超时';
-  return '请求失败或被浏览器拦截';
-}
-
-async function fetchJson(path, options = {}) {
-  const headers = {
-    ...(options.headers || {})
-  };
-  const response = await fetch(path, { ...options, headers, cache: 'no-store' });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(data.error || data.configError || `HTTP ${response.status}`);
-    error.status = response.status;
-    error.data = data;
-    throw error;
-  }
-  return data;
-}
-
-function postJson(path, body) {
-  return fetchJson(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  return normalizeTargetGroups(state.targets);
 }
 
 async function loadStaticContext() {
