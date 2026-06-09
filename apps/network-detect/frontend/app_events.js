@@ -7,16 +7,15 @@ import {
 import {
   selectTokenGroupState
 } from './app_state.js';
+import {
+  isTokenGroupOptionKey,
+  isTokenGroupTriggerOpenKey,
+  nextTokenGroupOptionIndex
+} from './app_event_keys.js';
+
+export { nextTokenGroupOptionIndex } from './app_event_keys.js';
 
 let filterRenderTimer = null;
-
-export function nextTokenGroupOptionIndex(key, currentIndex, total) {
-  if (total <= 0 || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(key)) return null;
-  if (key === 'Home') return 0;
-  if (key === 'End') return total - 1;
-  const delta = key === 'ArrowDown' ? 1 : -1;
-  return Math.max(0, Math.min(total - 1, currentIndex + delta));
-}
 
 export function bindAppEvents({
   documentRef = document,
@@ -69,7 +68,7 @@ export function bindAppEvents({
   });
 
   tokenGroupTrigger?.addEventListener('keydown', (event) => {
-    if (!['Enter', ' ', 'ArrowDown'].includes(event.key)) return;
+    if (!isTokenGroupTriggerOpenKey(event.key)) return;
     event.preventDefault();
     state.groupSelectOpen = true;
     renderWithMotion('select');
@@ -88,7 +87,7 @@ export function bindAppEvents({
 
   documentRef.querySelectorAll('[data-token-group-option]').forEach((button) => {
     button.addEventListener('keydown', (event) => {
-      if (!['ArrowDown', 'ArrowUp', 'Home', 'End', 'Escape'].includes(event.key)) return;
+      if (!isTokenGroupOptionKey(event.key)) return;
       event.preventDefault();
       const options = [...documentRef.querySelectorAll('[data-token-group-option]')];
       if (event.key === 'Escape') {
