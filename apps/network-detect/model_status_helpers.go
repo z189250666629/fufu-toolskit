@@ -162,25 +162,3 @@ func maxInt64(a, b int64) int64 {
 	}
 	return b
 }
-
-func groupLogs(rows []LogRow) map[string][]LogRow {
-	m := map[string][]LogRow{}
-	for _, r := range rows {
-		if r.ModelName != "" {
-			m[r.ModelName] = append(m[r.ModelName], r)
-		}
-	}
-	return m
-}
-
-func groupLogsByModelGroup(rows []LogRow) map[string][]LogRow {
-	m := map[string][]LogRow{}
-	for _, r := range rows {
-		for _, g := range parseList(r.Group) {
-			if r.ModelName != "" && g != "" {
-				m[r.ModelName+"\x00"+g] = append(m[r.ModelName+"\x00"+g], r)
-			}
-		}
-	}
-	return m
-}

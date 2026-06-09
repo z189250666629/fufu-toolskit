@@ -81,7 +81,8 @@ func buildModelStatus() *ModelStatus {
 				if len(groupChans) == 0 {
 					continue
 				}
-				gs := buildCell(site.Name, model, groupChans, successByMG[model+"\x00"+g], errorByMG[model+"\x00"+g], pricing[model])
+				logKey := modelGroupLogKey(model, g)
+				gs := buildCell(site.Name, model, groupChans, successByMG[logKey], errorByMG[logKey], pricing[model])
 				gs.Groups = []string{g}
 				cell.GroupStats[g] = gs
 			}
