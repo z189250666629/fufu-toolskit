@@ -102,7 +102,9 @@ The numbered form supports indexes `1` through `10` and the same optional suffix
 The URL detection panel can also be driven by deployment env vars:
 
 ```text
+# Optional: defaults to NEWAPI_API_SITE_URL when unset
 CONNECTIVITY_API_URLS=https://api.fufuapi.top,https://api.fufuflower.top
+# Optional: defaults to NEWAPI_TOKEN_SITE_URL when unset
 CONNECTIVITY_TOKEN_URLS=https://token.fufuapi.top,https://token.fufuflower.top
 ```
 

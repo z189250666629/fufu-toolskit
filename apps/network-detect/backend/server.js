@@ -205,10 +205,18 @@ function connectivityGroupsFromEnv() {
     }
   }
 
-  const apiUrls = splitEnvList(envValue('CONNECTIVITY_API_URLS') || envValue('FUFU_API_URLS'))
+  const apiUrls = splitEnvList(
+    envValue('CONNECTIVITY_API_URLS')
+      || envValue('FUFU_API_URLS')
+      || envValue('NEWAPI_API_SITE_URL')
+  )
     .map(normalizeBaseUrl)
     .filter(Boolean);
-  const tokenUrls = splitEnvList(envValue('CONNECTIVITY_TOKEN_URLS') || envValue('FUFU_TOKEN_URLS'))
+  const tokenUrls = splitEnvList(
+    envValue('CONNECTIVITY_TOKEN_URLS')
+      || envValue('FUFU_TOKEN_URLS')
+      || envValue('NEWAPI_TOKEN_SITE_URL')
+  )
     .map(normalizeBaseUrl)
     .filter(Boolean);
   const groups = [];

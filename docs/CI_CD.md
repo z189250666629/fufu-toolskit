@@ -123,8 +123,8 @@ scripts/deploy-docker-app.sh
 | `MCY_UPLOAD_ENDPOINT` | 默认 `/plugin/virtual-card-ship/card/add` |
 | `NEWAPI_API_SITE_URL` | network-detect / fufu-act 可共用 |
 | `NEWAPI_TOKEN_SITE_URL` | network-detect |
-| `CONNECTIVITY_API_URLS` | network-detect URL 检测列表 |
-| `CONNECTIVITY_TOKEN_URLS` | network-detect URL 检测列表 |
+| `CONNECTIVITY_API_URLS` | network-detect URL 检测列表；不填时复用 `NEWAPI_API_SITE_URL` |
+| `CONNECTIVITY_TOKEN_URLS` | network-detect URL 检测列表；不填时复用 `NEWAPI_TOKEN_SITE_URL` |
 
 ## GitHub Secrets
 

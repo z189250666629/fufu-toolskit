@@ -66,8 +66,8 @@ Set these in `Settings -> Secrets and variables -> Actions -> Variables` only wh
 | `HOST_PORT` / `DEPLOY_APP_PORT` | No | `8080` | Host port exposed by Compose. |
 | `NEWAPI_API_SITE_URL` | No | checked-in config URL | Override API 次数站 URL. |
 | `NEWAPI_TOKEN_SITE_URL` | No | checked-in config URL | Override Token 站 URL. |
-| `CONNECTIVITY_API_URLS` | No | built-in list | Comma-separated API URL detection targets. |
-| `CONNECTIVITY_TOKEN_URLS` | No | built-in list | Comma-separated Token URL detection targets. |
+| `CONNECTIVITY_API_URLS` | No | `NEWAPI_API_SITE_URL` | Comma-separated API URL detection targets; overrides `NEWAPI_API_SITE_URL` for connectivity checks. |
+| `CONNECTIVITY_TOKEN_URLS` | No | `NEWAPI_TOKEN_SITE_URL` | Comma-separated Token URL detection targets; overrides `NEWAPI_TOKEN_SITE_URL` for connectivity checks. |
 
 ## GitHub Repository Settings
 
