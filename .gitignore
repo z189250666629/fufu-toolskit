@@ -37,10 +37,6 @@ apps/**/coverage/
 # Go artifacts
 *.test
 *.out
-/fufu-combine
-/fufu-combine.exe
-apps/fufu-combine/fufu-combine
-apps/fufu-combine/fufu-combine.exe
 
 # Runtime databases
 apps/**/data/*.db
@@ -56,3 +52,11 @@ apps/**/backups/
 *.backup
 *~
 
+
+# Go app artifacts
+apps/network-detect/network-detect
+apps/network-detect/network-detect.exe
+apps/fufu-act/fufu-act
+apps/fufu-act/fufu-act.exe
+apps/y2k-nav/y2k-nav
+apps/y2k-nav/y2k-nav.exe

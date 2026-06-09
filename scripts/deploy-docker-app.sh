@@ -87,53 +87,11 @@ write_env_var HOST_PORT
 
 CONFIG_JSON_FILE=""
 case "$APP_NAME" in
-  fufu-combine)
-    : "${FUFU_COMBINE_API_URL:=${FUFU_API_BASE_URL:-${NEWAPI_API_SITE_URL:-}}}"
-    : "${FUFU_COMBINE_API_TOKEN:=${FUFU_API_TOKEN:-${NEWAPI_API_SITE_TOKEN:-}}}"
-    : "${FUFU_COMBINE_USER_ID:=${FUFU_API_USER_ID:-${NEWAPI_API_SITE_USER_ID:-1}}}"
-    : "${FUFU_COMBINE_QUOTA_UNIT:=${FUFU_QUOTA_UNIT:-500000}}"
-    export FUFU_COMBINE_API_URL FUFU_COMBINE_API_TOKEN FUFU_COMBINE_USER_ID FUFU_COMBINE_QUOTA_UNIT
-    python3 - <<'PY'
-import json
-import os
-import sys
-
-url = os.environ.get('FUFU_COMBINE_API_URL', '').strip().rstrip('/')
-token = os.environ.get('FUFU_COMBINE_API_TOKEN', '').strip()
-user_id = os.environ.get('FUFU_COMBINE_USER_ID', '1').strip()
-quota_raw = os.environ.get('FUFU_COMBINE_QUOTA_UNIT', '500000').strip() or '500000'
-
-missing = [name for name, value in {
-    'FUFU_COMBINE_API_URL': url,
-    'FUFU_COMBINE_API_TOKEN': token,
-    'FUFU_COMBINE_USER_ID': user_id,
-}.items() if not value]
-if missing:
-    print('missing required fufu-combine config env: ' + ', '.join(missing), file=sys.stderr)
-    sys.exit(1)
-
-try:
-    quota_unit = int(quota_raw)
-except ValueError:
-    print('FUFU_COMBINE_QUOTA_UNIT must be an integer', file=sys.stderr)
-    sys.exit(1)
-
-with open('.fufu-combine.config.json', 'w', encoding='utf-8') as fh:
-    json.dump({
-        'url': url,
-        'token': token,
-        'userId': user_id,
-        'quotaUnit': quota_unit,
-    }, fh, ensure_ascii=False, indent=2)
-    fh.write('\n')
-PY
-    CONFIG_JSON_FILE=".fufu-combine.config.json"
-    ;;
   fufu-act)
     for name in \
       FUFU_API_BASE_URL FUFU_API_TOKEN FUFU_API_USER_ID FUFU_QUOTA_UNIT \
       NEWAPI_API_SITE_URL NEWAPI_API_SITE_TOKEN NEWAPI_TOKEN_SITE_TOKEN \
-      MCY_BASE_URL MCY_COOKIE MCY_USERNAME MCY_PASSWORD MCY_LOGIN_ENDPOINT MCY_UPLOAD_ENDPOINT
+      MCY_BASE_URL MCY_COOKIE MCY_USERNAME MCY_PASSWORD MCY_LOGIN_ENDPOINT MCY_UPLOAD_ENDPOINT ADMIN_TOKEN
     do
       write_env_var "$name"
     done
@@ -143,7 +101,8 @@ PY
   network-detect)
     for name in \
       NEWAPI_MANAGED_API_SITES NEWAPI_MANAGED_API_CONFIG \
-      NEWAPI_API_SITE_TOKEN NEWAPI_TOKEN_SITE_TOKEN NEWAPI_API_SITE_URL NEWAPI_TOKEN_SITE_URL
+      NEWAPI_API_SITE_TOKEN NEWAPI_TOKEN_SITE_TOKEN NEWAPI_API_SITE_URL NEWAPI_TOKEN_SITE_URL \
+      CONNECTIVITY_API_URLS CONNECTIVITY_TOKEN_URLS
     do
       write_env_var "$name"
     done

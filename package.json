@@ -2,22 +2,21 @@
   "name": "fufu-toolskit",
   "version": "1.0.0",
   "private": true,
-  "description": "Monorepo for y2k-nav, fufu-combine, fufu-act/activity, and network-detect.",
+  "description": "Monorepo for y2k-nav, network-detect (with combine), and fufu-act/activity.",
   "scripts": {
-    "deps": "npm run deps:combine && npm run deps:act && npm run deps:network",
-    "deps:combine": "cd apps/fufu-combine && go mod download",
-    "deps:act": "npm --prefix apps/fufu-act install",
-    "deps:network": "npm --prefix apps/network-detect install",
+    "deps": "npm run deps:go",
+    "deps:go": "go work sync",
     "start:all": "node scripts/start-all.mjs",
-    "start:combine": "npm --prefix apps/fufu-combine start",
-    "dev:combine": "npm --prefix apps/fufu-combine run dev",
-    "build:combine": "npm --prefix apps/fufu-combine run build",
-    "test:combine": "cd apps/fufu-combine && go test ./...",
-    "start:act": "npm --prefix apps/fufu-act start",
-    "test:act": "node --check apps/fufu-act/server/index.mjs && node --check apps/fufu-act/server/routes.mjs && node --check apps/fufu-act/server/slot.mjs && node --check apps/fufu-act/server/db.mjs && node --check apps/fufu-act/server/credit-worker.mjs && node --check apps/fufu-act/scripts/api-act.mjs",
     "start:network": "npm --prefix apps/network-detect start",
+    "dev:network": "npm --prefix apps/network-detect run dev",
+    "build:network": "npm --prefix apps/network-detect run build",
     "test:network": "npm --prefix apps/network-detect test",
-    "test": "npm run test:combine && npm run test:act && npm run test:network"
+    "start:act": "npm --prefix apps/fufu-act start",
+    "test:act": "npm --prefix apps/fufu-act test",
+    "start:y2k": "npm --prefix apps/y2k-nav start",
+    "test:y2k": "npm --prefix apps/y2k-nav test",
+    "test:shared": "go test ./packages/go/fufu/...",
+    "test": "npm run test:shared && npm run test:network && npm run test:act && npm run test:y2k"
   },
   "engines": {
     "node": ">=20"

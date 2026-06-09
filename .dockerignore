@@ -1,0 +1,15 @@
+.git
+.github
+.vscode
+.idea
+.claude
+node_modules
+apps/**/node_modules
+apps/**/data/*.db*
+.env
+.env.*
+*.log
+*.tmp
+*.temp
+apps/**/dist
+apps/**/build

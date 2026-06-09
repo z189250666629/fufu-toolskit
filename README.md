@@ -1,86 +1,75 @@
 # fufu-toolskit
 
-`fufu-toolskit` 是把 FuFu 工具集合合并后的 monorepo：
+`fufu-toolskit` 是 FuFu 工具集合 monorepo。本阶段后端已 Go 化，前端暂时复用现有静态 HTML/CSS/JS。
 
-| 子项目 | 目录 | 默认端口 | 说明 |
+| 子项目 | 目录 | 对外端口 | 说明 |
 | --- | --- | ---: | --- |
-| y2k-nav | `apps/y2k-nav` | `33148` | 静态导航页 |
-| fufu-combine | `apps/fufu-combine` | `3456` | Go 后端 + 原生单页前端，用于合卡/生成卡 |
-| fufu-act / activity | `apps/fufu-act` | `18820` | Node.js Express 活动抽奖/刮刮卡服务 |
-| network-detect | `apps/network-detect` | `8080` | Node.js 网络检测和 NewAPI 用量看板 |
+| y2k-nav | `apps/y2k-nav` | `33148` | Go 静态服务，导航页 |
+| network-detect | `apps/network-detect` | `38473` | Go 后端，网络检测 + NewAPI 模型状态 + 合卡工具 |
+| fufu-act / activity | `apps/fufu-act` | `18820` | Go 后端，活动抽奖/刮刮卡服务 |
 
-当前合并方式是“同仓库、独立应用”：导航页和三个服务各自保留原入口、依赖和配置，避免强行改成单个进程导致功能互相影响。
+`fufu-combine` 已并入 `network-detect`，合卡入口为 `http://127.0.0.1:8080/combine`（部署对外端口 `38473`）。旧独立 combine 部署链路已移除。
 
 ## 目录结构
 
 ```text
 apps/
-  y2k-nav/          # 导航页
-  fufu-combine/      # 原 fufu-combine
-  fufu-act/          # 原 activity / fufu_act
-  network-detect/    # 原 network-detect / network_detect
+  y2k-nav/            # 导航页 Go 静态服务
+  network-detect/     # 网络检测 + 合卡统一后台
+    frontend/         # 原 network 静态前端
+    combine/          # 复用原 combine 静态前端
+  fufu-act/           # 活动服务 Go 后端 + 原静态前端
+packages/go/fufu/     # 共享 Go 包：config/newapi/tokens/combine/activity/auth
 scripts/
-  start-all.mjs      # 同时启动三个服务
-.env.example         # 环境变量示例，不含真实密钥
-package.json         # 根目录统一脚本
+  start-all.mjs
 ```
 
-## 安装依赖
-
-根目录执行：
-
-```powershell
-npm run deps
-```
-
-也可以按需安装：
-
-```powershell
-npm run deps:combine
-npm run deps:act
-npm run deps:network
-```
+## 安装/检查
 
 要求：
 
-- Node.js 20+
-- Go（`apps/fufu-combine/go.mod` 声明 Go 1.25.0）
-
-## 启动
-
-分别启动：
+- Go 1.25+
+- Node.js 20+（仅用于根目录 npm 脚本和 `start-all.mjs`）
 
 ```powershell
-npm run start:combine
-npm run start:act
-npm run start:network
+npm run deps
+npm test
+go test ./...
 ```
 
-同时启动三个服务：
+## 本地启动
 
 ```powershell
+npm run start:network
+npm run start:act
+npm run start:y2k
 npm run start:all
 ```
 
-访问地址：
+本地默认访问：
 
-- fufu-combine: `http://127.0.0.1:3456/`
-- fufu-act/activity: `http://127.0.0.1:18820/`
 - network-detect: `http://127.0.0.1:8080/`
+- 合卡工具: `http://127.0.0.1:8080/combine`
+- fufu-act: `http://127.0.0.1:18820/`
+- y2k-nav: `http://127.0.0.1:33148/`
 
 ## 配置
 
-### fufu-combine
+### network-detect + 合卡
+
+常用变量：
 
 ```powershell
-Copy-Item apps/fufu-combine/config.example.json apps/fufu-combine/config.json
+$env:NEWAPI_API_SITE_URL = 'https://api.fufuflower.top'
+$env:NEWAPI_API_SITE_TOKEN = '<api-site-admin-token>'
+$env:NEWAPI_TOKEN_SITE_URL = 'https://token.fufuflower.top'
+$env:NEWAPI_TOKEN_SITE_TOKEN = '<token-site-admin-token>'
+$env:PORT = '8080'
 ```
 
-然后编辑 `apps/fufu-combine/config.json`。真实 `config.json` 已被 `.gitignore` 忽略。
+也支持 `NEWAPI_MANAGED_API_SITES` / `NEWAPI_MANAGED_API_CONFIG`。合卡功能复用同一套 NewAPI 配置。
 
 ### fufu-act / activity
-
-复制 `.env.example` 为 `.env`，或在启动前设置环境变量：
 
 ```powershell
 $env:FUFU_API_BASE_URL = 'https://api.fufuflower.top'
@@ -89,52 +78,23 @@ $env:FUFU_API_USER_ID = '1'
 $env:SLOT_PORT = '18820'
 ```
 
-如果需要通过 MCY 商城校验购买时间或执行自动补货，还需要：
+可选 MCY 商城变量：
 
 ```powershell
 $env:MCY_BASE_URL = 'https://shop.example.com'
 $env:MCY_COOKIE = '<session-cookie>'
-# 或者使用账号密码登录：
 $env:MCY_USERNAME = '<username>'
 $env:MCY_PASSWORD = '<password>'
 ```
 
-`apps/fufu-act/scripts/api-act.mjs` 已改为自包含模块，不再依赖原本本机上级目录里的 `skills/fufu-shop`。
-
-### network-detect
-
-参考 `apps/network-detect/README.md`。常用变量：
-
-```powershell
-$env:NEWAPI_API_SITE_TOKEN = '<api-site-admin-token>'
-$env:NEWAPI_TOKEN_SITE_TOKEN = '<token-site-admin-token>'
-$env:PORT = '8080'
-```
-
-## 检查
-
-```powershell
-npm test
-```
-
-该命令会运行：
-
-- `go test ./...`（fufu-combine）
-- `node --check`（fufu-act）
-- `npm --prefix apps/network-detect test`（network-detect）
-
 ## 不应提交的内容
 
-根目录 `.gitignore` 已忽略：
-
-- 真实密钥：`.env*`、`config.json`
-- 依赖目录：`node_modules/`
-- 运行数据库：`apps/**/data/*.db*`
+- `.env*`
+- `config.json`
+- `apps/**/data/*.db*`
+- `node_modules/`
 - 构建产物和日志
-
-`apps/fufu-act/data/.gitkeep` 和 `apps/fufu-combine/data/.gitkeep` 只是为了保留运行数据目录。
 
 ## CI/CD
 
-打标后的部署已拆分为 y2k-nav、fufu-combine、fufu-act/activity、network-detect。详见 docs/CI_CD.md。
-
+生产部署按 tag + directive 触发，详见 `docs/CI_CD.md`。
