@@ -28,15 +28,8 @@ func (a *App) traceResultsForKeys(ctx context.Context, rawKeys []string) ([]Trac
 		if err != nil {
 			return nil, err
 		}
-		newIDs := []int64{}
-		for _, id := range ids {
-			if seenMergeIDs[id] {
-				continue
-			}
-			seenMergeIDs[id] = true
-			mergeIDs = append(mergeIDs, id)
-			newIDs = append(newIDs, id)
-		}
+		var newIDs []int64
+		mergeIDs, newIDs = appendNewTraceMergeIDs(ids, seenMergeIDs, mergeIDs)
 		if len(newIDs) == 0 {
 			break
 		}
@@ -45,15 +38,7 @@ func (a *App) traceResultsForKeys(ctx context.Context, rawKeys []string) ([]Trac
 		if err != nil {
 			return nil, err
 		}
-		next := []string{}
-		for _, hash := range relatedHashes {
-			if seenHashes[hash] {
-				continue
-			}
-			seenHashes[hash] = true
-			next = append(next, hash)
-		}
-		frontier = next
+		frontier = nextUnseenTraceHashes(relatedHashes, seenHashes)
 	}
 
 	results := []TraceResult{}

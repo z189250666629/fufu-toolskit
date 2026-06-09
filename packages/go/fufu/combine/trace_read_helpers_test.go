@@ -31,3 +31,29 @@ func TestTraceDirectionFromMatches(t *testing.T) {
 		}
 	}
 }
+func TestAppendNewTraceMergeIDsSkipsSeenAndPreservesOrder(t *testing.T) {
+	seen := map[int64]bool{2: true}
+	all, fresh := appendNewTraceMergeIDs([]int64{1, 2, 3, 1}, seen, []int64{9})
+
+	if len(all) != 3 || all[0] != 9 || all[1] != 1 || all[2] != 3 {
+		t.Fatalf("all merge IDs = %#v", all)
+	}
+	if len(fresh) != 2 || fresh[0] != 1 || fresh[1] != 3 {
+		t.Fatalf("fresh merge IDs = %#v", fresh)
+	}
+	if !seen[1] || !seen[2] || !seen[3] || len(seen) != 3 {
+		t.Fatalf("seen = %#v", seen)
+	}
+}
+
+func TestNextUnseenTraceHashesSkipsBlankAndSeen(t *testing.T) {
+	seen := map[string]bool{"a": true}
+	next := nextUnseenTraceHashes([]string{"", "a", "b", " b ", "c"}, seen)
+
+	if len(next) != 3 || next[0] != "b" || next[1] != " b " || next[2] != "c" {
+		t.Fatalf("next = %#v", next)
+	}
+	if !seen["a"] || !seen["b"] || !seen[" b "] || !seen["c"] || len(seen) != 4 {
+		t.Fatalf("seen = %#v", seen)
+	}
+}
