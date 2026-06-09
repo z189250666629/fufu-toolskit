@@ -11,20 +11,10 @@ func (a *App) traceResultsForKeys(ctx context.Context, rawKeys []string) ([]Trac
 	if a.db == nil {
 		return []TraceResult{}, nil
 	}
-	keys := normalizeKeys(rawKeys)
-	if len(keys) == 0 {
+	hashes, hashSet := uniqueTraceKeyHashes(rawKeys)
+	if len(hashes) == 0 {
 		return []TraceResult{}, nil
 	}
-	hashSet := map[string]bool{}
-	hashes := []string{}
-	for _, key := range keys {
-		hash := keyHash(key)
-		if !hashSet[hash] {
-			hashSet[hash] = true
-			hashes = append(hashes, hash)
-		}
-	}
-
 	seenHashes := map[string]bool{}
 	for hash := range hashSet {
 		seenHashes[hash] = true
@@ -207,15 +197,6 @@ func (a *App) loadTraceResult(ctx context.Context, mergeID int64, queryHashes ma
 	if err := rows.Err(); err != nil {
 		return TraceResult{}, err
 	}
-	switch {
-	case matchedSource && matchedResult:
-		trace.Direction = "both"
-	case matchedResult:
-		trace.Direction = "result"
-	case matchedSource:
-		trace.Direction = "source"
-	default:
-		trace.Direction = "related"
-	}
+	trace.Direction = traceDirectionFromMatches(matchedSource, matchedResult)
 	return trace, nil
 }
