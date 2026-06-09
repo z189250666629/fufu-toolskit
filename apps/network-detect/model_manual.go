@@ -55,7 +55,7 @@ func testModel(siteName, model, group string) (map[string]any, error) {
 	if site == nil {
 		return nil, &httpError{Status: 404, Message: "站点不存在"}
 	}
-	key := siteName + "\x00" + model
+	key := modelManualKey(siteName, model)
 	now := time.Now().Unix()
 	if v, ok := testCooldowns.Load(key); ok && v.(int64) > now {
 		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: v.(int64)}

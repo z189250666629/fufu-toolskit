@@ -77,10 +77,10 @@ func buildModelStatus() *ModelStatus {
 				gs.Groups = []string{g}
 				cell.GroupStats[g] = gs
 			}
-			if rec, ok := testResults.Load(site.Name + "\x00" + model); ok {
+			if rec, ok := testResults.Load(modelManualKey(site.Name, model)); ok {
 				cell.ManualTest = rec
 			}
-			if until, ok := testCooldowns.Load(site.Name + "\x00" + model); ok {
+			if until, ok := testCooldowns.Load(modelManualKey(site.Name, model)); ok {
 				cell.NextTestAllowedAt = until.(int64)
 			}
 			row.PerSite[site.Name] = cell
