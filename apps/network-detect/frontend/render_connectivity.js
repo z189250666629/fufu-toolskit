@@ -1,12 +1,13 @@
 import {
-  escapeHtml,
-  formatMs,
-  formatRate
+  escapeHtml
 } from './utils.js';
 import {
   renderChip,
   renderMetric
 } from './render_components.js';
+import {
+  buildConnectivityGroupView
+} from './connectivity_result_view.js';
 
 export function connectivityTagClass(status) {
   if (status === 'ok') return 'ok';
@@ -45,41 +46,16 @@ export function renderConnectivityRow(result) {
 
 export function renderConnectivityResults({ results = [], groups = [] }) {
   return groups.map((group) => {
-    const groupResults = results.filter((item) => item.groupId === group.id);
-    const okCount = groupResults.filter((item) => item.reachable).length;
-    const resultMap = Object.fromEntries(groupResults.map((item) => [item.url, item]));
-    const bestInGroup = groupResults
-      .filter((item) => item.reachable && item.averageMs != null)
-      .sort((a, b) => a.averageMs - b.averageMs)[0] || null;
+    const view = buildConnectivityGroupView(group, results);
 
     return `
       <div class="connectivity-group" data-slot="card">
         <div class="group-head" data-slot="card-header">
-          <h3 data-slot="card-title">${escapeHtml(group.name)}</h3>
-          <span data-slot="card-description">${results.length ? `可达 ${okCount}/${group.urls.length}` : `${group.urls.length} 个站点`}</span>
+          <h3 data-slot="card-title">${escapeHtml(view.title)}</h3>
+          <span data-slot="card-description">${escapeHtml(view.description)}</span>
         </div>
         <div class="result-list" data-slot="card-content">
-          ${group.urls.map((url) => {
-            const item = resultMap[url];
-            if (!item) {
-              return renderConnectivityRow({
-                url,
-                status: 'idle',
-                label: '等待',
-                rate: '-',
-                latency: '-',
-                starred: false
-              });
-            }
-            return renderConnectivityRow({
-              url: item.url,
-              status: item.reachable ? 'ok' : 'bad',
-              label: item.reachable ? '可达' : '失败',
-              rate: formatRate(item.successRate),
-              latency: formatMs(item.averageMs),
-              starred: !!bestInGroup && item.url === bestInGroup.url
-            });
-          }).join('')}
+          ${view.rows.map(renderConnectivityRow).join('')}
         </div>
       </div>
     `;
