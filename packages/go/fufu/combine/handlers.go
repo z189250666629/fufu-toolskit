@@ -94,9 +94,9 @@ func (a *App) handleMerge(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]string{"error": "创建任务失败"})
 		return
 	}
-	a.setMergeJob(jobID, MergeJobPatch{Status: strp("queued"), StepText: strp("准备合并..."), Current: intp(0), Total: intp(len(p.Keys)), Role: &role})
+	a.setMergeJob(jobID, buildQueuedMergeJobPatch(len(p.Keys), role, "准备合并..."))
 	go a.runMergeJob(jobID, p, role)
-	writeJSON(w, 200, map[string]any{"ok": true, "jobId": jobID})
+	writeJSON(w, 200, buildMergeAcceptedResponse(jobID))
 }
 
 func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
@@ -114,9 +114,9 @@ func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role := RoleGuest
-	a.setMergeJob(jobID, MergeJobPatch{Status: strp("queued"), StepText: strp("准备普通合卡..."), Current: intp(0), Total: intp(len(p.Keys)), Role: &role})
+	a.setMergeJob(jobID, buildQueuedMergeJobPatch(len(p.Keys), role, "准备普通合卡..."))
 	go a.runMergeJob(jobID, MergePayload{Keys: p.Keys, IntervalUnit: publicTargetUnit}, RoleGuest)
-	writeJSON(w, 200, map[string]any{"ok": true, "jobId": jobID})
+	writeJSON(w, 200, buildMergeAcceptedResponse(jobID))
 }
 
 func (a *App) runMergeJob(jobID string, p MergePayload, role Role) {
@@ -133,7 +133,7 @@ func (a *App) runMergeJob(jobID string, p MergePayload, role Role) {
 
 func (a *App) handleMergeStatus(w http.ResponseWriter, r *http.Request) {
 	a.cleanMergeJobs()
-	jobID := strings.TrimPrefix(r.URL.Path, "/api/merge-status/")
+	jobID := mergeStatusJobIDFromPath(r.URL.Path)
 	job, ok := a.getMergeJob(jobID)
 	if jobID == "" || !ok {
 		writeJSON(w, 404, map[string]string{"error": "任务不存在或已过期"})
