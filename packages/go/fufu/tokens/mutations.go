@@ -58,8 +58,10 @@ func (s *Service) AddQuota(ctx context.Context, key string, dollars int64) error
 		raw[k] = v
 	}
 	raw["remain_quota"] = t.RemainQuota + add
-	if name := getString(raw, "name"); len(name) > 30 {
-		raw["name"] = name[:30]
+	if name := getString(raw, "name"); name != "" {
+		if truncated := truncateTokenName(name, 30); truncated != name {
+			raw["name"] = truncated
+		}
 	}
 	res, _, err := s.UpdateTokenRaw(ctx, raw)
 	if err != nil {
