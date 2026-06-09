@@ -146,3 +146,27 @@ test('styles/models/cards.css is an ordered cards partial manifest', () => {
     assert.ok(lines.length <= 90, `${partial} should stay focused`);
   }
 });
+
+test('styles/models/results.css is an ordered results partial manifest', () => {
+  const expected = [
+    'styles/models/results/groups.css',
+    'styles/models/results/rows.css',
+    'styles/models/results/url-copy.css',
+    'styles/models/results/fields.css',
+    'styles/models/results/tags.css'
+  ];
+  const css = readFileSync(join(here, 'styles/models/results.css'), 'utf8');
+  const imports = [...css.matchAll(/@import url\("\.\/(results\/[^"]+)"\);/g)]
+    .map((match) => `styles/models/${match[1]}`);
+
+  assert.deepEqual(imports, expected);
+  assert.ok(css.split(/\r?\n/).filter(Boolean).length <= expected.length + 1);
+
+  for (const partial of expected) {
+    const path = join(here, partial);
+    assert.equal(existsSync(path), true, `${partial} should exist`);
+    const lines = readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean);
+    assert.ok(lines.length > 0, `${partial} should not be empty`);
+    assert.ok(lines.length <= 80, `${partial} should stay focused`);
+  }
+});

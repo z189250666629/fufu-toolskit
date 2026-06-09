@@ -1,0 +1,16 @@
+.result-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.8fr) repeat(3, minmax(82px, 0.55fr));
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px;
+  background: var(--sage-surface);
+}
+
+.result-row.is-best {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+}
