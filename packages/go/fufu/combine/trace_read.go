@@ -74,7 +74,7 @@ func (a *App) traceMergeIDsForHashes(ctx context.Context, hashes []string, limit
 	if len(hashes) == 0 || limit <= 0 {
 		return nil, nil
 	}
-	placeholders := strings.TrimRight(strings.Repeat("?,", len(hashes)), ",")
+	placeholders := sqlPlaceholders(len(hashes))
 	args := make([]any, 0, len(hashes)+1)
 	for _, hash := range hashes {
 		args = append(args, hash)
@@ -109,7 +109,7 @@ func (a *App) traceKeyHashesForMergeIDs(ctx context.Context, mergeIDs []int64) (
 	if len(mergeIDs) == 0 {
 		return nil, nil
 	}
-	placeholders := strings.TrimRight(strings.Repeat("?,", len(mergeIDs)), ",")
+	placeholders := sqlPlaceholders(len(mergeIDs))
 	args := make([]any, 0, len(mergeIDs))
 	for _, id := range mergeIDs {
 		args = append(args, id)
