@@ -50,6 +50,60 @@ func TestQuotaConversion(t *testing.T) {
 	}
 }
 
+func TestFromRawNormalizesKeyStatusAndNumbers(t *testing.T) {
+	token := FromRaw(map[string]any{
+		"id":             float64(9),
+		"key":            "abc123456789",
+		"name":           "card",
+		"remain_quota":   json.Number("123"),
+		"used_quota":     "45",
+		"interval_unit":  float64(60),
+		"interval_quota": "1000",
+		"group":          "vip",
+		"status":         float64(0),
+		"created_time":   "99",
+	})
+
+	if token.ID != 9 || token.Key != "sk-abc123456789" || token.Name != "card" {
+		t.Fatalf("unexpected token identity: %#v", token)
+	}
+	if token.RemainQuota != 123 || token.UsedQuota != 45 || token.IntervalUnit != 60 || token.IntervalQuota != 1000 || token.CreatedTime != 99 {
+		t.Fatalf("unexpected token counters: %#v", token)
+	}
+	if token.Group != "vip" || token.Status != 1 {
+		t.Fatalf("unexpected token defaults: %#v", token)
+	}
+}
+
+func TestDataListReadsNestedCandidates(t *testing.T) {
+	data := map[string]any{
+		"data": map[string]any{
+			"items": []any{
+				map[string]any{"id": float64(1)},
+				"skip",
+				map[string]any{"id": float64(2)},
+			},
+		},
+	}
+
+	got := DataList(data)
+	if len(got) != 2 || got[0]["id"] != float64(1) || got[1]["id"] != float64(2) {
+		t.Fatalf("DataList = %#v", got)
+	}
+}
+
+func TestMajorityGroupTieBreaksAndFallback(t *testing.T) {
+	if got := MajorityGroup([]Token{{Group: "vip"}, {Group: "default"}, {Group: "vip"}}); got != "vip" {
+		t.Fatalf("majority group = %q", got)
+	}
+	if got := MajorityGroup([]Token{{Group: "zeta"}, {Group: "alpha"}}); got != "alpha" {
+		t.Fatalf("tie majority group = %q", got)
+	}
+	if got := MajorityGroup([]Token{{}}); got != "default" {
+		t.Fatalf("fallback majority group = %q", got)
+	}
+}
+
 func TestSearchCreateUpdateDelete(t *testing.T) {
 	var created map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
