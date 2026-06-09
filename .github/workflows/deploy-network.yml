@@ -120,12 +120,12 @@ jobs:
       SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.DEPLOY_SSH_KEY }}
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS || vars.SSH_KNOWN_HOSTS }}
-      DEPLOY_PATH: ${{ vars.NETWORK_DETECT_DEPLOY_PATH || '/data/docker/network-detact' }}
+      DEPLOY_PATH: ${{ vars.NETWORK_DETECT_DEPLOY_PATH || '/data/docker/network-detect' }}
       COMPOSE_FILE: infra/deploy/network-detect/docker-compose.yml
       COMPOSE_SERVICE_NAME: network-detact
       CONTAINER_NAME: ${{ vars.NETWORK_DETECT_CONTAINER_NAME || 'network-detact' }}
       HOST_BIND: ${{ vars.NETWORK_DETECT_HOST_BIND || vars.HOST_BIND || '0.0.0.0' }}
-      HOST_PORT: ${{ vars.NETWORK_DETECT_HOST_PORT || '8080' }}
+      HOST_PORT: ${{ vars.NETWORK_DETECT_HOST_PORT || '38473' }}
       NEWAPI_MANAGED_API_SITES: ${{ secrets.NEWAPI_MANAGED_API_SITES || vars.NEWAPI_MANAGED_API_SITES }}
       NEWAPI_MANAGED_API_CONFIG: ${{ vars.NEWAPI_MANAGED_API_CONFIG }}
       NEWAPI_API_SITE_TOKEN: ${{ secrets.NEWAPI_API_SITE_TOKEN }}
