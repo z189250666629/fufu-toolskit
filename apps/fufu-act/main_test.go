@@ -67,3 +67,42 @@ func TestWriteHTTPErrorMapsKnownError(t *testing.T) {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestMCYLoginSendsAllSetCookieValuesOnPost(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = ""
+
+	var gotCookie string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login":
+			http.SetCookie(w, &http.Cookie{Name: "mcy_session", Value: "s1"})
+			http.SetCookie(w, &http.Cookie{Name: "mcy_csrf", Value: "c1"})
+		case "/check":
+			gotCookie = r.Header.Get("Cookie")
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "p")
+	t.Setenv("MCY_LOGIN_ENDPOINT", "/login")
+
+	if err := mcyLogin(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mcyPost("/check", map[string]any{"ok": true}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{"mcy_session=s1", "mcy_csrf=c1"} {
+		if !strings.Contains(gotCookie, want) {
+			t.Fatalf("Cookie header %q missing %q; mcyCookie=%q", gotCookie, want, mcyCookie)
+		}
+	}
+}

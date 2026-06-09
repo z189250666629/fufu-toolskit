@@ -48,12 +48,18 @@ func mcyLogin() error {
 		return err
 	}
 	defer resp.Body.Close()
-	if sc := resp.Header.Get("Set-Cookie"); sc != "" {
-		parts := []string{}
-		for _, p := range strings.Split(sc, ",") {
-			parts = append(parts, strings.Split(p, ";")[0])
+	cookies := resp.Cookies()
+	if len(cookies) > 0 {
+		parts := make([]string, 0, len(cookies))
+		for _, cookie := range cookies {
+			if cookie.Name == "" {
+				continue
+			}
+			parts = append(parts, cookie.Name+"="+cookie.Value)
 		}
-		mcyCookie = strings.Join(parts, "; ")
+		if len(parts) > 0 {
+			mcyCookie = strings.Join(parts, "; ")
+		}
 	}
 	return nil
 }
