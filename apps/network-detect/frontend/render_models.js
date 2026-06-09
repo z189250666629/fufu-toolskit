@@ -1,7 +1,6 @@
 import {
   compactNumber,
   escapeHtml,
-  formatCooldown,
   formatNullableRate,
   formatShortTime,
   formatWindow,
@@ -18,10 +17,16 @@ import {
   renderAlert,
   renderChip,
   renderMetric,
-  renderPriceCell,
   renderStateCard,
-  renderStatusPill
 } from './render_components.js';
+import {
+  renderModelTableRows
+} from './render_model_table.js';
+
+export {
+  manualTestRowClass,
+  renderModelTestAction
+} from './render_model_table.js';
 
 function renderSiteStatusCard(site, group, summary, windowLabel) {
   const meta = modelStatusMeta(summary.status, true);
@@ -43,32 +48,6 @@ function renderSiteStatusCard(site, group, summary, windowLabel) {
       ${site.logError || site.channelsError ? `<p class="site-error" data-slot="card-footer">${escapeHtml(site.logError || site.channelsError)}</p>` : ''}
     </article>
   `;
-}
-
-export function renderModelTestAction(cell, stateLike = {}) {
-  const key = `${cell.siteName}\u0000${cell.model}`;
-  const testing = stateLike.testingCells?.has(key);
-  const cooldown = formatCooldown(cell.nextTestAllowedAt);
-
-  return `
-    <div class="model-action">
-      <button
-        class="button small model-test-button"
-        type="button"
-        data-model-test="1"
-        data-site="${escapeHtml(cell.siteName)}"
-        data-model="${escapeHtml(cell.model)}"
-        data-group="${escapeHtml(cell.groups?.[0] || '')}"
-        ${testing || Boolean(cooldown) ? 'disabled' : ''}
-      >${testing ? '测试中' : (cooldown || '测试')}</button>
-    </div>
-  `;
-}
-
-export function manualTestRowClass(cell) {
-  if (cell.manualTestTone === 'ok') return 'is-manual-ok';
-  if (cell.manualTestTone === 'bad') return 'is-manual-bad';
-  return '';
 }
 
 export function renderTokenGroupSelect(groups, selectedGroup, stateLike = {}) {
@@ -234,16 +213,7 @@ export function renderModelAvailability({ state, panelMotionClass = '', scopeMot
                 </tr>
               </thead>
               <tbody>
-                ${models.map(({ row, cell }) => `
-                  <tr class="${manualTestRowClass(cell)}">
-                    <td class="sticky-col model-name" data-label="模型">${escapeHtml(row.model)}</td>
-                    <td data-label="价格">${renderPriceCell(cell.pricing)}</td>
-                    <td data-label="状态">${renderStatusPill(cell.status, true)}</td>
-                    <td data-label="成功率">${escapeHtml(formatNullableRate(cell.successRate))}</td>
-                    <td data-label="最近">${escapeHtml(formatShortTime(cell.lastSuccessAt || cell.lastFailureAt || cell.lastSeenAt))}</td>
-                    <td data-label="操作">${renderModelTestAction(cell, state)}</td>
-                  </tr>
-                `).join('')}
+                ${renderModelTableRows(models, state)}
               </tbody>
             </table>
           </div>
