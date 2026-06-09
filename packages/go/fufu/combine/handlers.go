@@ -62,13 +62,7 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return
 	}
-	elig := evaluatePublicMergeEligibility(found)
-	writeJSON(w, 200, map[string]any{
-		"found": found, "missing": missing, "quotaUnit": a.quotaUnit, "searched": len(keys),
-		"concurrency": min(searchConcurrency, len(keys)), "elapsedMs": time.Since(started).Milliseconds(),
-		"publicMergeEligibility": map[string]any{"eligible": elig.Eligible, "reasons": elig.Reasons, "targetUnit": publicTargetUnit},
-		"traceResults":           traceResults,
-	})
+	writeJSON(w, 200, buildSearchKeysResponse(keys, found, missing, a.quotaUnit, time.Since(started).Milliseconds(), traceResults))
 }
 
 func (a *App) handleMerge(w http.ResponseWriter, r *http.Request) {

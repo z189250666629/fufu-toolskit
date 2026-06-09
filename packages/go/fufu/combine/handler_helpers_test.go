@@ -54,3 +54,28 @@ func TestDeleteTokenIDFromPath(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildSearchKeysResponseIncludesEligibilityAndTrace(t *testing.T) {
+	keys := []string{"sk-a", "sk-b"}
+	found := []ResolvedToken{
+		{RemainQuota: 1, UsedQuota: 0, IntervalUnit: publicSourceUnit, Status: 1},
+		{RemainQuota: 1, UsedQuota: 0, IntervalUnit: publicSourceUnit, Status: 1},
+	}
+	missing := []string{"sk-missing"}
+	traces := []TraceResult{{MergeID: 7}}
+
+	resp := buildSearchKeysResponse(keys, found, missing, 500000, 123, traces)
+	if resp["searched"] != 2 || resp["quotaUnit"] != int64(500000) || resp["elapsedMs"] != int64(123) {
+		t.Fatalf("basic response = %#v", resp)
+	}
+	if resp["concurrency"] != 2 {
+		t.Fatalf("concurrency = %#v", resp["concurrency"])
+	}
+	elig, ok := resp["publicMergeEligibility"].(map[string]any)
+	if !ok || elig["eligible"] != true || elig["targetUnit"] != publicTargetUnit {
+		t.Fatalf("eligibility = %#v", resp["publicMergeEligibility"])
+	}
+	if got := resp["traceResults"].([]TraceResult); len(got) != 1 || got[0].MergeID != 7 {
+		t.Fatalf("trace results = %#v", resp["traceResults"])
+	}
+}

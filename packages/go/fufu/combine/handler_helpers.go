@@ -23,6 +23,16 @@ func buildMergeAcceptedResponse(jobID string) map[string]any {
 	return map[string]any{"ok": true, "jobId": jobID}
 }
 
+func buildSearchKeysResponse(keys []string, found []ResolvedToken, missing []string, quotaUnit int64, elapsedMs int64, traceResults []TraceResult) map[string]any {
+	elig := evaluatePublicMergeEligibility(found)
+	return map[string]any{
+		"found": found, "missing": missing, "quotaUnit": quotaUnit, "searched": len(keys),
+		"concurrency": min(searchConcurrency, len(keys)), "elapsedMs": elapsedMs,
+		"publicMergeEligibility": map[string]any{"eligible": elig.Eligible, "reasons": elig.Reasons, "targetUnit": publicTargetUnit},
+		"traceResults":           traceResults,
+	}
+}
+
 func canDeleteTokenRole(role Role) bool {
 	return role == RoleAdmin || role == RoleUser
 }
