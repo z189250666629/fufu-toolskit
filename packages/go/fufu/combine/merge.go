@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -103,7 +101,6 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 		return MergeResult{}, errors.New("这些卡正在合并中，请稍后再试")
 	}
 	defer a.releaseMergeLock(ids)
-	verifiedQuota := int64(0)
 	verified := []ResolvedToken{}
 	update(MergeJobPatch{Status: strp("verifying"), StepText: strp("校验额度中..."), Total: intp(len(ids)), Current: intp(0)})
 	a.setTraceStatus(ctx, mergeID, "verifying")
@@ -123,7 +120,6 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 			return MergeResult{}, fmt.Errorf("%s 已被禁用，无法参与合卡", displayKey(t.Key))
 		}
 		verified = append(verified, t)
-		verifiedQuota += t.RemainQuota
 		if e := a.upsertTraceToken(ctx, mergeID, "source", t); e != nil {
 			return MergeResult{}, e
 		}
@@ -134,24 +130,16 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 			return MergeResult{}, e
 		}
 	}
-	finalQuota := verifiedQuota
-	if p.Quota != nil {
-		finalQuota = *p.Quota
+	target, err := buildMergeTargetPlan(verified, p.Quota, p.Name, a.quotaUnit)
+	if err != nil {
+		return MergeResult{}, err
 	}
-	if finalQuota <= 0 {
-		return MergeResult{}, errors.New("合并额度无效")
-	}
-	finalName := strings.TrimSpace(p.Name)
-	if finalName == "" {
-		finalName = strconv.FormatInt(int64(math.Round(float64(finalQuota)/float64(a.quotaUnit))), 10)
-	}
-	finalGroup := majorityGroup(verified)
 	uniqueName := fmt.Sprintf("merge-%d-%s", time.Now().UnixMilli(), randomBase36(6))
-	a.setTraceFinal(ctx, mergeID, finalQuota, finalName, finalGroup)
+	a.setTraceFinal(ctx, mergeID, target.Quota, target.Name, target.Group)
 
 	update(MergeJobPatch{Status: strp("creating"), StepText: strp("创建新卡中..."), Total: intp(1), Current: intp(0)})
 	a.setTraceStatus(ctx, mergeID, "creating")
-	body := map[string]any{"name": uniqueName, "remain_quota": finalQuota, "unlimited_quota": false, "expired_time": -1, "group": finalGroup, "interval_quota": finalQuota, "interval_time": -1, "trigger_last_time": 0, "interval_unit": p.IntervalUnit}
+	body := map[string]any{"name": uniqueName, "remain_quota": target.Quota, "unlimited_quota": false, "expired_time": -1, "group": target.Group, "interval_quota": target.Quota, "interval_time": -1, "trigger_last_time": 0, "interval_unit": p.IntervalUnit}
 	res, _, e := a.createToken(ctx, body)
 	if e != nil {
 		return MergeResult{}, e
@@ -173,7 +161,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 	newCard := cloneMap(token.Raw)
 	createdID = toInt(newCard["id"])
 	a.setTraceCreatedCard(ctx, mergeID, createdID)
-	newCard["name"] = finalName
+	newCard["name"] = target.Name
 	res, _, e = a.updateTokenRaw(ctx, newCard)
 	if e != nil || !res.OK() {
 		rb := attemptRollback("重命名失败")
@@ -224,7 +212,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 		return MergeResult{}, fmt.Errorf("旧卡删除不完整：%s。已保留新卡以避免额度丢失，请立即人工清理剩余旧卡。", failed)
 	}
 
-	result = MergeResult{Success: true, NewCard: NewCardResult{Key: ensureFullKey(getString(newCard, "key")), Name: getString(newCard, "name"), RemainQuota: int64OrDefault(toInt64(newCard["remain_quota"]), finalQuota), IntervalUnit: intOrDefault(toInt(newCard["interval_unit"]), p.IntervalUnit), Group: stringOrDefault(getString(newCard, "group"), finalGroup)}, DeleteResults: deleteResults}
+	result = MergeResult{Success: true, NewCard: NewCardResult{Key: ensureFullKey(getString(newCard, "key")), Name: getString(newCard, "name"), RemainQuota: int64OrDefault(toInt64(newCard["remain_quota"]), target.Quota), IntervalUnit: intOrDefault(toInt(newCard["interval_unit"]), p.IntervalUnit), Group: stringOrDefault(getString(newCard, "group"), target.Group)}, DeleteResults: deleteResults}
 	mergeCompleted = true
 	update(MergeJobPatch{Status: strp("done"), StepText: strp("合并完成"), Result: result, HasResult: true, Total: intp(len(verified)), Current: intp(len(verified))})
 	return result, nil
