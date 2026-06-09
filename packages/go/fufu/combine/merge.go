@@ -133,8 +133,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 
 	update(MergeJobPatch{Status: strp("creating"), StepText: strp("创建新卡中..."), Total: intp(1), Current: intp(0)})
 	a.setTraceStatus(ctx, mergeID, "creating")
-	body := map[string]any{"name": uniqueName, "remain_quota": target.Quota, "unlimited_quota": false, "expired_time": -1, "group": target.Group, "interval_quota": target.Quota, "interval_time": -1, "trigger_last_time": 0, "interval_unit": p.IntervalUnit}
-	res, _, e := a.createToken(ctx, body)
+	res, _, e := a.createToken(ctx, buildNewMergeTokenBody(uniqueName, target, p.IntervalUnit))
 	if e != nil {
 		return MergeResult{}, e
 	}
@@ -203,7 +202,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 		return MergeResult{}, formatMergeDeletionFailure(deleteFailures, oldDeleted, rb)
 	}
 
-	result = MergeResult{Success: true, NewCard: NewCardResult{Key: ensureFullKey(getString(newCard, "key")), Name: getString(newCard, "name"), RemainQuota: int64OrDefault(toInt64(newCard["remain_quota"]), target.Quota), IntervalUnit: intOrDefault(toInt(newCard["interval_unit"]), p.IntervalUnit), Group: stringOrDefault(getString(newCard, "group"), target.Group)}, DeleteResults: deleteResults}
+	result = buildMergeResult(newCard, target, p.IntervalUnit, deleteResults)
 	mergeCompleted = true
 	update(MergeJobPatch{Status: strp("done"), StepText: strp("合并完成"), Result: result, HasResult: true, Total: intp(len(verified)), Current: intp(len(verified))})
 	return result, nil
