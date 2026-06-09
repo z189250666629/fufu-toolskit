@@ -77,3 +77,25 @@ test('styles/layout.css is an ordered layout partial manifest', () => {
     assert.ok(lines.length <= 160, `${partial} should stay focused`);
   }
 });
+
+test('styles/responsive.css is an ordered responsive partial manifest', () => {
+  const expected = [
+    'styles/responsive/wide.css',
+    'styles/responsive/mobile.css',
+    'styles/responsive/motion.css'
+  ];
+  const css = readFileSync(join(here, 'styles/responsive.css'), 'utf8');
+  const imports = [...css.matchAll(/@import url\("\.\/(responsive\/[^"]+)"\);/g)]
+    .map((match) => `styles/${match[1]}`);
+
+  assert.deepEqual(imports, expected);
+  assert.ok(css.split(/\r?\n/).filter(Boolean).length <= expected.length + 1);
+
+  for (const partial of expected) {
+    const path = join(here, partial);
+    assert.equal(existsSync(path), true, `${partial} should exist`);
+    const lines = readFileSync(path, 'utf8').split(/\r?\n/).filter(Boolean);
+    assert.ok(lines.length > 0, `${partial} should not be empty`);
+    assert.ok(lines.length <= 160, `${partial} should stay focused`);
+  }
+});
