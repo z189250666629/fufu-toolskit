@@ -70,6 +70,20 @@ func TestMajorityGroupAndUniqueIDs(t *testing.T) {
 	}
 }
 
+func TestTraceSchemaContainsMergeAndGeneratedTokenTables(t *testing.T) {
+	for _, fragment := range []string{
+		"CREATE TABLE IF NOT EXISTS merge_records",
+		"CREATE TABLE IF NOT EXISTS merge_tokens",
+		"CREATE INDEX IF NOT EXISTS idx_merge_tokens_key_hash",
+		"CREATE TABLE IF NOT EXISTS generated_tokens",
+		"CREATE INDEX IF NOT EXISTS idx_generated_tokens_key_hash",
+	} {
+		if !strings.Contains(traceSchemaSQL, fragment) {
+			t.Fatalf("trace schema missing %q", fragment)
+		}
+	}
+}
+
 func TestPublicAPIRoutes(t *testing.T) {
 	for _, path := range []string{"/api/auth", "/api/search-keys", "/api/public-merge", "/api/merge-status/job-1"} {
 		if !isPublicAPI(path) {
