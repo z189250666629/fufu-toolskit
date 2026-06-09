@@ -86,33 +86,39 @@ func NormalizeManagedSites(data any, allowedNames map[string]bool) ([]newapi.Sit
 }
 
 func DeploymentSitesFromEnv() []newapi.Site {
-	defs := []struct{ Prefix, Name, URL, Ratio string }{
-		{"NEWAPI_API_SITE", "次数fufu", Env("NEWAPI_API_SITE_URL"), "0.1"},
-		{"NEWAPI_TOKEN_SITE", "token-fufu", Env("NEWAPI_TOKEN_SITE_URL"), "1"},
+	defs := []managedSiteEnvDef{
+		{
+			Prefix:                   "NEWAPI_API_SITE",
+			DefaultName:              "次数fufu",
+			DefaultURL:               Env("NEWAPI_API_SITE_URL"),
+			DefaultRatio:             "0.1",
+			DefaultChannelListPath:   "/api/channel/search?keyword=&p=1&page_size=500",
+			AllowAccessTokenFallback: true,
+		},
+		{
+			Prefix:                   "NEWAPI_TOKEN_SITE",
+			DefaultName:              "token-fufu",
+			DefaultURL:               Env("NEWAPI_TOKEN_SITE_URL"),
+			DefaultRatio:             "1",
+			DefaultChannelListPath:   "/api/channel/search?keyword=&p=1&page_size=500",
+			AllowAccessTokenFallback: true,
+		},
 	}
 	var sites []newapi.Site
 	for _, def := range defs {
-		url := NormalizeBaseURL(Env(def.Prefix + "_URL"))
-		if url == "" {
-			url = NormalizeBaseURL(def.URL)
+		if site, ok := managedSiteFromEnv(def); ok {
+			sites = append(sites, site)
 		}
-		token := Env(def.Prefix + "_TOKEN")
-		if token == "" {
-			token = Env(def.Prefix + "_ACCESS_TOKEN")
-		}
-		if url == "" || token == "" {
-			continue
-		}
-		sites = append(sites, newapi.Site{Name: stringOrDefault(Env(def.Prefix+"_NAME"), def.Name), URL: url, Token: token, UserID: stringOrDefault(Env(def.Prefix+"_USER_ID"), "1"), Kind: stringOrDefault(Env(def.Prefix+"_KIND"), "api"), QuotaUnit: int64Value(Env(def.Prefix+"_QUOTA_UNIT"), newapi.DefaultQuotaUnit), Currency: stringOrDefault(Env(def.Prefix+"_CURRENCY"), "$"), RechargeRatio: floatValue(stringOrDefault(Env(def.Prefix+"_RECHARGE_RATIO"), def.Ratio), 1), ChannelListEndpoint: stringOrDefault(Env(def.Prefix+"_CHANNEL_LIST_ENDPOINT"), "/api/channel/search?keyword=&p=1&page_size=500"), SkipUserHeader: boolValue(Env(def.Prefix + "_SKIP_USER_HEADER")), Note: Env(def.Prefix + "_NOTE")})
 	}
 	for i := 1; i <= 10; i++ {
 		prefix := fmt.Sprintf("NEWAPI_MANAGED_SITE_%d", i)
-		url := NormalizeBaseURL(Env(prefix + "_URL"))
-		token := Env(prefix + "_TOKEN")
-		if url == "" || token == "" {
-			continue
+		if site, ok := managedSiteFromEnv(managedSiteEnvDef{
+			Prefix:       prefix,
+			DefaultName:  fmt.Sprintf("managed-site-%d", i),
+			DefaultRatio: "",
+		}); ok {
+			sites = append(sites, site)
 		}
-		sites = append(sites, newapi.Site{Name: stringOrDefault(Env(prefix+"_NAME"), fmt.Sprintf("managed-site-%d", i)), URL: url, Token: token, UserID: stringOrDefault(Env(prefix+"_USER_ID"), "1"), Kind: stringOrDefault(Env(prefix+"_KIND"), "api"), QuotaUnit: int64Value(Env(prefix+"_QUOTA_UNIT"), newapi.DefaultQuotaUnit), Currency: stringOrDefault(Env(prefix+"_CURRENCY"), "$"), RechargeRatio: floatValue(Env(prefix+"_RECHARGE_RATIO"), 1), ChannelListEndpoint: Env(prefix + "_CHANNEL_LIST_ENDPOINT"), SkipUserHeader: boolValue(Env(prefix + "_SKIP_USER_HEADER")), Note: Env(prefix + "_NOTE")})
 	}
 	return sites
 }
