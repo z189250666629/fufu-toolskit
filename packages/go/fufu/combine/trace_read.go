@@ -3,7 +3,6 @@ package combine
 import (
 	"context"
 	"database/sql"
-	"sort"
 	"strings"
 )
 
@@ -49,9 +48,7 @@ func (a *App) traceResultsForKeys(ctx context.Context, rawKeys []string) ([]Trac
 		}
 		results = append(results, trace)
 	}
-	sort.SliceStable(results, func(i, j int) bool {
-		return results[i].CreatedAt < results[j].CreatedAt
-	})
+	sortTraceResultsByCreatedAt(results)
 	return results, nil
 }
 
