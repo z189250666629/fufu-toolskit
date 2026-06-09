@@ -8,6 +8,29 @@ export function updateModelCell(modelStatus, siteName, model, cell) {
   row.perSite[siteName] = cell;
 }
 
+export function buildManualTestCellPatch(testRecord) {
+  if (!testRecord) return null;
+  return {
+    manualTest: testRecord,
+    nextTestAllowedAt: testRecord.nextAllowedAt || 0
+  };
+}
+
+export function applyModelTestResultToState(modelStatus, siteName, model, result) {
+  const targetSite = result?.siteName || siteName;
+  const targetModel = result?.model || model;
+  if (result?.cell) {
+    updateModelCell(modelStatus, targetSite, targetModel, result.cell);
+    return true;
+  }
+  const row = modelStatus?.models?.find((item) => item.model === targetModel);
+  const cell = row?.perSite?.[targetSite];
+  const patch = buildManualTestCellPatch(result?.test);
+  if (!cell || !patch) return false;
+  Object.assign(cell, patch);
+  return true;
+}
+
 export async function runModelCellTest({
   state,
   siteName,
@@ -26,7 +49,7 @@ export async function runModelCellTest({
 
   try {
     const result = await postJsonImpl('/api/newapi/model-status/test', { siteName, model, group });
-    updateModelCell(state.modelStatus, siteName, model, result.cell);
+    applyModelTestResultToState(state.modelStatus, siteName, model, result);
     state.modelTestMessage = `${siteName} / ${model} 测试完成：${result.test?.message || '测试完成'}`;
   } catch (error) {
     const row = state.modelStatus?.models?.find((item) => item.model === model);

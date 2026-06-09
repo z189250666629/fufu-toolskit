@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  applyModelTestResultToState,
   modelCellKey,
   runModelCellTest,
   updateModelCell
@@ -25,6 +26,23 @@ test('updateModelCell replaces the matching per-site cell', () => {
 
   assert.equal(modelStatus.models[0].perSite.site, nextCell);
   assert.deepEqual(modelStatus.models[1].perSite.site, { status: 'ok' });
+});
+
+test('applyModelTestResultToState records returned test when API omits cell', () => {
+  const modelStatus = {
+    models: [{ model: 'model-a', perSite: { site: { status: 'unknown', requestCount: 0 } } }]
+  };
+  const testRecord = { ok: true, status: 'operational', testedAt: 123, message: 'ok', nextAllowedAt: 456 };
+
+  assert.equal(applyModelTestResultToState(modelStatus, 'site', 'model-a', {
+    siteName: 'site',
+    model: 'model-a',
+    test: testRecord
+  }), true);
+
+  assert.equal(modelStatus.models[0].perSite.site.manualTest, testRecord);
+  assert.equal(modelStatus.models[0].perSite.site.nextTestAllowedAt, 456);
+  assert.equal(modelStatus.models[0].perSite.site.status, 'unknown');
 });
 
 test('runModelCellTest toggles testing state and writes success message', async () => {
