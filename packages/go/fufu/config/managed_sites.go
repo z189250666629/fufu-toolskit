@@ -5,95 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"fufu/newapi"
 )
-
-func Env(name string) string { return strings.TrimSpace(os.Getenv(name)) }
-
-func NormalizeBaseURL(value string) string {
-	value = strings.TrimRight(strings.TrimSpace(value), "/")
-	if value == "" {
-		return ""
-	}
-	if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
-		return ""
-	}
-	return value
-}
-
-func boolValue(value any) bool {
-	switch v := value.(type) {
-	case bool:
-		return v
-	case string:
-		v = strings.TrimSpace(strings.ToLower(v))
-		return v == "1" || v == "true" || v == "yes" || v == "on"
-	default:
-		return false
-	}
-}
-
-func int64Value(value any, fallback int64) int64 {
-	switch v := value.(type) {
-	case json.Number:
-		if n, err := v.Int64(); err == nil && n > 0 {
-			return n
-		}
-	case float64:
-		if v > 0 {
-			return int64(v)
-		}
-	case int64:
-		if v > 0 {
-			return v
-		}
-	case int:
-		if v > 0 {
-			return int64(v)
-		}
-	case string:
-		if n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64); err == nil && n > 0 {
-			return n
-		}
-	}
-	return fallback
-}
-
-func floatValue(value any, fallback float64) float64 {
-	switch v := value.(type) {
-	case json.Number:
-		if n, err := v.Float64(); err == nil && n > 0 {
-			return n
-		}
-	case float64:
-		if v > 0 {
-			return v
-		}
-	case int:
-		if v > 0 {
-			return float64(v)
-		}
-	case string:
-		if n, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil && n > 0 {
-			return n
-		}
-	}
-	return fallback
-}
-
-func stringValue(item map[string]any, names ...string) string {
-	for _, name := range names {
-		if v, ok := item[name]; ok {
-			if s := strings.TrimSpace(fmt.Sprint(v)); s != "" && s != "<nil>" {
-				return s
-			}
-		}
-	}
-	return ""
-}
 
 func tokenValue(item map[string]any) string {
 	if tokenEnv := stringValue(item, "tokenEnv", "token_env", "accessTokenEnv", "access_token_env"); tokenEnv != "" {
@@ -170,21 +85,6 @@ func NormalizeManagedSites(data any, allowedNames map[string]bool) ([]newapi.Sit
 	return sites, ""
 }
 
-func first(item map[string]any, keys ...string) any {
-	for _, key := range keys {
-		if v, ok := item[key]; ok {
-			return v
-		}
-	}
-	return nil
-}
-func stringOrDefault(v, fallback string) string {
-	if strings.TrimSpace(v) != "" {
-		return strings.TrimSpace(v)
-	}
-	return fallback
-}
-
 func DeploymentSitesFromEnv() []newapi.Site {
 	defs := []struct{ Prefix, Name, URL, Ratio string }{
 		{"NEWAPI_API_SITE", "次数fufu", Env("NEWAPI_API_SITE_URL"), "0.1"},
@@ -259,47 +159,4 @@ func LoadManagedSites(rootDir string) ([]newapi.Site, string) {
 		lastErr = msg
 	}
 	return nil, lastErr
-}
-
-func LoadPrimarySite(rootDir string) (newapi.Site, error) {
-	url := NormalizeBaseURL(Env("FUFU_COMBINE_API_URL"))
-	if url == "" {
-		url = NormalizeBaseURL(Env("FUFU_API_BASE_URL"))
-		if url == "" {
-			url = NormalizeBaseURL(Env("NEWAPI_API_SITE_URL"))
-		}
-	}
-	token := Env("FUFU_COMBINE_API_TOKEN")
-	if token == "" {
-		token = Env("FUFU_API_TOKEN")
-		if token == "" {
-			token = Env("NEWAPI_API_SITE_TOKEN")
-		}
-	}
-	if url != "" && token != "" {
-		return newapi.Site{Name: stringOrDefault(Env("FUFU_COMBINE_NAME"), "次数fufu"), URL: url, Token: token, UserID: stringOrDefault(Env("FUFU_COMBINE_USER_ID"), stringOrDefault(Env("FUFU_API_USER_ID"), "1")), QuotaUnit: int64Value(stringOrDefault(Env("FUFU_COMBINE_QUOTA_UNIT"), Env("FUFU_QUOTA_UNIT")), newapi.DefaultQuotaUnit), Currency: "$", RechargeRatio: 1}, nil
-	}
-	if sites, _ := LoadManagedSites(rootDir); len(sites) > 0 {
-		return sites[0], nil
-	}
-	for _, path := range []string{filepath.Join(rootDir, "config.json")} {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		var cfg struct {
-			Name, URL, Token, UserID string
-			QuotaUnit                int64
-		}
-		if json.Unmarshal(raw, &cfg) == nil && NormalizeBaseURL(cfg.URL) != "" && strings.TrimSpace(cfg.Token) != "" {
-			if cfg.UserID == "" {
-				cfg.UserID = "1"
-			}
-			if cfg.QuotaUnit <= 0 {
-				cfg.QuotaUnit = newapi.DefaultQuotaUnit
-			}
-			return newapi.Site{Name: stringOrDefault(cfg.Name, "次数fufu"), URL: NormalizeBaseURL(cfg.URL), Token: strings.TrimSpace(cfg.Token), UserID: cfg.UserID, QuotaUnit: cfg.QuotaUnit, Currency: "$", RechargeRatio: 1}, nil
-		}
-	}
-	return newapi.Site{}, fmt.Errorf("missing NewAPI primary site config")
 }
