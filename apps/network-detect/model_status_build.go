@@ -37,17 +37,8 @@ func buildModelStatus() *ModelStatus {
 		}
 		channels, chErr := loadSiteChannels(site)
 		pricing, priceErr := loadPricing(site)
-		groupSet := map[string]bool{}
-		modelChannelStats := map[string][]Channel{}
-		for _, ch := range channels {
-			for _, g := range ch.Groups {
-				groupSet[g] = true
-			}
-			for _, m := range ch.Models {
-				modelChannelStats[m] = append(modelChannelStats[m], ch)
-			}
-		}
-		groups := keys(groupSet)
+		channelIndex := indexChannelsForModelStatus(channels)
+		groups := channelIndex.groups
 		ss := SiteStatus{Site: site.Public(), Groups: groups, LogError: logErr, ChannelsError: chErr, PricingError: priceErr}
 		ss.SuccessCount = len(successLogs)
 		ss.FailureCount = len(errorLogs)
@@ -63,7 +54,7 @@ func buildModelStatus() *ModelStatus {
 		errorByModel := groupLogs(errorLogs)
 		successByMG := groupLogsByModelGroup(successLogs)
 		errorByMG := groupLogsByModelGroup(errorLogs)
-		for model, chans := range modelChannelStats {
+		for model, chans := range channelIndex.channelsByModel {
 			row := modelRows[model]
 			if row == nil {
 				row = &ModelRow{Model: model, PerSite: map[string]*ModelCell{}}
