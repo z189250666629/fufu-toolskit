@@ -162,16 +162,12 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	totalQuota := int64(math.Round(p.Quota * float64(a.quotaUnit)))
-	group := strings.TrimSpace(p.Group)
-	if group == "" {
-		group = "mix"
-	}
+	group := normalizeGenerateGroup(p.Group)
 	keys := []string{}
 	errs := []string{}
 	for i := 0; i < p.Count; i++ {
 		uniqueName := fmt.Sprintf("gen-%d-%s", time.Now().UnixMilli(), randomBase36(6))
-		body := map[string]any{"name": uniqueName, "remain_quota": totalQuota, "unlimited_quota": false, "expired_time": -1, "group": group, "interval_quota": totalQuota, "interval_time": -1, "trigger_last_time": 0, "interval_unit": p.IntervalUnit}
-		res, _, err := a.createToken(r.Context(), body)
+		res, _, err := a.createToken(r.Context(), buildGeneratedTokenCreateBody(uniqueName, totalQuota, group, p.IntervalUnit))
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("#%d: %s", i+1, err))
 			continue
