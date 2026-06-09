@@ -1,0 +1,9 @@
+go 1.25.0
+
+use (
+	.
+	./apps/fufu-act
+	./apps/network-detect
+	./apps/y2k-nav
+	./packages/go/fufu
+)
