@@ -1,6 +1,9 @@
 package combine
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 func mergeStatusJobIDFromPath(path string) string {
 	return strings.TrimPrefix(path, "/api/merge-status/")
@@ -18,4 +21,16 @@ func buildQueuedMergeJobPatch(total int, role Role, stepText string) MergeJobPat
 
 func buildMergeAcceptedResponse(jobID string) map[string]any {
 	return map[string]any{"ok": true, "jobId": jobID}
+}
+
+func canDeleteTokenRole(role Role) bool {
+	return role == RoleAdmin || role == RoleUser
+}
+
+func deleteTokenIDFromPath(path string) (int, bool) {
+	id, err := strconv.Atoi(strings.TrimPrefix(path, "/api/token/"))
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
 }

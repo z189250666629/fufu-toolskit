@@ -7,7 +7,6 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -203,12 +202,12 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	role := roleFromContext(r.Context())
-	if role != RoleAdmin && role != RoleUser {
+	if !canDeleteTokenRole(role) {
 		writeJSON(w, 403, map[string]string{"error": "无权删除"})
 		return
 	}
-	id, err := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/api/token/"))
-	if err != nil || id <= 0 {
+	id, ok := deleteTokenIDFromPath(r.URL.Path)
+	if !ok {
 		writeJSON(w, 400, map[string]string{"error": "无效的 token ID"})
 		return
 	}
