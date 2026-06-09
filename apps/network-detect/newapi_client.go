@@ -62,8 +62,7 @@ func items(data map[string]any) []map[string]any {
 func toInt64(v any) int64 {
 	switch x := v.(type) {
 	case json.Number:
-		n, _ := x.Int64()
-		return n
+		return jsonNumberToInt64(x)
 	case float64:
 		return int64(x)
 	case int:
@@ -77,6 +76,15 @@ func toInt64(v any) int64 {
 		n, _ := strconv.ParseInt(fmt.Sprint(x), 10, 64)
 		return n
 	}
+}
+
+func jsonNumberToInt64(n json.Number) int64 {
+	value, err := n.Int64()
+	if err == nil {
+		return value
+	}
+	f, _ := n.Float64()
+	return int64(f)
 }
 
 func toFloat(v any) float64 {
