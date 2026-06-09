@@ -207,15 +207,7 @@ func (a *App) resolveTokensForSearch(ctx context.Context, raw []string) ([]strin
 	if err != nil {
 		return keys, nil, nil, err
 	}
-	found := []ResolvedToken{}
-	missing := []string{}
-	for _, r := range results {
-		if r.Found != nil {
-			found = append(found, *r.Found)
-		} else {
-			missing = append(missing, r.Key)
-		}
-	}
+	found, missing := splitSearchTokenResults(results)
 	return keys, found, missing, nil
 }
 
@@ -228,21 +220,9 @@ func (a *App) resolveTokensStrict(ctx context.Context, raw []string) ([]Resolved
 	if err != nil {
 		return nil, err
 	}
-	missing := []string{}
-	found := make([]ResolvedToken, 0, len(keys))
-	for _, r := range results {
-		if r.Found == nil {
-			missing = append(missing, r.Key)
-		} else {
-			found = append(found, *r.Found)
-		}
-	}
-	if len(missing) > 0 {
-		shown := []string{}
-		for _, k := range missing {
-			shown = append(shown, displayKey(k))
-		}
-		return nil, fmt.Errorf("未找到令牌: %s", strings.Join(shown, ", "))
+	found, missing := splitSearchTokenResults(results)
+	if err := missingTokenError(missing); err != nil {
+		return nil, err
 	}
 	return found, nil
 }
