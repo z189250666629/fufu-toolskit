@@ -110,14 +110,8 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 			return MergeResult{}, e
 		}
 		req := findResolvedByID(sourceTokens, id)
-		if req == nil {
-			return MergeResult{}, fmt.Errorf("Token %d 校验失败", id)
-		}
-		if strings.TrimPrefix(t.Key, "sk-") != strings.TrimPrefix(req.Key, "sk-") {
-			return MergeResult{}, fmt.Errorf("%s 校验失败，请重试", displayKey(req.Key))
-		}
-		if t.Status != 1 {
-			return MergeResult{}, fmt.Errorf("%s 已被禁用，无法参与合卡", displayKey(t.Key))
+		if e := validateVerifiedSourceToken(req, t); e != nil {
+			return MergeResult{}, e
 		}
 		verified = append(verified, t)
 		if e := a.upsertTraceToken(ctx, mergeID, "source", t); e != nil {
