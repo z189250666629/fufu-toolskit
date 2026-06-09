@@ -74,12 +74,10 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 	}
 	defer func() {
 		if err != nil {
-			if createdID != 0 && !mergeCompleted && !rollbackAttempted && (!deletionStarted || oldDeleted == 0) {
+			if shouldAttemptMergeRollbackOnError(createdID, mergeCompleted, rollbackAttempted, deletionStarted, oldDeleted) {
 				attemptRollback("合并异常")
 			}
-			if rollbackAttempted && !rollbackSucceeded && rollbackNote != "" && !strings.Contains(err.Error(), rollbackNote) {
-				err = fmt.Errorf("%s %s", strings.TrimSpace(err.Error()), rollbackNote)
-			}
+			err = appendRollbackNote(err, rollbackState{rollbackAttempted, rollbackSucceeded, rollbackNote})
 			a.finishTrace(context.Background(), mergeID, "error", err.Error())
 			return
 		}
