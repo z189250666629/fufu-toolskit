@@ -1,0 +1,17 @@
+{
+  "managedApiSites": [
+    {
+      "name": "次数fufu",
+      "url": "https://api.fufuflower.top",
+      "token": "your-admin-access-token",
+      "userId": "1",
+      "kind": "api",
+      "channelListEndpoint": "/api/channel/search?keyword=&p=1&page_size=500",
+      "quotaUnit": 500000,
+      "currency": "$",
+      "rechargeRatio": 1,
+      "skipUserHeader": false,
+      "note": "用于固定展示 API 站使用日志和按模型聚合可用通道"
+    }
+  ]
+}

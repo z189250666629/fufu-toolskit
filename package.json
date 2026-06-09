@@ -1,0 +1,25 @@
+{
+  "name": "fufu-toolskit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo for fufu-combine, fufu-act/activity, and network-detect.",
+  "scripts": {
+    "deps": "npm run deps:combine && npm run deps:act && npm run deps:network",
+    "deps:combine": "cd apps/fufu-combine && go mod download",
+    "deps:act": "npm --prefix apps/fufu-act install",
+    "deps:network": "npm --prefix apps/network-detect install",
+    "start:all": "node scripts/start-all.mjs",
+    "start:combine": "npm --prefix apps/fufu-combine start",
+    "dev:combine": "npm --prefix apps/fufu-combine run dev",
+    "build:combine": "npm --prefix apps/fufu-combine run build",
+    "test:combine": "cd apps/fufu-combine && go test ./...",
+    "start:act": "npm --prefix apps/fufu-act start",
+    "test:act": "node --check apps/fufu-act/server/index.mjs && node --check apps/fufu-act/server/routes.mjs && node --check apps/fufu-act/server/slot.mjs && node --check apps/fufu-act/server/db.mjs && node --check apps/fufu-act/server/credit-worker.mjs && node --check apps/fufu-act/scripts/api-act.mjs",
+    "start:network": "npm --prefix apps/network-detect start",
+    "test:network": "npm --prefix apps/network-detect test",
+    "test": "npm run test:combine && npm run test:act && npm run test:network"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "managedApiSites": [
+    {
+      "name": "次数fufu",
+      "url": "https://api.fufuflower.top",
+      "tokenEnv": "NEWAPI_API_SITE_TOKEN",
+      "userId": "1",
+      "kind": "api",
+      "channelListEndpoint": "/api/channel/search?keyword=&p=1&page_size=500",
+      "quotaUnit": 500000,
+      "currency": "$",
+      "rechargeRatio": 0.1,
+      "skipUserHeader": false,
+      "note": "API 次数站管理配置；token 从 NEWAPI_API_SITE_TOKEN 读取"
+    },
+    {
+      "name": "token-fufu",
+      "url": "https://token.fufuflower.top",
+      "tokenEnv": "NEWAPI_TOKEN_SITE_TOKEN",
+      "userId": "1",
+      "kind": "api",
+      "channelListEndpoint": "/api/channel/search?keyword=&p=1&page_size=500",
+      "quotaUnit": 500000,
+      "currency": "$",
+      "rechargeRatio": 1,
+      "skipUserHeader": false,
+      "note": "Token 站管理配置；token 从 NEWAPI_TOKEN_SITE_TOKEN 读取"
+    }
+  ]
+}

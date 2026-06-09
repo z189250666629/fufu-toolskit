@@ -1,0 +1,57 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+
+# Dependencies
+node_modules/
+apps/**/node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+config.json
+apps/**/config.json
+apps/**/newapi-log-sources.json
+*.user.ini
+
+# Logs / temp
+*.log
+logs/
+.tmp/
+tmp/
+*.tmp
+*.temp
+
+# Build outputs
+build/
+dist/
+coverage/
+apps/**/build/
+apps/**/dist/
+apps/**/coverage/
+
+# Go artifacts
+*.test
+*.out
+fufu-combine
+fufu-combine.exe
+apps/fufu-combine/fufu-combine
+apps/fufu-combine/fufu-combine.exe
+
+# Runtime databases
+apps/**/data/*.db
+apps/**/data/*.db-*
+apps/**/data/*.sqlite
+apps/**/data/*.sqlite-*
+!apps/**/data/.gitkeep
+
+# Backups
+backups/
+apps/**/backups/
+*.bak
+*.backup
+*~

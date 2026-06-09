@@ -1,0 +1,28 @@
+services:
+  network-detact:
+    image: ${APP_IMAGE:?APP_IMAGE is required}:${APP_TAG:?APP_TAG is required}
+    container_name: ${CONTAINER_NAME:-network-detact}
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-8080}:8080"
+    environment:
+      PORT: 8080
+      NEWAPI_MANAGED_API_SITES: ${NEWAPI_MANAGED_API_SITES:-}
+      NEWAPI_MANAGED_API_CONFIG: ${NEWAPI_MANAGED_API_CONFIG:-}
+      NEWAPI_API_SITE_TOKEN: ${NEWAPI_API_SITE_TOKEN:-}
+      NEWAPI_TOKEN_SITE_TOKEN: ${NEWAPI_TOKEN_SITE_TOKEN:-}
+      NEWAPI_API_SITE_URL: ${NEWAPI_API_SITE_URL:-}
+      NEWAPI_TOKEN_SITE_URL: ${NEWAPI_TOKEN_SITE_URL:-}
+      CONNECTIVITY_API_URLS: ${CONNECTIVITY_API_URLS:-}
+      CONNECTIVITY_TOKEN_URLS: ${CONNECTIVITY_TOKEN_URLS:-}
+      NEWAPI_DASHBOARD_VIEW_KEY: ${NEWAPI_DASHBOARD_VIEW_KEY:-}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

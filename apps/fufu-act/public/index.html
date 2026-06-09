@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>FUFU SLOTS · 8-BIT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       8-bit pixel-art tokens
+       ============================================================ */
+    :root {
+      --c-red:    #e0254a;
+      --c-blue:   #2c54d6;
+      --c-cyan:   #00d4d4;
+      --c-yellow: #f4d837;
+      --c-purple: #8a3cdc;
+      --c-pink:   #ff8cb6;
+      --c-green:  #4cc24f;
+      --c-orange: #ff8e34;
+      --c-black:  #0a0a14;
+      --c-ink:    #14081a;
+      --c-white:  #f0f0f0;
+      --c-bg:     #1a0d2e;
+      --c-bg-2:   #2a1a4e;
+      --c-frame:  #4a1d8a;
+      --c-frame-hi: #b86bff;
+      --c-frame-lo: #2a0d5a;
+      --c-chrome: #c8c8d0;
+      --c-chrome-hi: #f0f0f8;
+      --c-chrome-lo: #5a5a64;
+      --p: 4px;        /* pixel unit */
+      --pixel-font: 'Press Start 2P', 'Courier New', monospace;
+      --cn-font: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { height: 100%; image-rendering: pixelated; -webkit-font-smoothing: none; }
+
+    body {
+      font-family: var(--pixel-font);
+      background: var(--c-bg);
+      color: var(--c-white);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      -webkit-tap-highlight-color: transparent;
+      line-height: 1.5;
+    }
+
+    /* Dithered checker pattern, fixed bg */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(45deg, var(--c-bg-2) 25%, transparent 25%, transparent 75%, var(--c-bg-2) 75%),
+        linear-gradient(45deg, var(--c-bg-2) 25%, transparent 25%, transparent 75%, var(--c-bg-2) 75%);
+      background-size: 12px 12px;
+      background-position: 0 0, 6px 6px;
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    /* CRT scanlines overlay */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 200;
+      pointer-events: none;
+      background: repeating-linear-gradient(0deg,
+        rgba(0,0,0,0.18) 0,
+        rgba(0,0,0,0.18) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      mix-blend-mode: multiply;
+    }
+
+    /* Pixel-shake on body */
+    body.shake { animation: pixel-shake 0.5s steps(8) 1; }
+    @keyframes pixel-shake {
+      0%   { transform: translate(0, 0); }
+      12%  { transform: translate(-8px, -4px); }
+      25%  { transform: translate(8px, 4px); }
+      37%  { transform: translate(-4px, 8px); }
+      50%  { transform: translate(4px, -8px); }
+      62%  { transform: translate(-8px, 0); }
+      75%  { transform: translate(8px, 0); }
+      87%  { transform: translate(-4px, -4px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    /* ============================================================
+       Background canvases
+       ============================================================ */
+    canvas#starfield { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+    canvas#particles { position: fixed; inset: 0; z-index: 150; pointer-events: none; }
+
+    /* ============================================================
+       Layout
+       ============================================================ */
+    .container {
+      max-width: 480px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 12px 36px;
+      position: relative;
+      z-index: 5;
+      min-height: 100vh;
+    }
+
+    .page-title {
+      text-align: center;
+      font-family: var(--pixel-font);
+      font-size: 20px;
+      letter-spacing: 4px;
+      color: var(--c-yellow);
+      text-shadow:
+        4px 0 0 var(--c-black),
+        -4px 0 0 var(--c-black),
+        0 4px 0 var(--c-black),
+        0 -4px 0 var(--c-black),
+        4px 4px 0 var(--c-red),
+        4px 8px 0 var(--c-black);
+      margin-bottom: 12px;
+    }
+
+    .page-sub {
+      text-align: center;
+      font-family: var(--cn-font);
+      color: var(--c-cyan);
+      font-size: 12px;
+      letter-spacing: 6px;
+      margin-bottom: 22px;
+    }
+
+    /* ============================================================
+       Pixel UI primitives
+       ============================================================ */
+
+    /* A 3-tone pixel border:  outer black 4px + inner 4px highlight + 4px shadow */
+    .px-frame {
+      background: var(--c-frame);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame-hi),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black),
+        0 0 0 8px var(--c-yellow),
+        0 0 0 12px var(--c-black);
+    }
+
+    .px-panel {
+      background: var(--c-bg-2);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+    }
+
+    /* ============================================================
+       Login Panel
+       ============================================================ */
+    #login-panel {
+      padding: 24px 20px;
+      background: var(--c-bg-2);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black),
+        0 0 0 8px var(--c-cyan),
+        0 0 0 12px var(--c-black);
+      margin-top: 12px;
+    }
+
+    /* Mini idle slot machine on login */
+    .login-icon {
+      width: 240px;
+      margin: 0 auto 24px;
+      background: var(--c-frame);
+      padding: 10px;
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame-hi),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black),
+        0 0 0 8px var(--c-yellow),
+        0 0 0 12px var(--c-black);
+      position: relative;
+    }
+    .login-icon-marquee {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      padding: 4px 0 8px;
+    }
+    .login-icon-marquee i {
+      width: 8px; height: 8px;
+      background: var(--c-yellow);
+      box-shadow: 0 0 0 2px var(--c-black);
+      animation: bulb-chase 1.2s steps(1) infinite;
+      animation-delay: calc(var(--i) * 0.1s);
+    }
+    .login-icon-bulbs i:nth-child(odd) { background: var(--c-cyan); }
+
+    @keyframes bulb-chase {
+      0%, 100% { background: var(--c-yellow); box-shadow: 0 0 0 2px var(--c-black), 0 0 8px var(--c-yellow); }
+      50%      { background: var(--c-orange); box-shadow: 0 0 0 2px var(--c-black); opacity: 0.4; }
+    }
+
+    .login-icon-reels {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 6px;
+      background: var(--c-black);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame-lo),
+        inset -4px -4px 0 0 #000;
+    }
+    .login-icon-reels .mini-reel {
+      height: 64px;
+      overflow: hidden;
+      background: var(--c-ink);
+      box-shadow: inset 0 0 0 2px var(--c-frame);
+      position: relative;
+    }
+    .login-icon-reels .mini-strip {
+      animation: mini-cycle 3s linear infinite;
+      font-size: 28px;
+      line-height: 64px;
+      text-align: center;
+    }
+    .login-icon-reels .mini-reel:nth-child(2) .mini-strip { animation-duration: 2.4s; animation-delay: -.7s; }
+    .login-icon-reels .mini-reel:nth-child(3) .mini-strip { animation-duration: 2.7s; animation-delay: -1.4s; }
+    @keyframes mini-cycle {
+      from { transform: translateY(0); }
+      to   { transform: translateY(-576px); } /* 9 cells * 64px */
+    }
+
+    .login-input {
+      display: block;
+      width: 100%;
+      padding: 14px 16px;
+      font-family: var(--pixel-font);
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: var(--c-yellow);
+      background: var(--c-black);
+      border: none;
+      outline: none;
+      box-shadow:
+        inset 4px 4px 0 0 #000,
+        inset -4px -4px 0 0 var(--c-purple),
+        0 0 0 4px var(--c-cyan);
+      margin: 0 4px 20px;
+      width: calc(100% - 8px);
+    }
+    .login-input::placeholder { color: var(--c-purple); }
+    .login-input:focus {
+      box-shadow:
+        inset 4px 4px 0 0 #000,
+        inset -4px -4px 0 0 var(--c-purple),
+        0 0 0 4px var(--c-yellow);
+    }
+
+    /* ============================================================
+       Pixel Button — chunky 8-bit
+       ============================================================ */
+    .px-btn {
+      display: inline-block;
+      width: 100%;
+      padding: 14px 16px;
+      font-family: var(--pixel-font);
+      font-size: 12px;
+      letter-spacing: 3px;
+      color: var(--c-black);
+      background: var(--c-yellow);
+      border: none;
+      cursor: pointer;
+      box-shadow:
+        inset 4px 4px 0 0 #fff8c8,
+        inset -4px -4px 0 0 #b89a00,
+        0 0 0 4px var(--c-black),
+        0 4px 0 0 #000;
+      transition: transform .05s, box-shadow .05s;
+    }
+    .px-btn:hover { background: #fff04d; }
+    .px-btn:active {
+      transform: translate(2px, 4px);
+      box-shadow:
+        inset 4px 4px 0 0 #b89a00,
+        inset -4px -4px 0 0 #fff8c8,
+        0 0 0 4px var(--c-black);
+    }
+    .px-btn:disabled {
+      background: #5a4a1a;
+      color: #888;
+      cursor: not-allowed;
+      box-shadow:
+        inset 4px 4px 0 0 #6a5a2a,
+        inset -4px -4px 0 0 #2a1a00,
+        0 0 0 4px var(--c-black);
+    }
+    .px-btn.btn-cyan { background: var(--c-cyan); }
+    .px-btn.btn-cyan:hover { background: #4ee0e0; }
+    .px-btn.btn-pink { background: var(--c-pink); color: var(--c-ink); }
+
+    .error {
+      color: var(--c-red);
+      text-align: center;
+      margin-top: 14px;
+      font-family: var(--pixel-font);
+      font-size: 10px;
+      letter-spacing: 1px;
+      min-height: 14px;
+    }
+
+    /* ============================================================
+       Game Panel
+       ============================================================ */
+    #game-panel { display: none; }
+
+    .info-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .info-cell {
+      background: var(--c-bg-2);
+      padding: 10px 4px;
+      text-align: center;
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+    }
+    .info-cell .label {
+      font-family: var(--cn-font);
+      font-size: 10px;
+      color: var(--c-cyan);
+      letter-spacing: 2px;
+    }
+    .info-cell .value {
+      display: block;
+      margin-top: 6px;
+      font-family: var(--pixel-font);
+      font-size: 18px;
+      color: var(--c-yellow);
+      text-shadow: 2px 2px 0 var(--c-black);
+    }
+
+    /* ============================================================
+       Slot Cabinet
+       ============================================================ */
+    .cabinet-wrap {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      margin: 18px 4px 24px;
+    }
+
+    .cabinet {
+      flex: 1;
+      background: var(--c-frame);
+      padding: 10px;
+      position: relative;
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame-hi),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black),
+        0 0 0 8px var(--c-yellow),
+        0 0 0 12px var(--c-black);
+    }
+
+    /* Marquee — chase lights row across the top */
+    .marquee {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 8px;
+      background: var(--c-black);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame-lo),
+        inset -4px -4px 0 0 #000;
+      margin-bottom: 8px;
+    }
+    .marquee-bulbs {
+      display: flex;
+      gap: 4px;
+    }
+    .marquee-bulbs i {
+      display: block;
+      width: 8px; height: 8px;
+      background: var(--c-yellow);
+      animation: bulb-chase 1.2s steps(1) infinite;
+      animation-delay: calc(var(--i) * 0.1s);
+    }
+
+    .marquee-text {
+      font-family: var(--pixel-font);
+      font-size: 14px;
+      letter-spacing: 4px;
+      color: var(--c-pink);
+      text-shadow:
+        2px 0 0 var(--c-black), -2px 0 0 var(--c-black),
+        0 2px 0 var(--c-black), 0 -2px 0 var(--c-black),
+        2px 2px 0 var(--c-purple),
+        2px 4px 0 var(--c-black);
+    }
+
+    /* Reels window — 3 visible rows per reel */
+    .reels-window {
+      background: var(--c-black);
+      padding: 10px 8px;
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      box-shadow:
+        inset 4px 4px 0 0 #000,
+        inset -4px -4px 0 0 var(--c-frame-lo);
+      position: relative;
+    }
+    /* Top + bottom row dim overlay */
+    .reels-window::before {
+      content: '';
+      position: absolute; inset: 10px 8px;
+      pointer-events: none;
+      background: linear-gradient(180deg,
+        rgba(0,0,0,0.65) 0%,
+        rgba(0,0,0,0.65) 32%,
+        rgba(0,0,0,0) 36%,
+        rgba(0,0,0,0) 64%,
+        rgba(0,0,0,0.65) 68%,
+        rgba(0,0,0,0.65) 100%
+      );
+      z-index: 5;
+    }
+    /* Payline glowing across the middle row */
+    .reels-window::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      height: 4px;
+      background: var(--c-yellow);
+      box-shadow:
+        0 -4px 0 0 var(--c-black),
+        0 4px 0 0 var(--c-black),
+        0 0 12px var(--c-yellow);
+      animation: payline-pulse 1s steps(2) infinite;
+      z-index: 6;
+      pointer-events: none;
+    }
+    @keyframes payline-pulse {
+      0%   { background: var(--c-yellow); }
+      50%  { background: var(--c-orange); }
+    }
+
+    .reel {
+      width: 64px;
+      height: 240px; /* 3 visible rows of 80px */
+      background: var(--c-ink);
+      overflow: hidden;
+      position: relative;
+      box-shadow:
+        inset 0 0 0 2px var(--c-frame-lo);
+    }
+
+    .reel-strip {
+      will-change: transform;
+      display: flex;
+      flex-direction: column;
+      transition: none;
+    }
+
+    .reel-cell {
+      height: 80px;
+      width: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      filter: drop-shadow(2px 2px 0 var(--c-black));
+      flex-shrink: 0;
+    }
+
+    /* Reel border flashes during win */
+    .reel.win {
+      animation: reel-win 0.4s steps(1) infinite;
+    }
+    @keyframes reel-win {
+      0%   { box-shadow: inset 0 0 0 4px var(--c-yellow); }
+      25%  { box-shadow: inset 0 0 0 4px var(--c-cyan); }
+      50%  { box-shadow: inset 0 0 0 4px var(--c-pink); }
+      75%  { box-shadow: inset 0 0 0 4px var(--c-green); }
+    }
+
+    /* ----- Pixel Lever (separate column attached to right) ----- */
+    .lever-housing {
+      width: 56px;
+      background: var(--c-frame-lo);
+      padding: 8px 4px;
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame),
+        inset -4px -4px 0 0 #1a0830,
+        0 0 0 4px var(--c-black),
+        0 0 0 8px var(--c-yellow),
+        0 0 0 12px var(--c-black);
+    }
+    .lever-housing.disabled { cursor: not-allowed; opacity: .55; }
+
+    .lever {
+      position: relative;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 14px;
+      overflow: hidden; /* clips the shaft once it slides down past the base */
+    }
+    /* "Floor" plate filling the padding-bottom area: hides the shaft once it
+       sinks below the base, so the arm never appears under the base.
+       z-index 4 sits above arm (2) but does not cover the base which is at a
+       higher y range. */
+    .lever::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 14px;
+      background: var(--c-frame-lo);
+      z-index: 4;
+    }
+    .lever-track {
+      position: absolute;
+      top: 16px;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      background: var(--c-black);
+      box-shadow: inset 0 0 0 2px #000;
+      z-index: 0;
+    }
+    .lever-arm {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%) translateY(0);
+      width: 12px;
+      height: 96px;
+      background: var(--c-chrome);
+      box-shadow:
+        inset 4px 0 0 0 var(--c-chrome-hi),
+        inset -4px 0 0 0 var(--c-chrome-lo),
+        0 0 0 2px var(--c-black);
+      transition: transform 0.32s steps(5);
+      z-index: 2;
+    }
+    .lever-ball {
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 24px;
+      background: var(--c-red);
+      box-shadow:
+        inset 4px 4px 0 0 #ff5577,
+        inset -4px -4px 0 0 #8a0020,
+        0 0 0 2px var(--c-black);
+    }
+    .lever-base {
+      position: relative;
+      width: 36px;
+      height: 12px;
+      background: var(--c-chrome-lo);
+      box-shadow:
+        inset 4px 0 0 0 var(--c-chrome),
+        inset -4px 0 0 0 #2a2a30,
+        0 0 0 2px var(--c-black);
+      z-index: 3;
+    }
+    .lever-housing.pulled .lever-arm {
+      transform: translateX(-50%) translateY(64px);
+    }
+    .lever-label {
+      position: absolute;
+      bottom: -2px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--pixel-font);
+      font-size: 9px;
+      color: var(--c-yellow);
+      text-shadow: 2px 2px 0 var(--c-black);
+      letter-spacing: 2px;
+      animation: blink 1s steps(2) infinite;
+      white-space: nowrap;
+      z-index: 5;
+    }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0.3; }
+    }
+
+    /* Coin slot strip below reels */
+    .coin-strip {
+      margin-top: 8px;
+      padding: 6px 8px;
+      background: var(--c-black);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame-lo),
+        inset -4px -4px 0 0 #000;
+    }
+    .coin-slot {
+      flex: 1;
+      height: 8px;
+      background: var(--c-bg);
+      box-shadow: inset 0 0 0 2px #000;
+    }
+    .coin-strip .label {
+      font-family: var(--pixel-font);
+      font-size: 9px;
+      color: var(--c-cyan);
+      letter-spacing: 2px;
+    }
+
+    /* Result ribbon (under cabinet) */
+    .result {
+      margin: 12px 4px 0;
+      padding: 12px;
+      text-align: center;
+      font-family: var(--pixel-font);
+      font-size: 12px;
+      letter-spacing: 2px;
+      background: var(--c-yellow);
+      color: var(--c-ink);
+      box-shadow:
+        inset 4px 4px 0 0 #fff8c8,
+        inset -4px -4px 0 0 #b89a00,
+        0 0 0 4px var(--c-black);
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .result.muted {
+      background: var(--c-bg-2);
+      color: var(--c-purple);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+    }
+    .result.win-jackpot {
+      background: var(--c-pink);
+      color: var(--c-ink);
+      animation: jackpot-flash 0.3s steps(2) infinite;
+    }
+    @keyframes jackpot-flash {
+      0%   { background: var(--c-pink); }
+      50%  { background: var(--c-yellow); }
+    }
+
+    /* ============================================================
+       Prize Drawer
+       ============================================================ */
+    .drawer-toggle {
+      width: 100%;
+      margin: 16px 0 6px;
+      padding: 12px 16px;
+      font-family: var(--pixel-font);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--c-cyan);
+      background: var(--c-bg-2);
+      border: none;
+      cursor: pointer;
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+      transition: transform .05s;
+    }
+    .drawer-toggle:hover { color: var(--c-yellow); }
+    .drawer-toggle .arrow {
+      display: inline-block;
+      transition: transform .25s steps(2);
+      margin-left: 6px;
+    }
+    .drawer-toggle.open .arrow { transform: rotate(180deg); }
+
+    .prize-drawer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .35s steps(8);
+      margin-bottom: 4px;
+    }
+    .prize-drawer.open { max-height: 540px; }
+
+    .prize-table {
+      background: var(--c-bg-2);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+      padding: 6px;
+    }
+    .prize-row {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-bottom: 2px solid rgba(0,0,0,0.3);
+      font-family: var(--pixel-font);
+      font-size: 10px;
+    }
+    .prize-row:last-child { border-bottom: none; }
+    .prize-row .symbol { font-size: 24px; text-align: center; filter: drop-shadow(2px 2px 0 var(--c-black)); }
+    .prize-row .amount { color: var(--c-yellow); letter-spacing: 1px; }
+    .prize-row.jackpot {
+      background: var(--c-frame);
+      box-shadow: inset 0 0 0 2px var(--c-yellow);
+      animation: jp-row-pulse 1s steps(2) infinite;
+    }
+    .prize-row.jackpot .amount { color: var(--c-yellow); }
+    @keyframes jp-row-pulse {
+      0%   { box-shadow: inset 0 0 0 2px var(--c-yellow); }
+      50%  { box-shadow: inset 0 0 0 2px var(--c-pink); }
+    }
+
+    /* ============================================================
+       History
+       ============================================================ */
+    .history {
+      margin-top: 16px;
+      padding: 12px 14px;
+      background: var(--c-bg-2);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+    }
+    .history h3 {
+      font-family: var(--pixel-font);
+      font-size: 10px;
+      color: var(--c-cyan);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+    .history-list { max-height: 200px; overflow-y: auto; }
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-bottom: 2px solid rgba(0,0,0,0.3);
+      font-family: var(--cn-font);
+      font-size: 12px;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-item .prize { color: var(--c-yellow); font-weight: 700; }
+    .history-item .time { color: var(--c-purple); font-size: 10px; }
+    .history-empty {
+      text-align: center;
+      padding: 14px;
+      color: var(--c-purple);
+      font-family: var(--pixel-font);
+      font-size: 9px;
+      letter-spacing: 2px;
+    }
+
+    .logout {
+      text-align: center;
+      margin-top: 18px;
+    }
+    .logout a {
+      color: var(--c-purple);
+      font-family: var(--pixel-font);
+      font-size: 10px;
+      text-decoration: none;
+      cursor: pointer;
+      letter-spacing: 2px;
+    }
+    .logout a:hover { color: var(--c-cyan); }
+
+    /* ============================================================
+       Jackpot Overlay
+       ============================================================ */
+    #jackpot-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 180;
+      pointer-events: none;
+      opacity: 0;
+      background: rgba(0,0,0,0.55);
+      transition: opacity .25s steps(2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #jackpot-overlay.show { opacity: 1; }
+    #jackpot-overlay::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(45deg, var(--c-yellow) 25%, transparent 25%, transparent 75%, var(--c-pink) 75%);
+      background-size: 32px 32px;
+      animation: jp-checker 0.3s steps(2) infinite;
+      opacity: 0.45;
+    }
+    @keyframes jp-checker {
+      0%   { background-position: 0 0; }
+      50%  { background-position: 16px 16px; }
+    }
+    .jackpot-card {
+      position: relative;
+      background: var(--c-frame);
+      padding: 32px 40px;
+      transform: scale(0.4);
+      transition: transform 0.4s steps(6);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame-hi),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black),
+        0 0 0 8px var(--c-yellow),
+        0 0 0 12px var(--c-black),
+        0 0 0 16px var(--c-pink);
+      text-align: center;
+    }
+    #jackpot-overlay.show .jackpot-card { transform: scale(1); }
+    .jackpot-text {
+      font-family: var(--pixel-font);
+      font-size: 36px;
+      letter-spacing: 6px;
+      color: var(--c-yellow);
+      text-shadow:
+        4px 0 0 var(--c-black), -4px 0 0 var(--c-black),
+        0 4px 0 var(--c-black), 0 -4px 0 var(--c-black),
+        4px 4px 0 var(--c-red);
+    }
+    .jackpot-sub {
+      margin-top: 16px;
+      font-family: var(--pixel-font);
+      font-size: 14px;
+      letter-spacing: 4px;
+      color: var(--c-white);
+      text-shadow: 2px 2px 0 var(--c-black);
+    }
+
+    /* ============================================================
+       Scratch Card Panel
+       ============================================================ */
+    #scratch-panel { display: none; }
+
+    .scratch-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 320px;
+      margin: 0 auto 20px;
+    }
+    .scratch-cell {
+      aspect-ratio: 1;
+      background: var(--c-frame);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-frame-hi),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+      transition: transform 0.1s steps(2);
+    }
+    .scratch-cell:hover:not(.revealed) {
+      background: var(--c-purple);
+      transform: scale(1.05);
+    }
+    .scratch-cell:active:not(.revealed) {
+      transform: scale(0.95);
+    }
+    .scratch-cell.revealed {
+      cursor: default;
+      background: var(--c-bg-2);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+    }
+    .scratch-cell.revealed.safe {
+      color: var(--c-yellow);
+    }
+    .scratch-cell.revealed.mine {
+      color: var(--c-red);
+      animation: mine-flash 0.3s steps(2) 3;
+    }
+    @keyframes mine-flash {
+      0%   { background: var(--c-red); }
+      50%  { background: var(--c-bg-2); }
+    }
+    .scratch-cell.disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .scratch-prize-display {
+      text-align: center;
+      margin: 16px 0;
+      padding: 16px;
+      background: var(--c-bg-2);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+    }
+    .scratch-prize-display .prize-label {
+      font-family: var(--cn-font);
+      font-size: 12px;
+      color: var(--c-cyan);
+      letter-spacing: 2px;
+    }
+    .scratch-prize-display .prize-value {
+      font-family: var(--pixel-font);
+      font-size: 28px;
+      color: var(--c-yellow);
+      text-shadow: 2px 2px 0 var(--c-black);
+      margin-top: 8px;
+    }
+    .scratch-prize-display .prize-value.lost {
+      color: var(--c-red);
+    }
+
+    .scratch-progress {
+      text-align: center;
+      font-family: var(--cn-font);
+      font-size: 12px;
+      color: var(--c-cyan);
+      letter-spacing: 2px;
+      margin-bottom: 16px;
+    }
+
+    .scratch-status {
+      text-align: center;
+      margin: 12px 0;
+      padding: 12px;
+      font-family: var(--pixel-font);
+      font-size: 12px;
+      letter-spacing: 2px;
+      background: var(--c-yellow);
+      color: var(--c-ink);
+      box-shadow:
+        inset 4px 4px 0 0 #fff8c8,
+        inset -4px -4px 0 0 #b89a00,
+        0 0 0 4px var(--c-black);
+    }
+    .scratch-status.lost {
+      background: var(--c-red);
+      color: var(--c-white);
+      box-shadow:
+        inset 4px 4px 0 0 #ff5577,
+        inset -4px -4px 0 0 #8a0020,
+        0 0 0 4px var(--c-black);
+    }
+    .scratch-status.won {
+      background: var(--c-yellow);
+      animation: jackpot-flash 0.3s steps(2) infinite;
+    }
+
+    .scratch-rules {
+      margin-top: 16px;
+      padding: 12px 14px;
+      background: var(--c-bg-2);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+    }
+    .scratch-rules h3 {
+      font-family: var(--pixel-font);
+      font-size: 10px;
+      color: var(--c-cyan);
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+    .scratch-rules p {
+      font-family: var(--cn-font);
+      font-size: 12px;
+      color: var(--c-chrome);
+      line-height: 1.8;
+    }
+
+    body.scratch-shake { animation: pixel-shake 0.5s steps(8) 1; }
+
+    /* ============================================================
+       Responsive
+       ============================================================ */
+    @media (max-width: 480px) {
+      .container { padding: 16px 8px 28px; }
+      .page-title { font-size: 18px; letter-spacing: 3px; }
+      .page-sub { font-size: 11px; letter-spacing: 4px; margin-bottom: 16px; }
+      .info-bar { gap: 6px; margin-bottom: 14px; }
+      .info-cell { padding: 8px 2px; }
+      .info-cell .value { font-size: 16px; }
+      .login-icon { width: 200px; }
+      .login-icon-reels .mini-reel { height: 52px; }
+      .login-icon-reels .mini-strip { line-height: 52px; font-size: 24px; }
+    }
+    @media (max-width: 400px) {
+      .reel { width: 56px; height: 210px; }
+      .reel-cell { width: 56px; height: 70px; font-size: 34px; }
+      .lever-housing { width: 48px; }
+      .cabinet { padding: 8px; }
+      .cabinet-wrap { gap: 6px; margin: 14px 2px 18px; }
+      .marquee-text { font-size: 12px; letter-spacing: 3px; }
+      .page-title { font-size: 16px; letter-spacing: 3px; }
+      .scratch-grid { max-width: 280px; gap: 6px; }
+      .scratch-cell { font-size: 28px; }
+      .scratch-prize-display .prize-value { font-size: 24px; }
+      .px-btn { padding: 12px 12px; font-size: 11px; }
+      .login-input { padding: 12px 12px; font-size: 11px; }
+    }
+    @media (max-width: 340px) {
+      .container { padding: 12px 4px 20px; }
+      .reel { width: 48px; height: 180px; }
+      .reel-cell { width: 48px; height: 60px; font-size: 28px; }
+      .lever-housing { width: 40px; }
+      .info-bar { grid-template-columns: 1fr 1fr; }
+      .info-cell .label { font-size: 9px; }
+      .info-cell .value { font-size: 14px; }
+      .scratch-grid { max-width: 240px; gap: 4px; }
+      .scratch-cell { font-size: 24px; }
+      .login-icon { width: 180px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="starfield"></canvas>
+  <canvas id="particles"></canvas>
+
+  <div class="container">
+    <h1 class="page-title">FUFU SLOTS</h1>
+    <p class="page-sub">五一活动暨一周年活动专属抽奖</p>
+
+    <!-- ===== Login Panel ===== -->
+    <div id="login-panel">
+      <div class="login-icon" aria-hidden="true">
+        <div class="login-icon-marquee login-icon-bulbs">
+          <i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i>
+          <i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i>
+          <i style="--i:6"></i><i style="--i:7"></i>
+        </div>
+        <div class="login-icon-reels">
+          <div class="mini-reel"><div class="mini-strip" id="mini-strip-1"></div></div>
+          <div class="mini-reel"><div class="mini-strip" id="mini-strip-2"></div></div>
+          <div class="mini-reel"><div class="mini-strip" id="mini-strip-3"></div></div>
+        </div>
+      </div>
+      <input type="text" class="login-input" id="card-input" placeholder="SK-XXXX..." autocomplete="off" spellcheck="false">
+      <button class="px-btn btn-cyan" id="btn-login">VERIFY KEY</button>
+      <div id="login-error" class="error"></div>
+    </div>
+
+    <!-- ===== Game Panel ===== -->
+    <div id="game-panel">
+      <div class="info-bar">
+        <div class="info-cell">
+          <div class="label">额度</div>
+          <span class="value" id="info-dollars">-</span>
+        </div>
+        <div class="info-cell">
+          <div class="label">剩余次数</div>
+          <span class="value" id="info-remaining">-</span>
+        </div>
+        <div class="info-cell">
+          <div class="label">累计中奖</div>
+          <span class="value" id="info-total-won">-</span>
+        </div>
+      </div>
+
+      <div class="cabinet-wrap">
+        <div class="cabinet">
+          <div class="marquee">
+            <div class="marquee-bulbs">
+              <i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i>
+              <i style="--i:3"></i><i style="--i:4"></i>
+            </div>
+            <div class="marquee-text">F U F U</div>
+            <div class="marquee-bulbs">
+              <i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i>
+              <i style="--i:8"></i><i style="--i:9"></i>
+            </div>
+          </div>
+
+          <div class="reels-window">
+            <div class="reel" id="reel1"><div class="reel-strip"></div></div>
+            <div class="reel" id="reel2"><div class="reel-strip"></div></div>
+            <div class="reel" id="reel3"><div class="reel-strip"></div></div>
+          </div>
+
+          <div class="coin-strip">
+            <span class="label">INSERT</span>
+            <div class="coin-slot"></div>
+            <span class="label">COIN</span>
+          </div>
+        </div>
+
+        <div class="lever-housing" id="lever-housing" role="button" aria-label="拉杆抽奖" tabindex="0">
+          <div class="lever">
+            <div class="lever-track"></div>
+            <div class="lever-arm">
+              <div class="lever-ball"></div>
+            </div>
+            <div class="lever-base"></div>
+          </div>
+          <div class="lever-label">PULL</div>
+        </div>
+      </div>
+
+      <div class="result muted" id="result">PRESS LEVER TO START</div>
+
+      <button class="drawer-toggle" id="drawer-toggle">
+        PRIZE TABLE <span class="arrow">▼</span>
+      </button>
+      <div class="prize-drawer" id="prize-drawer">
+        <div class="prize-table" id="prize-table"></div>
+      </div>
+
+      <div class="history">
+        <h3>WIN LOG</h3>
+        <div class="history-list" id="history-list"></div>
+      </div>
+
+      <div class="logout">
+        <a id="btn-logout">CHANGE KEY</a>
+      </div>
+    </div>
+
+    <!-- ===== Scratch Card Panel ===== -->
+    <div id="scratch-panel">
+      <div class="info-bar">
+        <div class="info-cell">
+          <div class="label">额度</div>
+          <span class="value" id="scratch-dollars">-</span>
+        </div>
+        <div class="info-cell">
+          <div class="label">已开格数</div>
+          <span class="value" id="scratch-opened">0/6</span>
+        </div>
+        <div class="info-cell">
+          <div class="label">当前奖励</div>
+          <span class="value" id="scratch-current-prize">$0</span>
+        </div>
+      </div>
+
+      <div class="scratch-progress" id="scratch-progress">点击格子开始刮奖</div>
+
+      <div class="scratch-grid" id="scratch-grid"></div>
+
+      <div class="scratch-prize-display">
+        <div class="prize-label">累计奖励</div>
+        <div class="prize-value" id="scratch-prize-value">$0</div>
+      </div>
+
+      <div id="scratch-status-bar" style="display:none" class="scratch-status"></div>
+
+      <button id="btn-scratch-cashout" class="scratch-status" style="display:none; cursor:pointer; width:100%; border:none; font-family:var(--pixel-font);">CASH OUT</button>
+
+      <button id="btn-scratch-reset" class="scratch-status" style="display:none; cursor:pointer; width:100%; border:none; font-family:var(--pixel-font); background:var(--c-cyan); color:var(--c-ink);">NEXT ROUND</button>
+
+      <div class="scratch-rules">
+        <h3>RULES</h3>
+        <p>
+          9宫格中藏有2个地雷。最多可刮开6个格子。<br>
+          安全格越多奖励越高：$2 → $4 → $6 → $8 → $12 → $15<br>
+          踩到地雷则奖励归零！
+        </p>
+      </div>
+
+      <div class="logout">
+        <a id="btn-scratch-logout">CHANGE KEY</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Jackpot overlay -->
+  <div id="jackpot-overlay">
+    <div class="jackpot-card">
+      <div class="jackpot-text">JACKPOT!!</div>
+      <div class="jackpot-sub">$1000 GET</div>
+    </div>
+  </div>
+
+  <script>
+    /* ============================================================
+       Constants
+       ============================================================ */
+    const API = window.location.origin + '/api';
+    const PRIZE_SYMBOLS = {
+      1: '🍋', 5: '🍒', 10: '🍊', 20: '🍇',
+      50: '💎', 100: '⭐', 200: '👑', 500: '🔥', 1000: '🏆'
+    };
+    const ALL_SYMBOLS = Object.values(PRIZE_SYMBOLS);
+    const STRIP_LENGTH = 40;
+    function getSymbolHeight() {
+      const cell = document.querySelector('.reel-cell');
+      return cell ? cell.offsetHeight : 80;
+    }
+
+    let currentCardKey = '';
+    let spinning = false;
+
+    const $ = id => document.getElementById(id);
+
+    /* ============================================================
+       Background — drifting pixel squares
+       ============================================================ */
+    (function pixelStarfield() {
+      const cv = $('starfield');
+      const ctx = cv.getContext('2d');
+      let squares = [];
+      const palette = ['#e0254a','#2c54d6','#00d4d4','#f4d837','#8a3cdc','#ff8cb6','#4cc24f','#ff8e34'];
+
+      function resize() {
+        cv.width = window.innerWidth;
+        cv.height = window.innerHeight;
+        ctx.imageSmoothingEnabled = false;
+        const count = Math.floor((cv.width * cv.height) / 14000);
+        squares = Array.from({ length: count }, () => ({
+          x: Math.random() * cv.width,
+          y: Math.random() * cv.height,
+          size: 2 + Math.floor(Math.random() * 3) * 2, // 2, 4, or 6 px
+          vy: 0.2 + Math.random() * 0.4,
+          color: palette[Math.floor(Math.random() * palette.length)],
+          phase: Math.random() * Math.PI * 2,
+        }));
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      function draw() {
+        if (document.hidden) { requestAnimationFrame(draw); return; }
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        for (const s of squares) {
+          s.y += s.vy;
+          s.phase += 0.04;
+          if (s.y > cv.height + 4) { s.y = -4; s.x = Math.random() * cv.width; }
+          // snap to integer (pixel grid)
+          const x = Math.round(s.x);
+          const y = Math.round(s.y);
+          // blink: alternate brightness
+          const alpha = 0.3 + Math.abs(Math.sin(s.phase)) * 0.5;
+          ctx.fillStyle = s.color;
+          ctx.globalAlpha = alpha;
+          ctx.fillRect(x, y, s.size, s.size);
+        }
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(draw);
+      }
+      requestAnimationFrame(draw);
+    })();
+
+    /* ============================================================
+       Particle system — pixel squares burst
+       ============================================================ */
+    const particles = (function () {
+      const cv = $('particles');
+      const ctx = cv.getContext('2d');
+      const list = [];
+      function resize() { cv.width = window.innerWidth; cv.height = window.innerHeight; ctx.imageSmoothingEnabled = false; }
+      window.addEventListener('resize', resize);
+      resize();
+
+      function emit(x, y, opts = {}) {
+        const count = opts.count ?? 60;
+        const speedMin = opts.speedMin ?? 4;
+        const speedMax = opts.speedMax ?? 11;
+        const palette = opts.palette ?? ['#e0254a','#2c54d6','#00d4d4','#f4d837','#8a3cdc','#ff8cb6','#4cc24f','#ff8e34','#f0f0f0'];
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = speedMin + Math.random() * (speedMax - speedMin);
+          list.push({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 2,
+            life: 1,
+            decay: 0.012 + Math.random() * 0.012,
+            size: 4 + Math.floor(Math.random() * 4) * 2, // 4, 6, 8, 10 px
+            color: palette[Math.floor(Math.random() * palette.length)],
+          });
+        }
+      }
+      function step() {
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        for (let i = list.length - 1; i >= 0; i--) {
+          const p = list[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.28;
+          p.vx *= 0.99;
+          p.life -= p.decay;
+          if (p.life <= 0) { list.splice(i, 1); continue; }
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
+        }
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(step);
+      }
+      step();
+      return { emit };
+    })();
+
+    /* ============================================================
+       Reel — real vertical scroll, 3 visible rows, target on middle
+       ============================================================ */
+    class Reel {
+      constructor(el) {
+        this.el = el;
+        this.strip = el.querySelector('.reel-strip');
+        this.position = 0;
+        this.spinning = false;
+        this.speed = 0;
+        this.tick = this.tick.bind(this);
+        this.buildStrip();
+      }
+      buildStrip() {
+        const cells = [];
+        for (let i = 0; i < STRIP_LENGTH; i++) {
+          cells.push(ALL_SYMBOLS[Math.floor(Math.random() * ALL_SYMBOLS.length)]);
+        }
+        // Render two copies so the transition can travel a full strip-length further
+        // without running off the rendered area (no more "blank" or sudden flash).
+        this.strip.innerHTML = cells.concat(cells)
+          .map(c => `<div class="reel-cell">${c}</div>`).join('');
+      }
+      reset() {
+        this.spinning = false;
+        this.strip.style.transition = 'none';
+        this.position = 0;
+        this.strip.style.transform = 'translateY(0)';
+        this.buildStrip();
+      }
+      startSpin() {
+        if (this.spinning) return;
+        this.spinning = true;
+        this.strip.style.transition = 'none';
+        this.speed = 26 + Math.random() * 6;
+        requestAnimationFrame(this.tick);
+      }
+      tick() {
+        if (!this.spinning) return;
+        this.position -= this.speed;
+        const sh = getSymbolHeight() * STRIP_LENGTH;
+        if (this.position <= -sh) this.position += sh;
+        this.strip.style.transform = `translateY(${this.position}px)`;
+        requestAnimationFrame(this.tick);
+      }
+      stopOn(targetSymbol, durationMs) {
+        return new Promise(resolve => {
+          this.spinning = false;
+          const symH = getSymbolHeight();
+          const stripH = symH * STRIP_LENGTH;
+          // Pick a target index in [5, STRIP_LENGTH-5] within the FIRST copy
+          const targetIdx = 5 + Math.floor(Math.random() * (STRIP_LENGTH - 10));
+          // Update both copies (idx + idx+STRIP_LENGTH) so the symbol is the same
+          // whether the transition lands on the first or second rendered copy.
+          [this.strip.children[targetIdx], this.strip.children[targetIdx + STRIP_LENGTH]]
+            .forEach(c => { if (c) c.textContent = targetSymbol; });
+          // Center target on middle row of the visible 3-row window.
+          let finalPos = -(targetIdx - 1) * symH;
+          // Ensure the strip keeps scrolling DOWN visually (translateY decreasing).
+          while (finalPos > this.position - 5 * symH) finalPos -= stripH;
+          // Snap current rendered transform without transition, force layout, then animate.
+          this.strip.style.transition = 'none';
+          this.strip.style.transform = `translateY(${this.position}px)`;
+          void this.strip.offsetHeight;
+          this.strip.style.transition = `transform ${durationMs}ms cubic-bezier(.18, .89, .32, 1.18)`;
+          this.strip.style.transform = `translateY(${finalPos}px)`;
+          let done = false;
+          const onEnd = () => {
+            if (done) return;
+            done = true;
+            this.strip.removeEventListener('transitionend', onEnd);
+            let snapped = finalPos % stripH;
+            if (snapped > 0) snapped -= stripH;
+            this.position = snapped;
+            this.strip.style.transition = 'none';
+            this.strip.style.transform = `translateY(${this.position}px)`;
+            resolve();
+          };
+          this.strip.addEventListener('transitionend', onEnd);
+          setTimeout(onEnd, durationMs + 250);
+        });
+      }
+      flashWin() { this.el.classList.add('win'); }
+      clearWin() { this.el.classList.remove('win'); }
+    }
+
+    const reels = [new Reel($('reel1')), new Reel($('reel2')), new Reel($('reel3'))];
+
+    /* ============================================================
+       Login flow
+       ============================================================ */
+    $('btn-login').onclick = async () => {
+      const key = $('card-input').value.trim();
+      if (!key) return;
+      $('login-error').textContent = '';
+      const btn = $('btn-login');
+      btn.disabled = true;
+      btn.textContent = 'CHECKING...';
+      try {
+        const res = await fetch(API + '/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: key }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          $('login-error').textContent = data.error || 'INVALID KEY';
+          return;
+        }
+        currentCardKey = key;
+        if (data.isScratch) {
+          showScratch(data);
+        } else {
+          await fetchPrizes();
+          showGame(data);
+        }
+      } catch (e) {
+        $('login-error').textContent = 'NETWORK ERROR';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'VERIFY KEY';
+      }
+    };
+    $('card-input').onkeydown = e => { if (e.key === 'Enter') $('btn-login').click(); };
+
+    function showGame(data) {
+      $('login-panel').style.display = 'none';
+      $('game-panel').style.display = 'block';
+      $('info-dollars').textContent = '$' + data.dollars;
+      $('info-remaining').textContent = data.remainingSpins;
+      $('info-total-won').textContent = '$' + data.totalWon;
+      renderHistory(data.history);
+      updateLeverState(data.remainingSpins);
+      reels.forEach(r => r.reset());
+    }
+
+    /* ============================================================
+       Prize drawer
+       ============================================================ */
+    async function fetchPrizes() {
+      try {
+        const res = await fetch(API + '/prizes');
+        if (!res.ok) return;
+        const data = await res.json();
+        const weights = {
+          1: 1100, 5: 2500, 10: 2000, 20: 2000,
+          50: 1300, 100: 600, 200: 300, 500: 195, 1000: 5,
+        };
+        const total = Object.values(weights).reduce((a, b) => a + b, 0);
+        const rows = data.prizes.map(p => {
+          const w = weights[p.dollars] || 0;
+          return { dollars: p.dollars, pct: ((w / total) * 100).toFixed(2) };
+        });
+        renderPrizeTable(rows);
+      } catch (e) { /* silent */ }
+    }
+    function renderPrizeTable(rows) {
+      $('prize-table').innerHTML = rows.map(r => `
+        <div class="prize-row ${r.dollars === 1000 ? 'jackpot' : ''}">
+          <div class="symbol">${PRIZE_SYMBOLS[r.dollars] || '🎁'}</div>
+          <div class="amount">$${r.dollars}${r.dollars === 1000 ? ' JP' : ''}</div>
+        </div>
+      `).join('');
+    }
+    $('drawer-toggle').onclick = () => {
+      $('drawer-toggle').classList.toggle('open');
+      $('prize-drawer').classList.toggle('open');
+    };
+
+    /* ============================================================
+       Lever
+       ============================================================ */
+    function updateLeverState(remaining) {
+      const lever = $('lever-housing');
+      if (remaining <= 0) lever.classList.add('disabled');
+      else lever.classList.remove('disabled');
+    }
+    function pullLeverAnim() {
+      const lever = $('lever-housing');
+      lever.classList.add('pulled');
+      setTimeout(() => lever.classList.remove('pulled'), 400);
+    }
+    $('lever-housing').addEventListener('click', () => doSpin());
+    $('lever-housing').addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && !spinning) {
+        e.preventDefault();
+        doSpin();
+      }
+    });
+
+    /* ============================================================
+       Spin flow
+       ============================================================ */
+    async function doSpin() {
+      if (spinning) return;
+      const lever = $('lever-housing');
+      if (lever.classList.contains('disabled')) return;
+      spinning = true;
+      lever.classList.add('disabled');
+      pullLeverAnim();
+
+      reels.forEach(r => r.clearWin());
+      $('result').className = 'result muted';
+      $('result').textContent = 'SPINNING...';
+
+      reels.forEach(r => r.startSpin());
+
+      const minSpinTime = 600;
+      const startedAt = performance.now();
+
+      let data;
+      try {
+        const res = await fetch(API + '/spin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error || '抽奖失败');
+      } catch (err) {
+        await new Promise(r => setTimeout(r, 200));
+        for (const reel of reels) {
+          await reel.stopOn(ALL_SYMBOLS[Math.floor(Math.random() * ALL_SYMBOLS.length)], 500);
+        }
+        $('result').className = 'result muted';
+        $('result').textContent = err.message || '网络错误';
+        spinning = false;
+        updateLeverState(parseInt($('info-remaining').textContent) || 0);
+        return;
+      }
+
+      const elapsed = performance.now() - startedAt;
+      if (elapsed < minSpinTime) await new Promise(r => setTimeout(r, minSpinTime - elapsed));
+
+      let symbols;
+      if (data.isRetry) {
+        symbols = ['🔄', '🔄', '🔄'];
+      } else if (data.isMiss) {
+        // 不中奖：三个互不相同的符号
+        const pool = ALL_SYMBOLS.slice();
+        const pick = () => pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        symbols = [pick(), pick(), pick()];
+      } else {
+        const sym = PRIZE_SYMBOLS[data.prize] || '🎁';
+        symbols = [sym, sym, sym];
+      }
+
+      const stagger = [700, 900, 1100];
+      for (let i = 0; i < reels.length; i++) {
+        await reels[i].stopOn(symbols[i], stagger[i]);
+      }
+
+      if (data.isRetry) {
+        $('result').className = 'result';
+        $('result').textContent = 'RE-SPIN! (FREE)';
+      } else if (data.isMiss) {
+        $('result').className = 'result muted';
+        $('result').textContent = 'NO WIN — TRY AGAIN';
+        $('info-remaining').textContent = data.remainingSpins;
+      } else {
+        const prize = data.prize;
+        reels.forEach(r => r.flashWin());
+        const rect = $('reel2').getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        if (prize >= 1000) {
+          $('result').className = 'result win-jackpot';
+          $('result').textContent = `🏆 JACKPOT $${prize}`;
+          triggerJackpot(prize, cx, cy);
+        } else if (prize >= 100) {
+          $('result').className = 'result';
+          $('result').textContent = `BIG WIN! +$${prize}`;
+          particles.emit(cx, cy, { count: 90 });
+        } else if (prize >= 20) {
+          $('result').className = 'result';
+          $('result').textContent = `WIN! +$${prize}`;
+          particles.emit(cx, cy, { count: 60 });
+        } else {
+          $('result').className = 'result';
+          $('result').textContent = `+$${prize}`;
+          particles.emit(cx, cy, { count: 30, speedMax: 8 });
+        }
+
+        $('info-remaining').textContent = data.remainingSpins;
+        $('info-total-won').textContent = '$' + data.totalWon;
+        refreshHistory();
+      }
+
+      spinning = false;
+      const remaining = data.isRetry
+        ? (parseInt($('info-remaining').textContent) || 0)
+        : data.remainingSpins;
+      updateLeverState(remaining);
+    }
+
+    function triggerJackpot(prize, cx, cy) {
+      // Massive gold burst
+      particles.emit(cx, cy, {
+        count: 200,
+        speedMin: 6,
+        speedMax: 18,
+        palette: ['#f4d837', '#fff04d', '#ff8e34', '#ff8cb6', '#f0f0f0'],
+      });
+      document.body.classList.add('shake');
+      setTimeout(() => document.body.classList.remove('shake'), 500);
+      const ov = $('jackpot-overlay');
+      ov.classList.add('show');
+      setTimeout(() => {
+        particles.emit(window.innerWidth / 2, window.innerHeight * 0.4, {
+          count: 150, speedMin: 4, speedMax: 14,
+          palette: ['#f4d837', '#fff04d', '#ff8e34', '#e0254a'],
+        });
+      }, 350);
+      setTimeout(() => ov.classList.remove('show'), 3500);
+    }
+
+    /* ============================================================
+       History
+       ============================================================ */
+    function renderHistory(history) {
+      const list = $('history-list');
+      if (!history || history.length === 0) {
+        list.innerHTML = '<div class="history-empty">NO RECORDS</div>';
+        return;
+      }
+      list.innerHTML = history.map(h => `
+        <div class="history-item">
+          <span class="prize">${PRIZE_SYMBOLS[h.prize_dollars] || '🎁'} $${h.prize_dollars}</span>
+          <span class="time">${h.created_at}</span>
+        </div>
+      `).join('');
+    }
+    async function refreshHistory() {
+      try {
+        const res = await fetch(API + '/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          renderHistory(data.history);
+          $('info-remaining').textContent = data.remainingSpins;
+          $('info-total-won').textContent = '$' + data.totalWon;
+          updateLeverState(data.remainingSpins);
+        }
+      } catch (e) { /* silent */ }
+    }
+
+    /* ============================================================
+       Logout
+       ============================================================ */
+    $('btn-logout').onclick = () => {
+      currentCardKey = '';
+      $('login-panel').style.display = 'block';
+      $('game-panel').style.display = 'none';
+      $('scratch-panel').style.display = 'none';
+      $('card-input').value = '';
+      $('result').className = 'result muted';
+      $('result').textContent = 'PRESS LEVER TO START';
+      reels.forEach(r => r.reset());
+    };
+
+    $('btn-scratch-logout').onclick = () => $('btn-logout').click();
+
+    /* ============================================================
+       Scratch Card
+       ============================================================ */
+    const SCRATCH_REWARDS_CLIENT = [2, 4, 6, 8, 12, 15];
+    const SCRATCH_MINES_COUNT = 2;
+    const SCRATCH_MAX_REVEALS_CLIENT = 6;
+    let scratchBusy = false;
+    let scratchPosMap = [0,1,2,3,4,5,6,7,8];
+    let scratchRevealed = [];
+    let scratchMines = [];
+    let scratchIsTest = false;
+
+    function showScratch(data) {
+      $('login-panel').style.display = 'none';
+      $('game-panel').style.display = 'none';
+      $('scratch-panel').style.display = 'block';
+      $('scratch-dollars').textContent = '$' + data.dollars;
+      scratchPosMap = [0,1,2,3,4,5,6,7,8];
+      scratchRevealed = [];
+      scratchMines = [];
+      scratchIsTest = (data.cardName || '').includes('test');
+
+      if (data.scratchGame) {
+        renderScratchState(data.scratchGame);
+      } else {
+        startScratchGame();
+      }
+    }
+
+    async function startScratchGame() {
+      try {
+        const res = await fetch(API + '/scratch/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          $('scratch-progress').textContent = data.error || '启动失败';
+          return;
+        }
+        renderScratchState(data);
+      } catch (e) {
+        $('scratch-progress').textContent = '网络错误';
+      }
+    }
+
+    function shuffleUnrevealed() {
+      const unrevealed = [];
+      const revealedPositions = [];
+      for (let pos = 0; pos < 9; pos++) {
+        if (scratchRevealed.includes(scratchPosMap[pos])) {
+          revealedPositions.push(pos);
+        } else {
+          unrevealed.push(pos);
+        }
+      }
+      if (unrevealed.length <= 1) return;
+
+      const vals = unrevealed.map(pos => scratchPosMap[pos]);
+      for (let i = vals.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [vals[i], vals[j]] = [vals[j], vals[i]];
+      }
+      unrevealed.forEach((pos, i) => { scratchPosMap[pos] = vals[i]; });
+    }
+
+    function renderScratchState(state, doShuffle) {
+      const revealed = state.revealed || [];
+      const mines = state.mines || [];
+      scratchRevealed = revealed;
+      scratchMines = mines;
+
+      const mineHits = revealed.filter(i => mines.includes(i)).length;
+      const safeCount = revealed.length - mineHits;
+      const gameOver = state.status === 'won' || state.status === 'lost' || state.status === 'cashout';
+
+      if (doShuffle && !gameOver) shuffleUnrevealed();
+
+      const grid = $('scratch-grid');
+      grid.innerHTML = '';
+      for (let pos = 0; pos < 9; pos++) {
+        const realIdx = scratchPosMap[pos];
+        const cell = document.createElement('div');
+        cell.className = 'scratch-cell';
+        if (revealed.includes(realIdx)) {
+          cell.classList.add('revealed');
+          if (mines.includes(realIdx)) {
+            cell.classList.add('mine');
+            cell.textContent = '💣';
+          } else {
+            cell.classList.add('safe');
+            cell.textContent = '💰';
+          }
+        } else if (gameOver) {
+          cell.classList.add('disabled');
+          cell.textContent = '?';
+        } else {
+          cell.textContent = '?';
+          cell.onclick = () => revealCell(realIdx);
+        }
+        grid.appendChild(cell);
+      }
+
+      $('scratch-opened').textContent = Math.min(safeCount, SCRATCH_MAX_REVEALS_CLIENT) + '/' + SCRATCH_MAX_REVEALS_CLIENT;
+      $('scratch-current-prize').textContent = '$' + state.prize;
+      $('scratch-prize-value').textContent = '$' + state.prize;
+      if (state.status === 'lost') {
+        $('scratch-prize-value').classList.add('lost');
+      } else {
+        $('scratch-prize-value').classList.remove('lost');
+      }
+
+      const statusBar = $('scratch-status-bar');
+      const cashoutBtn = $('btn-scratch-cashout');
+      const resetBtn = $('btn-scratch-reset');
+      resetBtn.style.display = 'none';
+      if (state.status === 'won') {
+        statusBar.style.display = 'block';
+        statusBar.className = 'scratch-status won';
+        statusBar.textContent = 'ALL CLEAR! +$' + state.prize;
+        $('scratch-progress').textContent = '恭喜通关！奖励已入队充值';
+        cashoutBtn.style.display = 'none';
+        if (scratchIsTest) resetBtn.style.display = 'block';
+      } else if (state.status === 'lost') {
+        statusBar.style.display = 'block';
+        statusBar.className = 'scratch-status lost';
+        statusBar.textContent = 'BOOM! $0';
+        $('scratch-progress').textContent = '踩到地雷，奖励归零';
+        cashoutBtn.style.display = 'none';
+        if (scratchIsTest) resetBtn.style.display = 'block';
+      } else if (state.status === 'cashout') {
+        statusBar.style.display = 'block';
+        statusBar.className = 'scratch-status won';
+        statusBar.textContent = 'CASHED OUT +$' + state.prize;
+        $('scratch-progress').textContent = '已结算！奖励已入队充值';
+        cashoutBtn.style.display = 'none';
+        if (scratchIsTest) resetBtn.style.display = 'block';
+      } else {
+        statusBar.style.display = 'none';
+        const remaining = SCRATCH_MAX_REVEALS_CLIENT - safeCount;
+        $('scratch-progress').textContent = '还可刮开 ' + remaining + ' 个格子';
+        cashoutBtn.style.display = safeCount > 0 ? 'block' : 'none';
+        cashoutBtn.textContent = 'CASH OUT $' + (safeCount > 0 ? SCRATCH_REWARDS_CLIENT[safeCount - 1] : 0);
+      }
+    }
+
+    function emitGridCorners(opts) {
+      const rect = $('scratch-grid').getBoundingClientRect();
+      const pad = 20;
+      const corners = [
+        [rect.left - pad, rect.top - pad],
+        [rect.right + pad, rect.top - pad],
+        [rect.left - pad, rect.bottom + pad],
+        [rect.right + pad, rect.bottom + pad],
+      ];
+      const perCorner = Math.ceil((opts.count || 40) / 4);
+      for (const [x, y] of corners) {
+        particles.emit(x, y, { ...opts, count: perCorner });
+      }
+    }
+
+    async function revealCell(idx) {
+      if (scratchBusy) return;
+      scratchBusy = true;
+      $('scratch-progress').textContent = '刮开中...';
+      try {
+        const res = await fetch(API + '/scratch/reveal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey, cellIndex: idx }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          $('scratch-progress').textContent = data.error || '操作失败';
+          scratchBusy = false;
+          return;
+        }
+
+        if (data.hit) {
+          renderScratchState(data);
+          document.body.classList.add('scratch-shake');
+          setTimeout(() => document.body.classList.remove('scratch-shake'), 500);
+          emitGridCorners({
+            count: 80,
+            palette: ['#e0254a', '#ff5577', '#8a0020', '#ff8e34'],
+          });
+        } else {
+          renderScratchState(data, true);
+          if (data.status === 'won') {
+            emitGridCorners({
+              count: 120,
+              palette: ['#f4d837', '#fff04d', '#00d4d4', '#4cc24f', '#ff8cb6'],
+            });
+          } else {
+            emitGridCorners({
+              count: 16, speedMax: 6,
+              palette: ['#f4d837', '#fff04d', '#00d4d4'],
+            });
+          }
+        }
+      } catch (e) {
+        $('scratch-progress').textContent = '网络错误';
+      }
+      scratchBusy = false;
+    }
+
+    $('btn-scratch-cashout').onclick = async () => {
+      if (scratchBusy) return;
+      scratchBusy = true;
+      $('scratch-progress').textContent = '结算中...';
+      try {
+        const res = await fetch(API + '/scratch/cashout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          $('scratch-progress').textContent = data.error || '结算失败';
+          scratchBusy = false;
+          return;
+        }
+        renderScratchState(data);
+        emitGridCorners({
+          count: 80,
+          palette: ['#f4d837', '#fff04d', '#00d4d4', '#4cc24f'],
+        });
+      } catch (e) {
+        $('scratch-progress').textContent = '网络错误';
+      }
+      scratchBusy = false;
+    };
+
+    $('btn-scratch-reset').onclick = async () => {
+      if (scratchBusy) return;
+      scratchBusy = true;
+      $('scratch-progress').textContent = '重置中...';
+      try {
+        const res = await fetch(API + '/scratch/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          $('scratch-progress').textContent = data.error || '重置失败';
+          scratchBusy = false;
+          return;
+        }
+        scratchPosMap = [0,1,2,3,4,5,6,7,8];
+        scratchRevealed = [];
+        scratchMines = [];
+        await startScratchGame();
+      } catch (e) {
+        $('scratch-progress').textContent = '网络错误';
+      }
+      scratchBusy = false;
+    };
+
+    /* ============================================================
+       Login icon mini reels — endless cycle + bulb decoration
+       ============================================================ */
+    (function setupMiniReels() {
+      ['mini-strip-1', 'mini-strip-2', 'mini-strip-3'].forEach(id => {
+        const el = $(id);
+        const symbols = ALL_SYMBOLS.slice().sort(() => Math.random() - 0.5);
+        // Each line is 64px; 9 symbols × 64 = 576 = matches @keyframes mini-cycle
+        el.innerHTML = symbols.concat(symbols).map(s => `<div>${s}</div>`).join('');
+      });
+    })();
+  </script>
+</body>
+</html>

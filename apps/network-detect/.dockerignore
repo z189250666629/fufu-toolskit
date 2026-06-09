@@ -1,0 +1,17 @@
+.git
+.gitlab-ci.yml
+.github
+.vscode
+.idea
+.claude
+docs
+*.log
+*.tmp
+*.temp
+.env
+.env.*
+.user.ini
+newapi-log-sources.json
+*.bak
+*.backup
+*~
