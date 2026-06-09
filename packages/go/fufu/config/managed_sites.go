@@ -1,11 +1,9 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"fufu/newapi"
 )
@@ -105,10 +103,8 @@ func DeploymentSitesFromEnv() []newapi.Site {
 
 func LoadManagedSites(rootDir string) ([]newapi.Site, string) {
 	if inline := Env("NEWAPI_MANAGED_API_SITES"); inline != "" {
-		var data any
-		dec := json.NewDecoder(strings.NewReader(inline))
-		dec.UseNumber()
-		if err := dec.Decode(&data); err != nil {
+		data, err := decodeManagedSitesJSON(inline)
+		if err != nil {
 			return nil, "NEWAPI_MANAGED_API_SITES 不是有效 JSON: " + err.Error()
 		}
 		return NormalizeManagedSites(data, nil)
@@ -131,10 +127,8 @@ func LoadManagedSites(rootDir string) ([]newapi.Site, string) {
 		if err != nil {
 			continue
 		}
-		var data any
-		dec := json.NewDecoder(strings.NewReader(string(raw)))
-		dec.UseNumber()
-		if err := dec.Decode(&data); err != nil {
+		data, err := decodeManagedSitesJSON(string(raw))
+		if err != nil {
 			lastErr = filepath.Base(path) + " 不是有效 JSON: " + err.Error()
 			continue
 		}
