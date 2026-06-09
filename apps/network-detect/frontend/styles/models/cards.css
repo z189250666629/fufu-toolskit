@@ -1,0 +1,199 @@
+.dashboard-title {
+  margin: 16px 0 12px;
+}
+
+.dashboard-title h2 {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.dashboard-title p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.metric-head {
+  display: grid;
+  gap: 4px;
+}
+
+.metric b {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.metric small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.metric-danger b {
+  color: var(--sage-danger-fg);
+}
+
+.metric-success b {
+  color: var(--sage-success-fg);
+}
+
+.section,
+.empty-panel {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.empty-panel {
+  min-height: 160px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.empty-panel h2 {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.empty-panel p {
+  max-width: 640px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-head h2 {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.section-head span {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.site-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.site-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface-soft);
+}
+
+.site-head,
+.site-foot {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.site-head h3 {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.site-head p {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.site-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.site-metrics .metric {
+  padding: 12px;
+  box-shadow: none;
+}
+
+.site-metrics .metric b {
+  font-size: 15px;
+}
+
+.site-foot {
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.site-error {
+  margin-top: 8px;
+  color: var(--sage-danger-fg);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 9999px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.status.ok {
+  color: var(--sage-success-fg);
+  background: var(--success-bg);
+}
+
+.status.bad {
+  color: var(--sage-danger-fg);
+  background: var(--danger-bg);
+}
+
+.status.warn {
+  color: var(--sage-warning-fg);
+  background: var(--warning-bg);
+}
+
+.status.muted {
+  color: var(--muted);
+  background: var(--surface-strong);
+}

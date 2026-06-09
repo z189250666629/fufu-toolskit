@@ -1,0 +1,33 @@
+.info-list {
+  display: grid;
+  gap: 8px;
+}
+
+.info-list > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.info-list > div:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.info-list span {
+  color: var(--muted);
+}
+
+code {
+  display: block;
+  margin-top: 8px;
+  color: var(--accent-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
