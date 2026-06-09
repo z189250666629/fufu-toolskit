@@ -52,32 +52,12 @@ func NormalizeManagedSites(data any, allowedNames map[string]bool) ([]newapi.Sit
 		if name == "" || (allowedNames != nil && !allowedNames[name]) || seen[name] {
 			continue
 		}
-		url := NormalizeBaseURL(stringValue(item, "url"))
-		token := tokenValue(item)
-		if url == "" || token == "" {
-			continue
-		}
-		kind := strings.ToLower(stringValue(item, "kind", "role", "siteType", "site_type"))
-		if kind == "" {
-			kind = "api"
-		}
-		if kind != "api" && kind != "managed-api" && kind != "managed_api" && kind != "admin" {
+		site, ok := normalizeManagedSiteItem(item)
+		if !ok {
 			continue
 		}
 		seen[name] = true
-		sites = append(sites, newapi.Site{
-			Name:                name,
-			URL:                 url,
-			Token:               token,
-			UserID:              stringOrDefault(stringValue(item, "userId", "user_id"), "1"),
-			Kind:                kind,
-			SkipUserHeader:      boolValue(item["skipUserHeader"]) || boolValue(item["skip_user_header"]),
-			QuotaUnit:           int64Value(first(item, "quotaUnit", "quota_unit"), newapi.DefaultQuotaUnit),
-			Currency:            stringOrDefault(stringValue(item, "currency"), "$"),
-			RechargeRatio:       floatValue(first(item, "rechargeRatio", "recharge_ratio", "exchangeRate", "exchange_rate"), 1),
-			ChannelListEndpoint: stringValue(item, "channelListEndpoint", "channel_list_endpoint"),
-			Note:                stringValue(item, "note"),
-		})
+		sites = append(sites, site)
 	}
 	if len(sites) == 0 && len(items) > 0 {
 		return nil, "配置文件中没有可用的 API 站点"
