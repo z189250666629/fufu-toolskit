@@ -5,27 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 )
 
 func (a *App) executeMerge(ctx context.Context, p ExecuteMergeParams) (MergeResult, error) {
-	validate := func(tokens []ResolvedToken) error {
-		return validateExecuteMergeRequest(p, tokens)
-	}
 	var onProgress func(MergeJobPatch)
 	if p.JobID != "" {
 		onProgress = func(patch MergeJobPatch) { a.setMergeJob(p.JobID, patch) }
 	}
-	var quota *int64
-	if p.Role == RoleAdmin && p.CustomQuota {
-		quota = p.TotalQuota
-	}
-	name := ""
-	if p.Role != RoleGuest {
-		name = strings.TrimSpace(p.Name)
-	}
-	return a.mergeCards(ctx, MergeCardParams{Keys: p.Keys, IntervalUnit: p.IntervalUnit, Quota: quota, Name: name, Role: p.Role, JobID: p.JobID, Validate: validate, OnProgress: onProgress})
+	return a.mergeCards(ctx, buildExecuteMergeCardParams(p, onProgress))
 }
 
 func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeResult, err error) {
