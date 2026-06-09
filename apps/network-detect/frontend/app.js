@@ -3,16 +3,9 @@ import {
   idFragment,
   formatTime,
   formatServerTime,
-  average,
-  formatMs,
-  formatRate
+  formatMs
 } from './utils.js';
 import {
-  SAMPLE_COUNT,
-  TIMEOUT_MS,
-  addCacheBust,
-  fetchErrorText,
-  fetchWithTimeout,
   normalizeTargetGroups
 } from './connectivity.js';
 import {
@@ -32,6 +25,9 @@ import {
 import {
   renderModelAvailability
 } from './render_models.js';
+import {
+  runConnectivityTests as runConnectivityTestSequence
+} from './connectivity_runner.js';
 
 const app = document.getElementById('app');
 let filterRenderTimer = null;
@@ -292,184 +288,12 @@ function setConnectivityState(partial) {
   render();
 }
 
-async function probeNoCors(url, onSample) {
-  const attempts = [];
-
-  for (let i = 0; i < SAMPLE_COUNT; i++) {
-    onSample(i + 1, SAMPLE_COUNT);
-    const started = performance.now();
-    try {
-      await fetchWithTimeout(addCacheBust(url), {
-        method: 'GET',
-        mode: 'no-cors',
-        cache: 'no-store',
-        credentials: 'omit',
-        redirect: 'follow'
-      }, TIMEOUT_MS);
-
-      attempts.push({
-        ok: true,
-        ms: performance.now() - started,
-        error: ''
-      });
-    } catch (error) {
-      attempts.push({
-        ok: false,
-        ms: performance.now() - started,
-        error: fetchErrorText(error)
-      });
-    }
-  }
-
-  const okAttempts = attempts.filter((item) => item.ok);
-  return {
-    ok: okAttempts.length > 0,
-    successRate: okAttempts.length / attempts.length,
-    averageMs: average(okAttempts.map((item) => item.ms)),
-    lastError: attempts.at(-1)?.error || ''
-  };
-}
-
-async function testTarget(group, url, index, total) {
-  const baseProgress = (index / total) * 90;
-  setConnectivityState({
-    currentUrl: url,
-    progress: Math.round(baseProgress),
-    progressText: `测试 ${group.name}: ${url}`
-  });
-
-  const reach = await probeNoCors(url, (current, samples) => {
-    const sampleProgress = (current / samples) * (90 / total);
-    setConnectivityState({
-      progress: Math.round(baseProgress + sampleProgress),
-      progressText: `${group.name} 采样 ${current}/${samples}`,
-      currentUrl: url
-    });
-  });
-
-  return {
-    groupId: group.id,
-    groupName: group.name,
-    url,
-    reachable: reach.ok,
-    successRate: reach.successRate,
-    averageMs: reach.averageMs,
-    lastError: reach.lastError
-  };
-}
-
 async function runConnectivityTests() {
-  if (state.connectivity.running) return;
-
-  const allTargets = targetGroups().flatMap((group) => group.urls.map((url) => ({ group, url })));
-  if (!allTargets.length) {
-    setConnectivityState({
-      mode: 'complete',
-      tone: 'bad',
-      icon: 'x',
-      title: '没有测试目标',
-      text: '后端没有返回固定 Base URL 目标。',
-      progress: 100,
-      progressText: '没有目标',
-      currentUrl: '-',
-      success: '-',
-      testedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      results: []
-    });
-    return;
-  }
-
-  setConnectivityState({
-    running: true,
-    mode: 'running',
-    tone: 'warn',
-    icon: '...',
-    title: '测试中',
-    text: '正在从当前浏览器逐个访问固定 Base URL。',
-    progress: 0,
-    progressText: '准备测试',
-    currentUrl: '正在准备测试目标',
-    success: '-',
-    testedAt: '-',
-    results: []
+  await runConnectivityTestSequence({
+    connectivity: state.connectivity,
+    targetGroups: targetGroups(),
+    setConnectivityState
   });
-
-  const results = [];
-
-  try {
-    for (let i = 0; i < allTargets.length; i++) {
-      const { group, url } = allTargets[i];
-      const result = await testTarget(group, url, i, allTargets.length);
-      results.push(result);
-      state.connectivity.results = [...results];
-      render();
-    }
-
-    const totalReachable = results.filter((item) => item.reachable).length;
-    const total = results.length;
-    const testedAt = new Date().toLocaleString('zh-CN', { hour12: false });
-
-    if (totalReachable === total) {
-      setConnectivityState({
-        running: false,
-        mode: 'complete',
-        tone: 'ok',
-        icon: 'OK',
-        title: '全部可达',
-        text: '当前用户浏览器可以访问全部 API 次数站和 Token 站 Base URL。',
-        progress: 100,
-        progressText: '测试完成',
-        currentUrl: '全部目标测试完成',
-        success: formatRate(totalReachable / total),
-        testedAt,
-        results
-      });
-    } else if (totalReachable > 0) {
-      setConnectivityState({
-        running: false,
-        mode: 'complete',
-        tone: 'warn',
-        icon: '!',
-        title: '部分可达',
-        text: '当前用户网络只能访问部分 fufu Base URL，请优先使用可达且延迟较低的站点。',
-        progress: 100,
-        progressText: '测试完成',
-        currentUrl: '全部目标测试完成',
-        success: formatRate(totalReachable / total),
-        testedAt,
-        results
-      });
-    } else {
-      setConnectivityState({
-        running: false,
-        mode: 'complete',
-        tone: 'bad',
-        icon: 'x',
-        title: '全部不可达',
-        text: '当前用户浏览器无法访问这些 fufu Base URL。可能是 DNS、证书、网络阻断、代理或目标服务异常。',
-        progress: 100,
-        progressText: '测试完成',
-        currentUrl: '全部目标测试完成',
-        success: '0%',
-        testedAt,
-        results
-      });
-    }
-  } catch (error) {
-    setConnectivityState({
-      running: false,
-      mode: 'complete',
-      tone: 'bad',
-      icon: 'x',
-      title: '测试异常',
-      text: error.message || '浏览器执行检测时发生异常。',
-      progress: 100,
-      progressText: '测试异常',
-      currentUrl: '-',
-      testedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      results
-    });
-  }
 }
 
 function getFixedTargetUrls() {
