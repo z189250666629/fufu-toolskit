@@ -1,9 +1,7 @@
 package newapi
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -82,26 +80,9 @@ func (c *Client) Request(ctx context.Context, method, endpoint string, body any)
 	if c == nil {
 		return Response{}, nil, fmt.Errorf("nil NewAPI client")
 	}
-	endpoint = requestEndpoint(endpoint)
-	var reader io.Reader
-	if body != nil {
-		payload, err := json.Marshal(body)
-		if err != nil {
-			return Response{}, nil, err
-		}
-		reader = bytes.NewReader(payload)
-	}
-	req, err := http.NewRequestWithContext(ctx, strings.ToUpper(method), strings.TrimRight(c.Site.URL, "/")+endpoint, reader)
+	req, err := buildHTTPRequest(ctx, c, method, endpoint, body)
 	if err != nil {
 		return Response{}, nil, err
-	}
-	for key, values := range c.Headers() {
-		for _, value := range values {
-			req.Header.Add(key, value)
-		}
-	}
-	if shouldSetJSONContentType(method, body) {
-		req.Header.Set("Content-Type", "application/json")
 	}
 	client := c.HTTPClient
 	if client == nil {
