@@ -1,19 +1,21 @@
 # fufu-toolskit
 
-`fufu-toolskit` 是把三个 FuFu 项目合并后的 monorepo：
+`fufu-toolskit` 是把 FuFu 工具集合合并后的 monorepo：
 
 | 子项目 | 目录 | 默认端口 | 说明 |
 | --- | --- | ---: | --- |
+| y2k-nav | `apps/y2k-nav` | `33148` | 静态导航页 |
 | fufu-combine | `apps/fufu-combine` | `3456` | Go 后端 + 原生单页前端，用于合卡/生成卡 |
 | fufu-act / activity | `apps/fufu-act` | `18820` | Node.js Express 活动抽奖/刮刮卡服务 |
 | network-detect | `apps/network-detect` | `8080` | Node.js 网络检测和 NewAPI 用量看板 |
 
-当前合并方式是“同仓库、独立应用”：三个服务各自保留原入口、依赖和配置，避免强行改成单个进程导致功能互相影响。
+当前合并方式是“同仓库、独立应用”：导航页和三个服务各自保留原入口、依赖和配置，避免强行改成单个进程导致功能互相影响。
 
 ## 目录结构
 
 ```text
 apps/
+  y2k-nav/          # 导航页
   fufu-combine/      # 原 fufu-combine
   fufu-act/          # 原 activity / fufu_act
   network-detect/    # 原 network-detect / network_detect
@@ -134,5 +136,5 @@ npm test
 
 ## CI/CD
 
-打标后的部署已拆成三部分：fufu-combine、fufu-act/activity、network-detect。详见 docs/CI_CD.md。
+打标后的部署已拆分为 y2k-nav、fufu-combine、fufu-act/activity、network-detect。详见 docs/CI_CD.md。
 

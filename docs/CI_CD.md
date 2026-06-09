@@ -8,20 +8,22 @@
 - 生产部署只认 `v*` tag。
 - pre-release tag 不部署：任何包含 `-` 的 tag（如 `v1.2.3-rc1`）都会跳过。
 - tag 还必须匹配 commit directive；没有 directive 的 tag 只跑 gate，然后跳过部署。
-- 三个应用分成三份 workflow，互不阻塞：
+- 四个应用分成四份 workflow，互不阻塞：
+  - `.github/workflows/deploy-y2k-nav.yml`
   - `.github/workflows/deploy-combine.yml`
   - `.github/workflows/deploy-act.yml`
   - `.github/workflows/deploy-network.yml`
 
-## 三段式部署
+## 分模块部署
 
 | Workflow | 目录 | 镜像 | 默认远端路径 | 默认端口 | Directive |
 | --- | --- | --- | --- | ---: | --- |
+| `deploy-y2k-nav` | `apps/y2k-nav` | `ghcr.io/<owner>/<repo>-y2k-nav` | `/data/docker/y2k-nav` | `33148` | `[deploy y2k]` / `[deploy y2k-nav]` / `[deploy nav]` |
 | `deploy-combine` | `apps/fufu-combine` | `ghcr.io/<owner>/<repo>-fufu-combine` | `/data/docker/fufu-combine` | `33147` | `[deploy combine]` / `[deploy fufu-combine]` |
 | `deploy-act` | `apps/fufu-act` | `ghcr.io/<owner>/<repo>-fufu-act` | `/data/docker/fufu-act` | `18820` | `[deploy act]` / `[deploy activity]` / `[deploy fufu-act]` |
 | `deploy-network` | `apps/network-detect` | `ghcr.io/<owner>/<repo>-network-detect` | `/data/docker/network-detect` | `38473` | `[deploy network]` / `[deploy network-detect]` / `[deploy network_detect]` |
 
-`[deploy all]` 会同时触发三份部署。
+`[deploy all]` 会同时触发四份部署。
 
 ## 示例
 
@@ -100,7 +102,9 @@ scripts/deploy-docker-app.sh
 
 | Name | 默认值 |
 | --- | --- |
-| `DEPLOY_PATH` | `/data/docker/fufu-toolskit`；作为统一根目录时会部署到 `<DEPLOY_PATH>/fufu-combine`、`<DEPLOY_PATH>/fufu-act`、`<DEPLOY_PATH>/network-detect` |
+| `DEPLOY_PATH` | `/data/docker/fufu-toolskit`；作为统一根目录时会部署到 `<DEPLOY_PATH>/y2k-nav`、`<DEPLOY_PATH>/fufu-combine`、`<DEPLOY_PATH>/fufu-act`、`<DEPLOY_PATH>/network-detect` |
+| `Y2K_NAV_DEPLOY_PATH` | 不填则回退 `DEPLOY_PATH/y2k-nav` 或 `/data/docker/y2k-nav` |
+| `Y2K_NAV_PORT` | `33148` |
 | `FUFU_COMBINE_DEPLOY_PATH` / `COMBINE_DEPLOY_PATH` | 不填则回退 `DEPLOY_PATH/fufu-combine` 或 `/data/docker/fufu-combine` |
 | `FUFU_COMBINE_HOST_PORT` / `COMBINE_PORT` | `33147` |
 | `FUFU_ACT_DEPLOY_PATH` / `ACT_DEPLOY_PATH` | 不填则回退 `DEPLOY_PATH/fufu-act` 或 `/data/docker/fufu-act` |
@@ -169,6 +173,7 @@ npm test
 本机如果安装 Docker，可以额外检查：
 
 ```bash
+docker compose -f infra/deploy/y2k-nav/docker-compose.yml config --quiet
 docker compose -f infra/deploy/fufu-combine/docker-compose.yml config --quiet
 docker compose -f infra/deploy/fufu-act/docker-compose.yml config --quiet
 docker compose -f infra/deploy/network-detect/docker-compose.yml config --quiet

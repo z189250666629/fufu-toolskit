@@ -1,0 +1,19 @@
+services:
+  y2k-nav:
+    image: ${APP_IMAGE:?APP_IMAGE is required}:${APP_TAG:?APP_TAG is required}
+    container_name: ${CONTAINER_NAME:-y2k-nav}
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-33148}:80"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1/
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s

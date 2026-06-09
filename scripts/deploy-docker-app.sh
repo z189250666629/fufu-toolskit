@@ -138,10 +138,12 @@ PY
       write_env_var "$name"
     done
     ;;
+  y2k-nav)
+    ;;
   network-detect)
     for name in \
       NEWAPI_MANAGED_API_SITES NEWAPI_MANAGED_API_CONFIG \
-      NEWAPI_API_SITE_TOKEN NEWAPI_TOKEN_SITE_TOKEN NEWAPI_API_SITE_URL NEWAPI_TOKEN_SITE_URL \
+      NEWAPI_API_SITE_TOKEN NEWAPI_TOKEN_SITE_TOKEN NEWAPI_API_SITE_URL NEWAPI_TOKEN_SITE_URL
     do
       write_env_var "$name"
     done
