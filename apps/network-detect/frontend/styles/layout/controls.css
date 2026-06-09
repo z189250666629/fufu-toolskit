@@ -1,0 +1,82 @@
+.control-bar {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.7fr) minmax(120px, 0.6fr) minmax(260px, 1.5fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.field-key {
+  min-width: 208px;
+}
+
+select,
+input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--field-background);
+  font-size: 13px;
+  outline: none;
+}
+
+select,
+input {
+  min-height: 40px;
+}
+
+select:focus,
+input:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px oklch(0.69 0.12 115 / 0.16);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 16px;
+  color: var(--ink);
+  background: var(--sage-surface);
+  font-size: 13px;
+  font-weight: 850;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+a.button {
+  text-decoration: none;
+}
+
+.button.primary {
+  border-color: var(--accent);
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.button.primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.button.small {
+  min-height: 28px;
+  border-radius: 0.5rem;
+  padding: 0 12px;
+  font-size: 11px;
+}

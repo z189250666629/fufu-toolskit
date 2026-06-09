@@ -1,0 +1,68 @@
+.url-monitor-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.72fr) minmax(0, 1.28fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.verdict-card {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--surface-soft);
+}
+
+.verdict-card.running {
+  border-color: var(--warning);
+}
+
+.verdict-card.complete {
+  border-color: var(--line-strong);
+}
+
+.verdict-icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--surface-strong);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.verdict-icon.ok {
+  color: var(--sage-success-fg);
+  background: var(--success-bg);
+}
+
+.verdict-icon.warn {
+  color: var(--sage-warning-fg);
+  background: var(--warning-bg);
+}
+
+.verdict-icon.bad {
+  color: var(--sage-danger-fg);
+  background: var(--danger-bg);
+}
+
+.verdict-body {
+  min-width: 0;
+}
+
+.verdict-body h2 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.verdict-body p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
