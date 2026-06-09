@@ -2,10 +2,13 @@
   "name": "network-detect",
   "version": "2.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "go run .",
     "start": "go run .",
     "build": "go build -o network-detect .",
-    "test": "go test ./..."
+    "test": "npm run test:go && npm run test:frontend",
+    "test:go": "go test ./...",
+    "test:frontend": "node --test frontend/*.test.mjs"
   }
 }
