@@ -150,17 +150,8 @@ func IsSuccess(data map[string]any) bool {
 }
 
 func ErrorMessage(data map[string]any, status int, fallback string) string {
-	for _, key := range []string{"message", "error"} {
-		if value := strings.TrimSpace(fmt.Sprint(data[key])); value != "" && value != "<nil>" {
-			return value
-		}
-	}
-	if nested, ok := data["data"].(map[string]any); ok {
-		for _, key := range []string{"message", "error"} {
-			if value := strings.TrimSpace(fmt.Sprint(nested[key])); value != "" && value != "<nil>" {
-				return value
-			}
-		}
+	if value, ok := messageFromPayload(data); ok {
+		return value
 	}
 	if status > 0 {
 		return fmt.Sprintf("NewAPI HTTP %d", status)
