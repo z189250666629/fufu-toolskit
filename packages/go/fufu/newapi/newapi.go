@@ -50,20 +50,7 @@ type Client struct {
 }
 
 func NewClient(site Site) *Client {
-	if site.UserID == "" {
-		site.UserID = "1"
-	}
-	if site.QuotaUnit <= 0 {
-		site.QuotaUnit = DefaultQuotaUnit
-	}
-	if site.Currency == "" {
-		site.Currency = "$"
-	}
-	if site.RechargeRatio <= 0 {
-		site.RechargeRatio = 1
-	}
-	site.URL = strings.TrimRight(strings.TrimSpace(site.URL), "/")
-	return &Client{Site: site, HTTPClient: &http.Client{Timeout: 60 * time.Second}}
+	return &Client{Site: normalizeSite(site), HTTPClient: &http.Client{Timeout: 60 * time.Second}}
 }
 
 type Response struct {
@@ -95,9 +82,7 @@ func (c *Client) Request(ctx context.Context, method, endpoint string, body any)
 	if c == nil {
 		return Response{}, nil, fmt.Errorf("nil NewAPI client")
 	}
-	if !strings.HasPrefix(endpoint, "/") {
-		endpoint = "/" + endpoint
-	}
+	endpoint = requestEndpoint(endpoint)
 	var reader io.Reader
 	if body != nil {
 		payload, err := json.Marshal(body)
@@ -115,7 +100,7 @@ func (c *Client) Request(ctx context.Context, method, endpoint string, body any)
 			req.Header.Add(key, value)
 		}
 	}
-	if body != nil && strings.ToUpper(method) != http.MethodGet && strings.ToUpper(method) != http.MethodHead {
+	if shouldSetJSONContentType(method, body) {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	client := c.HTTPClient
