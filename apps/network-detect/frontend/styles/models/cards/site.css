@@ -1,0 +1,63 @@
+.site-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.site-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface-soft);
+}
+
+.site-head,
+.site-foot {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.site-head h3 {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.site-head p {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.site-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.site-metrics .metric {
+  padding: 12px;
+  box-shadow: none;
+}
+
+.site-metrics .metric b {
+  font-size: 15px;
+}
+
+.site-foot {
+  align-items: center;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.site-error {
+  margin-top: 8px;
+  color: var(--sage-danger-fg);
+  font-size: 12px;
+  line-height: 1.45;
+}

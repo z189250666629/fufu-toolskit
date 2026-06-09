@@ -1,0 +1,15 @@
+.dashboard-title {
+  margin: 16px 0 12px;
+}
+
+.dashboard-title h2 {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.dashboard-title p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
