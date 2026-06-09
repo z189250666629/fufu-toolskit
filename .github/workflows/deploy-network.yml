@@ -106,26 +106,26 @@ jobs:
     name: Deploy network-detect
     needs: docker
     runs-on: ubuntu-latest
-    environment: docker
+    environment: toolskit
     env:
       APP_NAME: network-detect
       APP_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-network-detect
       APP_TAG: ${{ github.ref_name }}
       REGISTRY: ghcr.io
-      REGISTRY_USER: ${{ secrets.GHCR_USERNAME || github.actor }}
-      REGISTRY_PASSWORD: ${{ secrets.GHCR_TOKEN || github.token }}
+      REGISTRY_USER: ${{ vars.REGISTRY_USER || secrets.GHCR_USERNAME || github.actor }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.GHCR_TOKEN || github.token }}
       SSH_HOST: ${{ vars.SSH_HOST || vars.DEPLOY_HOST }}
       SSH_USER: ${{ vars.SSH_USER || vars.DEPLOY_USER }}
       SSH_PORT: ${{ vars.SSH_PORT || vars.DEPLOY_PORT || '22' }}
       SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.DEPLOY_SSH_KEY }}
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS || vars.SSH_KNOWN_HOSTS }}
-      DEPLOY_PATH: ${{ vars.NETWORK_DETECT_DEPLOY_PATH || '/data/docker/network-detect' }}
+      DEPLOY_PATH: ${{ vars.NETWORK_DETECT_DEPLOY_PATH || vars.DETECT_DEPLOY_PATH || vars.DEPLOY_PATH && format('{0}/network-detect', vars.DEPLOY_PATH) || '/data/docker/network-detect' }}
       COMPOSE_FILE: infra/deploy/network-detect/docker-compose.yml
       COMPOSE_SERVICE_NAME: network-detact
       CONTAINER_NAME: ${{ vars.NETWORK_DETECT_CONTAINER_NAME || 'network-detact' }}
       HOST_BIND: ${{ vars.NETWORK_DETECT_HOST_BIND || vars.HOST_BIND || '0.0.0.0' }}
-      HOST_PORT: ${{ vars.NETWORK_DETECT_HOST_PORT || '38473' }}
+      HOST_PORT: ${{ vars.NETWORK_DETECT_HOST_PORT || vars.DETECT_PORT || '38473' }}
       NEWAPI_MANAGED_API_SITES: ${{ secrets.NEWAPI_MANAGED_API_SITES || vars.NEWAPI_MANAGED_API_SITES }}
       NEWAPI_MANAGED_API_CONFIG: ${{ vars.NEWAPI_MANAGED_API_CONFIG }}
       NEWAPI_API_SITE_TOKEN: ${{ secrets.NEWAPI_API_SITE_TOKEN }}

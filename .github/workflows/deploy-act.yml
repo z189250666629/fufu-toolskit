@@ -109,26 +109,26 @@ jobs:
     name: Deploy fufu-act
     needs: docker
     runs-on: ubuntu-latest
-    environment: docker
+    environment: toolskit
     env:
       APP_NAME: fufu-act
       APP_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-fufu-act
       APP_TAG: ${{ github.ref_name }}
       REGISTRY: ghcr.io
-      REGISTRY_USER: ${{ secrets.GHCR_USERNAME || github.actor }}
-      REGISTRY_PASSWORD: ${{ secrets.GHCR_TOKEN || github.token }}
+      REGISTRY_USER: ${{ vars.REGISTRY_USER || secrets.GHCR_USERNAME || github.actor }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.GHCR_TOKEN || github.token }}
       SSH_HOST: ${{ vars.SSH_HOST || vars.DEPLOY_HOST }}
       SSH_USER: ${{ vars.SSH_USER || vars.DEPLOY_USER }}
       SSH_PORT: ${{ vars.SSH_PORT || vars.DEPLOY_PORT || '22' }}
       SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.DEPLOY_SSH_KEY }}
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS || vars.SSH_KNOWN_HOSTS }}
-      DEPLOY_PATH: ${{ vars.FUFU_ACT_DEPLOY_PATH || '/data/docker/fufu-act' }}
+      DEPLOY_PATH: ${{ vars.FUFU_ACT_DEPLOY_PATH || vars.ACT_DEPLOY_PATH || vars.DEPLOY_PATH && format('{0}/fufu-act', vars.DEPLOY_PATH) || '/data/docker/fufu-act' }}
       COMPOSE_FILE: infra/deploy/fufu-act/docker-compose.yml
       COMPOSE_SERVICE_NAME: fufu-act
       CONTAINER_NAME: ${{ vars.FUFU_ACT_CONTAINER_NAME || 'fufu-act' }}
       HOST_BIND: ${{ vars.FUFU_ACT_HOST_BIND || vars.HOST_BIND || '0.0.0.0' }}
-      HOST_PORT: ${{ vars.FUFU_ACT_HOST_PORT || '18820' }}
+      HOST_PORT: ${{ vars.FUFU_ACT_HOST_PORT || vars.ACT_PORT || '18820' }}
       FUFU_API_BASE_URL: ${{ vars.FUFU_API_BASE_URL || vars.NEWAPI_API_SITE_URL }}
       FUFU_API_TOKEN: ${{ secrets.FUFU_API_TOKEN || secrets.NEWAPI_API_SITE_TOKEN }}
       FUFU_API_USER_ID: ${{ vars.FUFU_API_USER_ID || '1' }}

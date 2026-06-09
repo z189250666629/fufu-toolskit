@@ -83,7 +83,7 @@ scripts/deploy-docker-app.sh
 
 ## GitHub Variables
 
-在 GitHub Repo → Settings → Secrets and variables → Actions 配置。
+在 GitHub Repo → Settings → Environments → `toolskit` → Secrets and variables 配置。
 
 ### 通用 Variables
 
@@ -100,12 +100,13 @@ scripts/deploy-docker-app.sh
 
 | Name | 默认值 |
 | --- | --- |
-| `FUFU_COMBINE_DEPLOY_PATH` | `/data/docker/fufu-combine` |
-| `FUFU_COMBINE_HOST_PORT` | `33147` |
-| `FUFU_ACT_DEPLOY_PATH` | `/data/docker/fufu-act` |
-| `FUFU_ACT_HOST_PORT` | `18820` |
-| `NETWORK_DETECT_DEPLOY_PATH` | `/data/docker/network-detect` |
-| `NETWORK_DETECT_HOST_PORT` | `38473` |
+| `DEPLOY_PATH` | `/data/docker/fufu-toolskit`；作为统一根目录时会部署到 `<DEPLOY_PATH>/fufu-combine`、`<DEPLOY_PATH>/fufu-act`、`<DEPLOY_PATH>/network-detect` |
+| `FUFU_COMBINE_DEPLOY_PATH` / `COMBINE_DEPLOY_PATH` | 不填则回退 `DEPLOY_PATH/fufu-combine` 或 `/data/docker/fufu-combine` |
+| `FUFU_COMBINE_HOST_PORT` / `COMBINE_PORT` | `33147` |
+| `FUFU_ACT_DEPLOY_PATH` / `ACT_DEPLOY_PATH` | 不填则回退 `DEPLOY_PATH/fufu-act` 或 `/data/docker/fufu-act` |
+| `FUFU_ACT_HOST_PORT` / `ACT_PORT` | `18820` |
+| `NETWORK_DETECT_DEPLOY_PATH` / `DETECT_DEPLOY_PATH` | 不填则回退 `DEPLOY_PATH/network-detect` 或 `/data/docker/network-detect` |
+| `NETWORK_DETECT_HOST_PORT` / `DETECT_PORT` | `38473` |
 
 ### 业务配置 Variables
 
@@ -134,8 +135,8 @@ scripts/deploy-docker-app.sh
 | `SSH_PRIVATE_KEY_B64` | 推荐；CI SSH 私钥的 base64 单行内容 |
 | `SSH_PRIVATE_KEY` | 可选；明文私钥，优先级低于 `SSH_PRIVATE_KEY_B64` |
 | `SSH_KNOWN_HOSTS` | 可选；未设置时 workflow 会 `ssh-keyscan` |
-| `GHCR_TOKEN` | 可选；远端拉 GHCR 私有镜像用。未设置时使用 workflow 的 `github.token` |
-| `GHCR_USERNAME` | 可选；默认 `github.actor` |
+| `REGISTRY_PASSWORD` / `GHCR_TOKEN` | 可选；远端拉 GHCR 私有镜像用。未设置时使用 workflow 的 `github.token` |
+| `REGISTRY_USER` / `GHCR_USERNAME` | 可选；默认 `github.actor` |
 
 也兼容旧命名：`DEPLOY_SSH_KEY`。
 
