@@ -36,3 +36,55 @@ func TestCombinePageServed(t *testing.T) {
 		t.Fatalf("combine page code=%d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestCombineAPIRoutes(t *testing.T) {
+	for _, path := range []string{
+		"/api/auth",
+		"/api/session",
+		"/api/search-keys",
+		"/api/merge",
+		"/api/public-merge",
+		"/api/generate",
+		"/api/merge-status/job-1",
+		"/api/token/1",
+	} {
+		if !isCombineAPI(path) {
+			t.Fatalf("%s should be routed to combine app", path)
+		}
+	}
+	if isCombineAPI("/api/health") {
+		t.Fatalf("network health endpoint should not be routed to combine app")
+	}
+}
+
+func TestParseListCleansSortsAndDedupes(t *testing.T) {
+	got := parseList(`["beta","alpha","beta",""]`)
+	if strings.Join(got, ",") != "alpha,beta" {
+		t.Fatalf("json parseList = %#v", got)
+	}
+
+	got = parseList(" beta,alpha beta|gamma ")
+	if strings.Join(got, ",") != "alpha,beta,gamma" {
+		t.Fatalf("text parseList = %#v", got)
+	}
+}
+
+func TestModelStatusClassifiers(t *testing.T) {
+	if got := statusFromCounts(0, 0); got != "unknown" {
+		t.Fatalf("empty status = %s", got)
+	}
+	if got := statusFromCounts(4, 1); got != "operational" {
+		t.Fatalf("mostly successful status = %s", got)
+	}
+	if got := statusFromCounts(1, 3); got != "degraded" {
+		t.Fatalf("mixed status = %s", got)
+	}
+	if got := statusFromCounts(0, 3); got != "down" {
+		t.Fatalf("failed status = %s", got)
+	}
+
+	rowStatus := modelRowStatus([]*ModelCell{{Configured: true, Status: "operational"}, {Configured: true, Status: "degraded"}})
+	if rowStatus != "degraded" {
+		t.Fatalf("row status = %s", rowStatus)
+	}
+}
