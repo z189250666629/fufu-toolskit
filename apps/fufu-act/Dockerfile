@@ -1,23 +1,29 @@
-ARG BASE_IMAGE=node:22-bookworm-slim
-FROM ${BASE_IMAGE}
+ARG GO_IMAGE=golang:1.25-alpine
+ARG RUNTIME_IMAGE=alpine:3.22
 
+FROM ${GO_IMAGE} AS build
+WORKDIR /src
+ENV GOWORK=off
+RUN apk add --no-cache ca-certificates
+COPY go.work ./
+COPY packages/go/fufu ./packages/go/fufu
+COPY apps/fufu-act/go.mod ./apps/fufu-act/go.mod
+COPY apps/fufu-act/go.sum ./apps/fufu-act/go.sum
+WORKDIR /src/apps/fufu-act
+RUN go mod download
+WORKDIR /src
+COPY apps/fufu-act ./apps/fufu-act
+WORKDIR /src/apps/fufu-act
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/fufu-act .
+
+FROM ${RUNTIME_IMAGE}
 WORKDIR /app
-ENV NODE_ENV=production
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
-
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-
-COPY public ./public
-COPY server ./server
-COPY scripts ./scripts
+RUN apk add --no-cache ca-certificates wget
+COPY --from=build /out/fufu-act /app/fufu-act
+COPY apps/fufu-act/public ./public
 RUN mkdir -p /app/data
-
 EXPOSE 18820
 ENV SLOT_PORT=18820
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=10s \
-  CMD node -e "fetch('http://127.0.0.1:18820/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "server/index.mjs"]
+  CMD wget -q -O /dev/null http://127.0.0.1:18820/ || exit 1
+CMD ["/app/fufu-act"]
