@@ -171,13 +171,9 @@ func (a *App) loadTraceResult(ctx context.Context, mergeID int64, queryHashes ma
 			ok := deleteOK.Int64 == 1
 			token.DeleteOK = &ok
 		}
-		if kind == "source" {
-			trace.SourceKeys = append(trace.SourceKeys, token)
-			matchedSource = matchedSource || queryHashes[hash]
-		} else if kind == "result" {
-			trace.ResultKey = &token
-			matchedResult = matchedResult || queryHashes[hash]
-		}
+		source, result := appendTraceToken(&trace, kind, token, queryHashes)
+		matchedSource = matchedSource || source
+		matchedResult = matchedResult || result
 	}
 	if err := rows.Err(); err != nil {
 		return TraceResult{}, err
