@@ -1,0 +1,24 @@
+services:
+  fufu-combine:
+    image: ${APP_IMAGE:?APP_IMAGE is required}:${APP_TAG:?APP_TAG is required}
+    container_name: ${CONTAINER_NAME:-fufu-combine}
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-3456}:3456"
+    environment:
+      PORT: 3456
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:3456/
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

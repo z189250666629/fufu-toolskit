@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Local secrets / runtime config
+config.json
+.env
+.env.*
+!.env.example
+
+# Local assistant/editor state
+.claude/settings.local.json
+
+# Logs
+*.log
+logs/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build/output caches
+.tmp/
+tmp/
+dist/
+build/
+coverage/
+
+# Go build artifacts
+fufu-combine
+fufu-combine.exe
+*.test
+*.out
+
+# SQLite trace database
+data/*.db
+data/*.db-wal
+data/*.db-shm

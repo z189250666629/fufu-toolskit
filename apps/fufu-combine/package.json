@@ -1,0 +1,10 @@
+{
+  "name": "fufu-combine",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "go run .",
+    "start": "go run .",
+    "build": "go build -o fufu-combine ."
+  }
+}

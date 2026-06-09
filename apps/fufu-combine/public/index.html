@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合卡 — 次数fufu</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #333;
+    --text: #e8e8e8;
+    --text2: #999;
+    --accent: #c084fc;
+    --accent2: #a855f7;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --warn: #f59e0b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1 .cat { font-size: 1.3rem; }
+  .subtitle {
+    color: var(--text2);
+    font-size: 0.85rem;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text2);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+    min-height: 100px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: #555; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+  .btn-danger {
+    background: var(--danger);
+    color: #fff;
+  }
+  .btn-danger:hover:not(:disabled) { background: #dc2626; }
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .token-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .token-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .token-section-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 0;
+    padding-left: 4px;
+  }
+  .token-section-title.valid { color: var(--success); }
+  .token-section-title.invalid { color: var(--warn); }
+  .token-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .token-item.disabled {
+    opacity: 0.6;
+    border-color: var(--warn);
+  }
+  .token-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+  }
+  .token-meta {
+    font-size: 0.8rem;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+  .token-quota {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--success);
+  }
+  .token-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .trace-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .trace-chain-summary {
+    background: rgba(192, 132, 252, 0.10);
+    border: 1px solid rgba(192, 132, 252, 0.45);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    padding: 10px 12px;
+  }
+  .trace-card {
+    background: rgba(192, 132, 252, 0.08);
+    border: 1px solid rgba(192, 132, 252, 0.35);
+    border-radius: 10px;
+    padding: 12px;
+  }
+  .trace-card.final-step {
+    border-color: rgba(192, 132, 252, 0.72);
+    box-shadow: 0 0 0 1px rgba(192, 132, 252, 0.18);
+  }
+  .trace-title {
+    align-items: center;
+    color: var(--accent);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+    font-weight: 600;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .trace-step-badge,
+  .trace-final-badge {
+    border-radius: 999px;
+    font-size: 0.72rem;
+    line-height: 1;
+    padding: 4px 8px;
+  }
+  .trace-step-badge {
+    background: rgba(192, 132, 252, 0.16);
+    border: 1px solid rgba(192, 132, 252, 0.35);
+    color: var(--accent);
+  }
+  .trace-final-badge {
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: var(--success);
+  }
+  .trace-flow {
+    align-items: center;
+    color: var(--text2);
+    display: flex;
+    flex-wrap: wrap;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.74rem;
+    gap: 6px;
+    margin: 8px 0 2px;
+  }
+  .trace-flow-key {
+    background: rgba(0,0,0,0.20);
+    border: 1px solid rgba(192, 132, 252, 0.22);
+    border-radius: 999px;
+    color: var(--text);
+    padding: 3px 7px;
+  }
+  .trace-arrow {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .trace-row {
+    margin-top: 8px;
+  }
+  .trace-label {
+    color: var(--text2);
+    font-size: 0.78rem;
+    margin-bottom: 4px;
+  }
+  .trace-key {
+    background: rgba(0,0,0,0.22);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+    padding: 7px 8px;
+  }
+  .trace-key:hover {
+    border-color: var(--accent);
+  }
+  .trace-key.chain-key,
+  .trace-key.chain-key:hover {
+    background: rgba(192, 132, 252, 0.10);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(192, 132, 252, 0.26);
+  }
+  .trace-key.copied {
+    border-color: var(--success);
+  }
+  .trace-key.copy-failed {
+    border-color: var(--danger);
+  }
+  .btn-small {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+  }
+  .type-select {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .type-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .type-btn:hover { border-color: var(--accent); }
+  .type-btn.active {
+    border-color: var(--accent);
+    background: rgba(192, 132, 252, 0.15);
+    color: var(--accent);
+  }
+  .type-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+    margin-top: 12px;
+  }
+  .summary-label { color: var(--text2); font-size: 0.85rem; }
+  .summary-value { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+  .result-key {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 76px 12px 12px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    word-break: break-all;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    position: relative;
+  }
+  .result-key:hover { border-color: var(--accent); }
+  .result-key::after {
+    content: '点击复制';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    color: var(--text2);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .result-key.copied {
+    border-color: var(--success);
+  }
+  .result-key.copied::after {
+    content: '已复制';
+    color: var(--success);
+  }
+  .result-key.copy-failed {
+    border-color: var(--danger);
+  }
+  .result-key.copy-failed::after {
+    content: '复制失败';
+    color: var(--danger);
+  }
+  .missing {
+    color: var(--warn);
+    font-size: 0.85rem;
+    padding: 8px 0;
+  }
+  .error {
+    color: var(--danger);
+    font-size: 0.85rem;
+    padding: 8px 0;
+  }
+  .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none; }
+  .step-indicator {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .step {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .step.active { background: var(--accent); }
+  .step.done { background: var(--success); }
+  .fade-in {
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .tab-btn {
+    padding: 8px 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .tab-btn:first-child { border-radius: 8px 0 0 8px; }
+  .tab-btn:last-child { border-radius: 0 8px 8px 0; }
+  .tab-btn.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .status-card {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(192, 132, 252, 0.08);
+  }
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    font-size: 0.85rem;
+  }
+  .status-text {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .status-meta {
+    color: var(--text2);
+    font-size: 0.8rem;
+  }
+  .progress-track {
+    margin-top: 10px;
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+  }
+  .progress-bar {
+    width: 35%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent), #e9d5ff, var(--accent2));
+    background-size: 200% 100%;
+    animation: progress-slide 1.2s linear infinite;
+  }
+  @keyframes progress-slide {
+    from { transform: translateX(-70%); background-position: 0% 50%; }
+    to { transform: translateX(250%); background-position: 100% 50%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><span class="cat">🐱</span> 合卡</h1>
+  <p class="subtitle">次数fufu · 多卡合一</p>
+  <div id="session-bar" class="hidden" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin:-8px 0 16px 0">
+    <span id="session-label" class="token-meta" style="margin:0"></span>
+    <button class="btn" id="session-switch-btn" style="background:var(--surface2);color:var(--text);padding:8px 14px">切换模式</button>
+  </div>
+
+  <div class="step-indicator hidden" id="step-bar">
+    <div class="step active" id="step1"></div>
+    <div class="step" id="step2"></div>
+    <div class="step" id="step3"></div>
+  </div>
+
+  <!-- Tab switcher (admin only) -->
+  <div id="tab-bar" class="hidden" style="display:none;gap:0;margin-bottom:16px">
+    <button class="tab-btn active" id="tab-merge" onclick="switchTab('merge')">合卡</button>
+    <button class="tab-btn" id="tab-generate" onclick="switchTab('generate')">批量生成</button>
+  </div>
+
+  <!-- Login -->
+  <div id="phase-login" class="card hidden">
+    <label>请输入密码</label>
+    <div style="display:flex;gap:10px">
+      <input type="password" id="password-input" placeholder="密码"
+        style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:0.9rem;outline:none"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn btn-primary" id="btn-login" onclick="doLogin()">进入</button>
+    </div>
+    <div id="login-error" class="error hidden"></div>
+  </div>
+
+  <!-- Step 1: Input keys -->
+  <div id="phase-input" class="card hidden">
+    <label>输入令牌（每行一个，sk- 前缀可省略）</label>
+    <textarea id="keys-input" placeholder="sk-xxxxxxxx&#10;yyyyyyyy&#10;zzzzzzzz"></textarea>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-search" onclick="searchKeys()">
+        查询令牌
+      </button>
+    </div>
+    <div id="search-status" class="status-card hidden">
+      <div class="status-row">
+        <span class="status-text" id="search-status-text">正在查询...</span>
+        <span class="status-meta" id="search-status-meta">已用时 0.0s</span>
+      </div>
+      <div class="progress-track"><div class="progress-bar"></div></div>
+    </div>
+    <div id="search-error" class="error hidden"></div>
+  </div>
+
+  <!-- Step 2: Confirm -->
+  <div id="phase-confirm" class="card hidden">
+    <label>找到的令牌</label>
+    <div id="token-list" class="token-list"></div>
+    <div id="missing-keys" class="missing hidden"></div>
+    <div id="trace-results" class="trace-list hidden"></div>
+
+    <div class="summary">
+      <span class="summary-label">总剩余额度</span>
+      <span class="summary-value" id="total-quota">$0.00</span>
+    </div>
+
+    <label style="margin-top:16px" id="merge-type-label">目标卡类型</label>
+    <div class="type-select">
+      <button class="type-btn" data-unit="3" onclick="selectType(this)">天卡</button>
+      <button class="type-btn" data-unit="8" onclick="selectType(this)">周不刷新卡</button>
+      <button class="type-btn active" data-unit="9" onclick="selectType(this)">月不刷新卡</button>
+    </div>
+
+    <div id="quota-section" class="hidden">
+      <label style="margin-top:16px">指定额度（可选，留空则按实际总额合并）</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="color:var(--text2);font-size:1rem">$</span>
+        <input type="number" id="target-quota" placeholder="如 520" min="0" step="1"
+          style="flex:1;max-width:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px 12px;font-size:0.9rem;outline:none">
+      </div>
+      <div id="quota-hint" class="hidden" style="font-size:0.8rem;margin-top:4px"></div>
+    </div>
+
+    <div id="merge-mode-note" class="token-meta hidden" style="margin-top:12px"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-merge" onclick="mergeCards()">
+        确认合并
+      </button>
+      <button class="btn" style="background:var(--surface2);color:var(--text)" onclick="reset()">
+        重新输入
+      </button>
+    </div>
+    <div id="merge-status" class="status-card hidden" style="margin-top:16px">
+      <div class="status-row">
+        <span class="status-text" id="merge-status-text">合并中...</span>
+        <span class="status-meta" id="merge-status-meta">准备中</span>
+      </div>
+      <div class="progress-track"><div class="progress-bar"></div></div>
+    </div>
+  </div>
+
+  <!-- Step 3: Result -->
+  <div id="phase-result" class="card hidden">
+    <label>✅ 合并完成</label>
+    <div style="margin-top:12px">
+      <label>新令牌</label>
+      <div class="result-key" id="new-key" onclick="copyKey()"></div>
+    </div>
+    <div id="result-meta" class="token-meta" style="margin-top:8px"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="reset()">继续合卡</button>
+    </div>
+  </div>
+  <!-- Batch Generate (admin only) -->
+  <div id="phase-generate" class="card hidden">
+    <label>批量生成令牌</label>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
+      <div style="display:flex;gap:12px;align-items:center">
+        <label style="min-width:60px;margin:0">数量</label>
+        <input type="number" id="gen-count" value="5" min="1" max="100"
+          style="width:80px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:0.9rem;outline:none">
+      </div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <label style="min-width:60px;margin:0">额度 $</label>
+        <input type="number" id="gen-quota" value="55" min="1"
+          style="width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:0.9rem;outline:none">
+      </div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <label style="min-width:60px;margin:0">卡类型</label>
+        <div class="type-select">
+          <button class="type-btn" data-unit="3" onclick="selectGenType(this)">天卡</button>
+          <button class="type-btn" data-unit="8" onclick="selectGenType(this)">周不刷新卡</button>
+          <button class="type-btn active" data-unit="9" onclick="selectGenType(this)">月不刷新卡</button>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-generate" onclick="generateKeys()">生成</button>
+    </div>
+    <div id="gen-error" class="error hidden"></div>
+  </div>
+
+  <!-- Generate Result -->
+  <div id="phase-gen-result" class="card hidden">
+    <label>✅ 生成完成</label>
+    <textarea id="gen-keys-output" readonly
+      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:12px;font-family:'SF Mono','Fira Code',monospace;font-size:0.8rem;resize:vertical;min-height:120px;margin-top:8px;outline:none;cursor:pointer"
+      onclick="copyGenKeys()"></textarea>
+    <div id="gen-result-meta" class="token-meta" style="margin-top:8px"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="copyGenKeys()">复制全部</button>
+      <button class="btn" style="background:var(--surface2);color:var(--text)" onclick="switchTab('generate')">继续生成</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const UNIT_NAMES = { 3: '天卡', 8: '周不刷新卡', 9: '月不刷新卡' };
+const API_URL = '';  // Empty means same origin
+let foundTokens = [];
+let traceResults = [];
+let selectedUnit = 9;
+let quotaUnit = 500000;
+let sessionToken = '';
+let userRole = '';
+let searchTimer = null;
+let searchStartedAt = 0;
+let mergePollTimer = null;
+let searchedKeys = [];
+
+function setSearchStatus(text = '', meta = '', visible = false) {
+  const card = document.getElementById('search-status');
+  document.getElementById('search-status-text').textContent = text;
+  document.getElementById('search-status-meta').textContent = meta;
+  card.classList.toggle('hidden', !visible);
+}
+
+function startSearchStatus(totalKeys) {
+  searchStartedAt = Date.now();
+  setSearchStatus(`正在查询 ${totalKeys} 个令牌...`, '已用时 0.0s', true);
+  if (searchTimer) clearInterval(searchTimer);
+  searchTimer = setInterval(() => {
+    const elapsed = ((Date.now() - searchStartedAt) / 1000).toFixed(1);
+    setSearchStatus(`正在查询 ${totalKeys} 个令牌...`, `已用时 ${elapsed}s`, true);
+  }, 150);
+}
+
+function stopSearchStatus(summary = '') {
+  if (searchTimer) {
+    clearInterval(searchTimer);
+    searchTimer = null;
+  }
+  if (summary) {
+    const elapsed = searchStartedAt ? ((Date.now() - searchStartedAt) / 1000).toFixed(1) : '0.0';
+    setSearchStatus(summary, `完成，用时 ${elapsed}s`, true);
+    return;
+  }
+  setSearchStatus('', '', false);
+}
+
+function setMergeStatus(text = '', meta = '', visible = false) {
+  const card = document.getElementById('merge-status');
+  document.getElementById('merge-status-text').textContent = text;
+  document.getElementById('merge-status-meta').textContent = meta;
+  card.classList.toggle('hidden', !visible);
+}
+
+function stopMergeStatus() {
+  if (mergePollTimer) {
+    clearTimeout(mergePollTimer);
+    mergePollTimer = null;
+  }
+}
+
+function setMergeModeNote(text = '', kind = 'info') {
+  const note = document.getElementById('merge-mode-note');
+  note.textContent = text;
+  note.className = kind === 'error' ? 'error' : kind === 'warn' ? 'missing' : 'token-meta';
+  if (!text) {
+    note.classList.add('hidden');
+  } else {
+    note.classList.remove('hidden');
+  }
+}
+
+function syncSessionBar() {
+  const bar = document.getElementById('session-bar');
+  const label = document.getElementById('session-label');
+  const button = document.getElementById('session-switch-btn');
+  const active = !!userRole;
+  bar.classList.toggle('hidden', !active);
+  bar.style.display = active ? 'flex' : 'none';
+  if (!active) return;
+  if (userRole === 'guest') {
+    label.textContent = '普通合卡模式';
+    button.textContent = '登录';
+    button.onclick = function() { showLoginPhase(); };
+  } else if (userRole === 'admin') {
+    label.textContent = '管理员模式';
+    button.textContent = '退出';
+    button.onclick = function() { logout(); };
+  } else {
+    label.textContent = '登录合卡模式';
+    button.textContent = '退出';
+    button.onclick = function() { logout(); };
+  }
+}
+
+// For user role: compute which target types are allowed based on source cards
+function getAllowedUnitsForUser(tokens) {
+  if (!tokens.length) return [3, 8, 9];
+  const units = new Set(tokens.map(t => t.interval_unit));
+  if (tokens.length === 1) {
+    // Single card renewal: must keep same type
+    return [tokens[0].interval_unit];
+  }
+  // Multiple cards: determine by source types
+  // Day cards (3) → weekly (8) only
+  // Weekly cards (8) → weekly (8) only
+  // Monthly cards (9) → monthly (9) only
+  // Mixed: union of what each type allows
+  const allowed = new Set();
+  if (units.has(3)) allowed.add(8);   // day → weekly
+  if (units.has(8)) allowed.add(8);   // weekly → weekly
+  if (units.has(9)) allowed.add(9);   // monthly → monthly
+  return Array.from(allowed);
+}
+
+function syncMergeTypeButtons() {
+  const isGuest = userRole === 'guest';
+  const isUser = userRole === 'user';
+  const allowedUnits = isUser ? getAllowedUnitsForUser(foundTokens) : null;
+  document.querySelectorAll('#phase-confirm .type-btn').forEach((button) => {
+    const unit = parseInt(button.dataset.unit);
+    // Guest: hide day card and monthly card
+    const hideForGuest = isGuest && (unit === 3 || unit === 9);
+    button.style.display = hideForGuest ? 'none' : '';
+    if (isGuest) {
+      button.disabled = unit !== 8;
+    } else if (isUser) {
+      button.disabled = !allowedUnits.includes(unit);
+    } else {
+      button.disabled = false;
+    }
+    button.classList.toggle('active', unit === selectedUnit);
+  });
+  document.getElementById('merge-type-label').textContent = '目标卡类型';
+}
+
+function authHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'X-Session-Token': sessionToken,
+  };
+}
+
+function enterGuestMode() {
+  sessionToken = '';
+  userRole = 'guest';
+  sessionStorage.removeItem('fufu_token');
+  sessionStorage.removeItem('fufu_role');
+  enterApp();
+}
+
+async function doLogin() {
+  const pw = document.getElementById('password-input').value;
+  if (!pw) return;
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  document.getElementById('login-error').classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      document.getElementById('login-error').textContent = data.error;
+      document.getElementById('login-error').classList.remove('hidden');
+      return;
+    }
+    sessionToken = data.token;
+    userRole = data.role || 'user';
+    sessionStorage.setItem('fufu_token', sessionToken);
+    sessionStorage.setItem('fufu_role', userRole);
+    enterApp();
+  } catch (e) {
+    document.getElementById('login-error').textContent = '连接失败';
+    document.getElementById('login-error').classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '进入';
+  }
+}
+
+function enterApp() {
+  document.getElementById('phase-login').classList.add('hidden');
+  document.getElementById('step-bar').classList.remove('hidden');
+  syncSessionBar();
+  applyRole();
+  showPhase('input');
+  setStep(1);
+}
+
+function applyRole() {
+  const quotaSection = document.getElementById('quota-section');
+  const tabBar = document.getElementById('tab-bar');
+  if (userRole === 'admin') {
+    quotaSection.classList.remove('hidden');
+    tabBar.style.display = 'flex';
+    tabBar.classList.remove('hidden');
+  } else {
+    quotaSection.classList.add('hidden');
+    document.getElementById('target-quota').value = '';
+    tabBar.style.display = 'none';
+  }
+
+  if (userRole === 'guest') {
+    selectedUnit = 8;
+    setMergeModeNote('');
+  } else {
+    if (![3, 8, 9].includes(selectedUnit)) selectedUnit = 9;
+    setMergeModeNote('', 'info');
+  }
+  syncMergeTypeButtons();
+}
+
+function showLoginPhase() {
+  // Show login overlay, hide merge phases
+  stopSearchStatus();
+  stopMergeStatus();
+  foundTokens = [];
+  traceResults = [];
+  searchedKeys = [];
+  renderTraceResults([]);
+  document.getElementById('keys-input').value = '';
+  document.getElementById('password-input').value = '';
+  document.getElementById('login-error').classList.add('hidden');
+  ['input', 'confirm', 'result', 'generate', 'gen-result'].forEach(p => {
+    const el = document.getElementById('phase-' + p);
+    if (el) el.classList.add('hidden');
+  });
+  document.getElementById('step-bar').classList.add('hidden');
+  document.getElementById('session-bar').classList.add('hidden');
+  document.getElementById('session-bar').style.display = 'none';
+  document.getElementById('phase-login').classList.remove('hidden');
+  document.getElementById('phase-login').classList.add('fade-in');
+}
+
+// Try restore session on load, default to guest mode
+(async function() {
+  const saved = sessionStorage.getItem('fufu_token');
+  if (saved) {
+    try {
+      const res = await fetch('/api/session', {
+        headers: { 'X-Session-Token': saved },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        sessionToken = saved;
+        userRole = data.role || sessionStorage.getItem('fufu_role') || 'user';
+        enterApp();
+        return;
+      }
+    } catch (e) {}
+    sessionStorage.removeItem('fufu_token');
+    sessionStorage.removeItem('fufu_role');
+  }
+  // Default: enter guest mode directly
+  enterGuestMode();
+})();
+
+// Target quota hint
+document.getElementById('target-quota')?.addEventListener('input', function() {
+  const hint = document.getElementById('quota-hint');
+  const val = parseFloat(this.value);
+  const total = foundTokens.reduce((s, t) => s + t.remain_quota, 0);
+  const totalDollars = total / quotaUnit;
+  if (!isNaN(val) && val > 0) {
+    const diff = val - totalDollars;
+    if (diff > 0) {
+      hint.textContent = `差额 +$${diff.toFixed(2)}，将自动补上`;
+      hint.style.color = 'var(--warn)';
+    } else if (diff === 0) {
+      hint.textContent = '与实际总额一致';
+      hint.style.color = 'var(--success)';
+    } else {
+      hint.textContent = `⚠️ 低于实际总额 $${totalDollars.toFixed(2)}`;
+      hint.style.color = 'var(--danger)';
+    }
+    hint.classList.remove('hidden');
+  } else {
+    hint.classList.add('hidden');
+  }
+});
+
+function formatQuota(q) {
+  return '$' + (q / quotaUnit).toFixed(2);
+}
+
+function selectType(el) {
+  if (userRole === 'guest') return;
+  document.querySelectorAll('#phase-confirm .type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  selectedUnit = parseInt(el.dataset.unit);
+}
+
+function setStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById('step' + i);
+    el.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+  }
+}
+
+function showPhase(phase) {
+  ['input', 'confirm', 'result'].forEach(p => {
+    const el = document.getElementById('phase-' + p);
+    if (p === phase) {
+      el.classList.remove('hidden');
+      el.classList.add('fade-in');
+    } else {
+      el.classList.add('hidden');
+    }
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeJsStringForAttr(value) {
+  return JSON.stringify(String(value ?? ''))
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatTraceTime(ms) {
+  if (!ms) return '未知时间';
+  try {
+    return new Date(ms).toLocaleString();
+  } catch {
+    return String(ms);
+  }
+}
+
+function traceStatusText(status) {
+  const map = {
+    done: '合并完成',
+    error: '合并失败',
+    rollback: '回滚中',
+    deleting: '删除旧卡中',
+    renaming: '整理新卡中',
+    creating: '创建新卡中',
+    verifying: '校验中',
+    resolving: '解析中',
+    started: '已开始',
+  };
+  return map[status] || status || '未知状态';
+}
+
+function traceDirectionText(direction) {
+  if (direction === 'result') return '输入的是合成后的 key';
+  if (direction === 'source') return '输入的是合成前的 key';
+  if (direction === 'both') return '输入命中了合成前后 key';
+  return '相关合卡记录';
+}
+
+function maskTraceKey(key) {
+  const value = String(key || '');
+  if (value.length <= 18) return value;
+  return `${value.slice(0, 10)}…${value.slice(-6)}`;
+}
+
+function traceTokenKey(token) {
+  return normalizeKeyForCompare(token?.key);
+}
+
+function buildTraceModel(records) {
+  const unique = [];
+  const seen = new Set();
+  (records || []).forEach(record => {
+    const id = String(record?.mergeId || `${record?.createdAt || 0}-${unique.length}`);
+    if (seen.has(id)) return;
+    seen.add(id);
+    unique.push(record);
+  });
+
+  const resultOwner = new Map();
+  const sourceKeys = new Set();
+  const resultKeys = new Set();
+  unique.forEach(record => {
+    const resultKey = traceTokenKey(record.resultKey);
+    if (resultKey) {
+      resultOwner.set(resultKey, record.mergeId);
+      resultKeys.add(resultKey);
+    }
+    (record.sourceKeys || []).forEach(token => {
+      const key = traceTokenKey(token);
+      if (key) sourceKeys.add(key);
+    });
+  });
+
+  const chainKeys = new Set();
+  resultKeys.forEach(key => {
+    if (sourceKeys.has(key)) chainKeys.add(key);
+  });
+
+  const edges = new Map();
+  const indegree = new Map();
+  unique.forEach(record => {
+    edges.set(record.mergeId, new Set());
+    indegree.set(record.mergeId, 0);
+  });
+  unique.forEach(record => {
+    (record.sourceKeys || []).forEach(token => {
+      const parentID = resultOwner.get(traceTokenKey(token));
+      if (!parentID || parentID === record.mergeId || !edges.has(parentID)) return;
+      const children = edges.get(parentID);
+      if (!children.has(record.mergeId)) {
+        children.add(record.mergeId);
+        indegree.set(record.mergeId, (indegree.get(record.mergeId) || 0) + 1);
+      }
+    });
+  });
+
+  const byID = new Map(unique.map(record => [record.mergeId, record]));
+  const byTime = (a, b) => (a.createdAt || 0) - (b.createdAt || 0) || (a.mergeId || 0) - (b.mergeId || 0);
+  const queue = unique.filter(record => (indegree.get(record.mergeId) || 0) === 0).sort(byTime);
+  const ordered = [];
+  while (queue.length) {
+    const record = queue.shift();
+    ordered.push(record);
+    (edges.get(record.mergeId) || []).forEach(childID => {
+      indegree.set(childID, (indegree.get(childID) || 0) - 1);
+      if ((indegree.get(childID) || 0) === 0) {
+        queue.push(byID.get(childID));
+        queue.sort(byTime);
+      }
+    });
+  }
+  if (ordered.length < unique.length) {
+    const orderedIDs = new Set(ordered.map(record => record.mergeId));
+    unique
+      .filter(record => !orderedIDs.has(record.mergeId))
+      .sort(byTime)
+      .forEach(record => ordered.push(record));
+  }
+
+  return { ordered, chainKeys };
+}
+
+function renderTraceKey(token, chainKeys = new Set()) {
+  if (!token?.key) return '<div class="trace-key">未记录</div>';
+  const key = traceTokenKey(token);
+  const classes = ['trace-key'];
+  if (chainKeys.has(key)) {
+    classes.push('chain-key');
+  }
+  const meta = [
+    token.name ? escapeHtml(token.name) : '',
+    UNIT_NAMES[token.interval_unit] || '',
+    token.group ? escapeHtml(token.group) : '',
+    token.remain_quota ? formatQuota(token.remain_quota) : '',
+  ].filter(Boolean).join(' · ');
+  return `
+    <div class="${classes.join(' ')}" data-key="${escapeHtml(token.key)}" onclick="copyTraceKey(this)" title="点击复制">
+      ${escapeHtml(token.key)}
+      ${meta ? `<div class="token-meta">${meta}</div>` : ''}
+    </div>
+  `;
+}
+
+function renderTraceResults(records) {
+  const el = document.getElementById('trace-results');
+  if (!records?.length) {
+    el.innerHTML = '';
+    el.classList.add('hidden');
+    return;
+  }
+
+  const { ordered, chainKeys } = buildTraceModel(records);
+  const summary = ordered.length > 1
+    ? `<div class="trace-chain-summary">检测到多步合卡路径，已按先后顺序整理；最后一步合成在最下面，紫色边框表示承接上下游合成的中间 key。</div>`
+    : '';
+
+  el.innerHTML = summary + ordered.map((record, index) => {
+    const sourceKeys = record.sourceKeys?.length
+      ? record.sourceKeys.map(token => renderTraceKey(token, chainKeys)).join('')
+      : '<div class="trace-key">未记录来源 key</div>';
+    const resultKey = record.resultKey
+      ? renderTraceKey(record.resultKey, chainKeys)
+      : '<div class="trace-key">未记录合成后 key</div>';
+    const sourceFlow = (record.sourceKeys || [])
+      .map(token => `<span class="trace-flow-key">${escapeHtml(token.keyMask || maskTraceKey(token.key))}</span>`)
+      .join('<span>+</span>');
+    const resultFlow = record.resultKey
+      ? `<span class="trace-flow-key">${escapeHtml(record.resultKey.keyMask || maskTraceKey(record.resultKey.key))}</span>`
+      : '<span class="trace-flow-key">未记录</span>';
+    const flow = `<div class="trace-flow"><span>第 ${index + 1} 步</span>${sourceFlow || '<span class="trace-flow-key">未记录</span>'}<span class="trace-arrow">→</span>${resultFlow}</div>`;
+    const finalBadge = ordered.length > 1 && index === ordered.length - 1
+      ? '<span class="trace-final-badge">最后一步</span>'
+      : '';
+    const warning = record.error || record.rollbackNote
+      ? `<div class="trace-row"><div class="trace-label">异常 / 回滚</div><div class="token-meta" style="color:var(--warn)">${escapeHtml([record.error, record.rollbackNote].filter(Boolean).join(' '))}</div></div>`
+      : '';
+    return `
+      <div class="trace-card ${ordered.length > 1 && index === ordered.length - 1 ? 'final-step' : ''}">
+        <div class="trace-title"><span class="trace-step-badge">第 ${index + 1} 步</span><span>检测到合卡记录 · ${traceStatusText(record.status)}</span>${finalBadge}</div>
+        <div class="token-meta">${traceDirectionText(record.direction)} · ${formatTraceTime(record.createdAt)}</div>
+        ${flow}
+        <div class="trace-row">
+          <div class="trace-label">合成前 key</div>
+          ${sourceKeys}
+        </div>
+        <div class="trace-row">
+          <div class="trace-label">合成后 key</div>
+          ${resultKey}
+        </div>
+        ${warning}
+      </div>
+    `;
+  }).join('');
+  el.classList.remove('hidden');
+}
+
+function normalizeKeyForCompare(key) {
+  const value = String(key || '').trim();
+  if (!value) return '';
+  return value.startsWith('sk-') ? value : `sk-${value}`;
+}
+
+function collectTraceKeys(records) {
+  const set = new Set();
+  (records || []).forEach(record => {
+    (record.sourceKeys || []).forEach(token => {
+      const key = normalizeKeyForCompare(token?.key);
+      if (key) set.add(key);
+    });
+    const resultKey = normalizeKeyForCompare(record.resultKey?.key);
+    if (resultKey) set.add(resultKey);
+  });
+  return set;
+}
+
+async function searchKeys() {
+  const input = document.getElementById('keys-input').value.trim();
+  if (!input) return;
+
+  // Split by newline/space/comma, and also split on sk- boundaries (e.g. "sk-aaask-bbb")
+  let normalized = input.replace(/sk-/g, '\nsk-').trim();
+  const raw = normalized.split(/[\n\s,]+/).filter(k => k.length > 10);
+  const keys = raw.map(k => k.startsWith('sk-') ? k : 'sk-' + k);
+  searchedKeys = keys;
+  if (!keys.length) {
+    document.getElementById('search-error').textContent = '请输入令牌';
+    document.getElementById('search-error').classList.remove('hidden');
+    return;
+  }
+  const btn = document.getElementById('btn-search');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 查询中...';
+  document.getElementById('search-error').classList.add('hidden');
+  renderTraceResults([]);
+  startSearchStatus(keys.length);
+
+  try {
+    const res = await fetch('/api/search-keys', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ keys }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      if (handleAuthError(data)) return;
+      throw new Error(data.error);
+    }
+
+    foundTokens = data.found || [];
+    traceResults = data.traceResults || [];
+    quotaUnit = data.quotaUnit || 500000;
+
+    if (!foundTokens.length && !traceResults.length) {
+      stopSearchStatus(`已查询 ${data.searched || keys.length} 个令牌，未找到可合并项`);
+      document.getElementById('search-error').textContent = '未找到任何匹配的令牌';
+      document.getElementById('search-error').classList.remove('hidden');
+      return;
+    }
+
+    // Render token list - separate valid and invalid
+    const validTokens = foundTokens.filter(t => t.status === 1 && t.remain_quota > 0);
+    const invalidTokens = foundTokens.filter(t => t.status !== 1 || t.remain_quota <= 0);
+
+    const list = document.getElementById('token-list');
+    let html = '';
+
+    if (validTokens.length > 0) {
+      html += `<div class="token-section">
+        <div class="token-section-title valid">✓ 可合成 (${validTokens.length})</div>`;
+      html += validTokens.map(t => `
+        <div class="token-item">
+          <div>
+            <div class="token-name">${escapeHtml(t.name || '(unnamed)')}</div>
+            <div class="token-meta">${UNIT_NAMES[t.interval_unit] || '未知类型'} · ${escapeHtml(t.group || '')}</div>
+          </div>
+          <div class="token-quota">${formatQuota(t.remain_quota)}</div>
+        </div>
+      `).join('');
+      html += '</div>';
+    }
+
+    if (invalidTokens.length > 0) {
+      html += `<div class="token-section">
+        <div class="token-section-title invalid">⚠ 不可合成 (${invalidTokens.length})</div>`;
+      html += invalidTokens.map(t => {
+        const reason = t.status !== 1 ? '已禁用' : '无额度';
+        const showDelete = t.status !== 1 && userRole !== 'guest';
+        return `
+        <div class="token-item disabled">
+          <div>
+            <div class="token-name">${escapeHtml(t.name || '(unnamed)')}</div>
+            <div class="token-meta">${UNIT_NAMES[t.interval_unit] || '未知类型'} · ${escapeHtml(t.group || '')} · ${reason}</div>
+          </div>
+          <div class="token-actions">
+            <span class="token-quota" style="color:var(--warn)">${formatQuota(t.remain_quota)}</span>
+            ${showDelete ? `<button class="btn btn-danger btn-small" onclick="deleteDisabledToken(${t.id}, ${escapeJsStringForAttr(t.key)})">删除</button>` : ''}
+          </div>
+        </div>
+      `;
+      }).join('');
+      html += '</div>';
+    }
+
+    list.innerHTML = html;
+    renderTraceResults(traceResults);
+
+    // Missing keys
+    const missingEl = document.getElementById('missing-keys');
+    const traceKeySet = collectTraceKeys(traceResults);
+    let visibleMissing = (data.missing || [])
+      .filter(key => !traceKeySet.has(normalizeKeyForCompare(key)));
+    if (!foundTokens.length && traceResults.length) {
+      visibleMissing = [];
+    }
+    if (visibleMissing.length) {
+      missingEl.textContent = '⚠️ 未找到: ' + visibleMissing.join(', ');
+      missingEl.classList.remove('hidden');
+    } else {
+      missingEl.textContent = '';
+      missingEl.classList.add('hidden');
+    }
+
+    // Total (only count valid tokens)
+    const total = validTokens.reduce((s, t) => s + t.remain_quota, 0);
+    document.getElementById('total-quota').textContent = formatQuota(total);
+
+    const mergeBtn = document.getElementById('btn-merge');
+    mergeBtn.disabled = false;
+    if (!foundTokens.length && traceResults.length) {
+      mergeBtn.disabled = true;
+      syncMergeTypeButtons();
+      setMergeModeNote('只找到合卡溯源记录，没有找到可继续合并的有效令牌。', 'info');
+    } else if (userRole === 'guest') {
+      selectedUnit = 8;
+      syncMergeTypeButtons();
+      const eligibility = data.publicMergeEligibility || { eligible: false, reasons: ['当前令牌不满足普通合卡条件'] };
+      if (eligibility.eligible) {
+        setMergeModeNote('');
+      } else {
+        mergeBtn.disabled = true;
+        setMergeModeNote(`不可用：${(eligibility.reasons || []).join('；')}`, 'error');
+      }
+    } else if (userRole === 'user') {
+      // User role: auto-select based on allowed types
+      const allowed = getAllowedUnitsForUser(foundTokens);
+      if (!allowed.includes(selectedUnit)) {
+        selectedUnit = allowed[0];
+      }
+      syncMergeTypeButtons();
+      if (foundTokens.length === 1) {
+        setMergeModeNote(`单卡续卡模式：目标类型已锁定为 ${UNIT_NAMES[selectedUnit] || '未知'}`, 'info');
+      } else if (allowed.length === 1) {
+        setMergeModeNote(`目标类型已锁定为 ${UNIT_NAMES[allowed[0]] || '未知'}`, 'info');
+      } else {
+        setMergeModeNote('', 'info');
+      }
+    } else {
+      syncMergeTypeButtons();
+      setMergeModeNote('', 'info');
+    }
+
+    const elapsedMs = data.elapsedMs || (Date.now() - searchStartedAt);
+    const summary = `已完成 ${data.searched || keys.length} 个令牌查询：找到 ${foundTokens.length} 个` +
+      (data.missing?.length ? `，未找到 ${data.missing.length} 个` : '');
+    stopSearchStatus(`${summary} · ${(elapsedMs / 1000).toFixed(1)}s · 并发 ${data.concurrency || 1}`);
+
+    setStep(2);
+    showPhase('confirm');
+  } catch (e) {
+    stopSearchStatus('查询失败');
+    document.getElementById('search-error').textContent = '查询失败: ' + e.message;
+    document.getElementById('search-error').classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '查询令牌';
+  }
+}
+
+async function mergeCards() {
+  const btn = document.getElementById('btn-merge');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 合并中...';
+
+  const totalQuota = foundTokens.reduce((s, t) => s + t.remain_quota, 0);
+
+  // Check if user specified a target quota
+  const targetInput = document.getElementById('target-quota').value.trim();
+  let finalQuota = totalQuota;
+  if (targetInput) {
+    const targetDollars = parseFloat(targetInput);
+    if (isNaN(targetDollars) || targetDollars <= 0) {
+      alert('指定额度无效');
+      btn.disabled = false;
+      btn.innerHTML = '确认合并';
+      return;
+    }
+    finalQuota = Math.round(targetDollars * quotaUnit);
+    if (finalQuota < totalQuota) {
+      alert(`指定额度 $${targetDollars} 小于实际总额 ${formatQuota(totalQuota)}，不允许缩水喵`);
+      btn.disabled = false;
+      btn.innerHTML = '确认合并';
+      return;
+    }
+  }
+
+  const name = (finalQuota / quotaUnit).toFixed(0);
+
+  try {
+    setMergeStatus('准备合并...', `共 ${foundTokens.length} 张旧卡`, true);
+    const mergeUrl = userRole === 'guest' ? '/api/public-merge' : '/api/merge';
+    const mergeBody = userRole === 'guest'
+      ? { keys: foundTokens.map(t => t.key) }
+      : {
+          keys: foundTokens.map(t => t.key),
+          intervalUnit: selectedUnit,
+          totalQuota: finalQuota,
+          name,
+          customQuota: !!targetInput,
+        };
+    const res = await fetch(mergeUrl, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(mergeBody),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      if (handleAuthError(data)) return;
+      throw new Error(data.error);
+    }
+
+    const jobId = data.jobId;
+    while (true) {
+      const statusRes = await fetch(`/api/merge-status/${jobId}`, { headers: authHeaders() });
+      const status = await statusRes.json();
+
+      if (status.error) {
+        if (handleAuthError(status)) return;
+        throw new Error(status.error);
+      }
+
+      const current = status.current || 0;
+      const total = status.total || 0;
+      const meta = total ? `${current}/${total}` : '处理中';
+      setMergeStatus(status.stepText || '合并中...', meta, true);
+
+      if (status.status === 'done') {
+        const result = status.result || {};
+        if (result.newCard) {
+          document.getElementById('new-key').textContent = result.newCard.key;
+          document.getElementById('result-meta').textContent =
+            `${formatQuota(result.newCard.remain_quota)} · ${UNIT_NAMES[result.newCard.interval_unit] || '未知'} · ${result.newCard.group}`;
+        } else {
+          document.getElementById('new-key').textContent = '新卡已创建，请到后台查看';
+          document.getElementById('result-meta').textContent = '';
+        }
+        setMergeStatus('合并完成', `已处理 ${current}/${total}`, true);
+        setStep(3);
+        showPhase('result');
+        break;
+      }
+
+      if (status.status === 'error') {
+        throw new Error(status.error || '合并失败');
+      }
+
+      await new Promise(r => {
+        mergePollTimer = setTimeout(r, 350);
+      });
+    }
+  } catch (e) {
+    stopMergeStatus();
+    alert('合并失败: ' + e.message);
+  } finally {
+    stopMergeStatus();
+    btn.disabled = false;
+    btn.innerHTML = '确认合并';
+  }
+}
+
+function copyWithTextarea(text) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '0';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+
+  const selection = document.getSelection();
+  const ranges = [];
+  if (selection) {
+    for (let i = 0; i < selection.rangeCount; i++) {
+      ranges.push(selection.getRangeAt(i));
+    }
+  }
+  const activeElement = document.activeElement;
+
+  textarea.focus({ preventScroll: true });
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  let copied = false;
+  try {
+    copied = document.execCommand('copy');
+  } catch {
+    copied = false;
+  }
+
+  document.body.removeChild(textarea);
+  if (activeElement && typeof activeElement.focus === 'function') {
+    activeElement.focus({ preventScroll: true });
+  }
+  if (selection) {
+    selection.removeAllRanges();
+    ranges.forEach(range => selection.addRange(range));
+  }
+  return copied;
+}
+
+async function copyText(text, feedbackEl) {
+  const value = String(text || '').trim();
+  if (!value) {
+    showCopyFeedback(feedbackEl, false);
+    return false;
+  }
+
+  let copied = copyWithTextarea(value);
+  if (!copied && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      copied = true;
+    } catch {
+      copied = false;
+    }
+  }
+
+  showCopyFeedback(feedbackEl, copied);
+  return copied;
+}
+
+function showCopyFeedback(el, copied) {
+  if (!el) return;
+  if (el.copyFeedbackTimer) {
+    clearTimeout(el.copyFeedbackTimer);
+  }
+  el.classList.remove('copied', 'copy-failed');
+  el.style.borderColor = copied ? 'var(--success)' : 'var(--danger)';
+  el.classList.add(copied ? 'copied' : 'copy-failed');
+  el.copyFeedbackTimer = setTimeout(() => {
+    el.classList.remove('copied', 'copy-failed');
+    el.style.borderColor = '';
+  }, copied ? 1200 : 1800);
+}
+
+function copyKey() {
+  const el = document.getElementById('new-key');
+  const key = el.textContent.trim();
+  if (key && key.startsWith('sk-')) {
+    copyText(key, el);
+  } else {
+    showCopyFeedback(el, false);
+  }
+}
+
+function copyTraceKey(el) {
+  const key = el?.dataset?.key || '';
+  copyText(key, el);
+}
+
+function reset() {
+  foundTokens = [];
+  traceResults = [];
+  searchedKeys = [];
+  selectedUnit = userRole === 'guest' ? 8 : 9;
+  stopSearchStatus();
+  stopMergeStatus();
+  setMergeStatus('', '', false);
+  document.getElementById('keys-input').value = '';
+  document.getElementById('target-quota').value = '';
+  document.getElementById('quota-hint').classList.add('hidden');
+  renderTraceResults([]);
+  syncMergeTypeButtons();
+  if (userRole !== 'guest') {
+    setMergeModeNote('', 'info');
+  }
+  setStep(1);
+  showPhase('input');
+}
+
+function logout() {
+  sessionToken = '';
+  userRole = '';
+  searchedKeys = [];
+  stopSearchStatus();
+  stopMergeStatus();
+  sessionStorage.removeItem('fufu_token');
+  sessionStorage.removeItem('fufu_role');
+  foundTokens = [];
+  traceResults = [];
+  document.getElementById('password-input').value = '';
+  renderTraceResults([]);
+  setMergeModeNote('', 'info');
+  ['input', 'confirm', 'result', 'generate', 'gen-result'].forEach(p => {
+    const el = document.getElementById('phase-' + p);
+    if (el) el.classList.add('hidden');
+  });
+  // Return to guest mode
+  enterGuestMode();
+}
+
+let genUnit = 9;
+
+function selectGenType(el) {
+  el.parentElement.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  genUnit = parseInt(el.dataset.unit);
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-merge').classList.toggle('active', tab === 'merge');
+  document.getElementById('tab-generate').classList.toggle('active', tab === 'generate');
+  // Hide all phases
+  ['input', 'confirm', 'result', 'generate', 'gen-result'].forEach(p => {
+    const el = document.getElementById('phase-' + p);
+    if (el) el.classList.add('hidden');
+  });
+  if (tab === 'merge') {
+    document.getElementById('step-bar').classList.remove('hidden');
+    showPhase('input');
+    setStep(1);
+  } else {
+    document.getElementById('step-bar').classList.add('hidden');
+    document.getElementById('phase-generate').classList.remove('hidden');
+    document.getElementById('phase-generate').classList.add('fade-in');
+  }
+}
+
+async function generateKeys() {
+  const count = parseInt(document.getElementById('gen-count').value);
+  const quota = parseFloat(document.getElementById('gen-quota').value);
+  if (!count || count < 1 || !quota || quota <= 0) {
+    document.getElementById('gen-error').textContent = '请填写有效的数量和额度';
+    document.getElementById('gen-error').classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 生成中...';
+  document.getElementById('gen-error').classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ count, quota, intervalUnit: genUnit, group: 'mix' }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      if (handleAuthError(data)) return;
+      throw new Error(data.error);
+    }
+
+    document.getElementById('gen-keys-output').value = data.keys.join('\n');
+    document.getElementById('gen-result-meta').textContent =
+      `${data.keys.length} 条 | $${quota} | ${UNIT_NAMES[genUnit] || '未知'}` +
+      (data.errors?.length ? ` | ${data.errors.length} 条失败` : '');
+
+    document.getElementById('phase-generate').classList.add('hidden');
+    document.getElementById('phase-gen-result').classList.remove('hidden');
+    document.getElementById('phase-gen-result').classList.add('fade-in');
+  } catch (e) {
+    document.getElementById('gen-error').textContent = '生成失败: ' + e.message;
+    document.getElementById('gen-error').classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '生成';
+  }
+}
+
+function copyGenKeys() {
+  const el = document.getElementById('gen-keys-output');
+  copyText(el.value, el);
+}
+
+function handleAuthError(data) {
+  if (data.error === '未授权') {
+    logout();
+    return true;
+  }
+  return false;
+}
+
+async function deleteDisabledToken(tokenId, tokenKey) {
+  if (!confirm(`确认删除禁用的令牌 ${tokenKey.slice(0, 12)}...？`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/token/${tokenId}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || '删除失败');
+    }
+
+    // Remove from foundTokens and re-render
+    foundTokens = foundTokens.filter(t => t.id !== tokenId);
+
+    // Re-render the list
+    const validTokens = foundTokens.filter(t => t.status === 1 && t.remain_quota > 0);
+    const invalidTokens = foundTokens.filter(t => t.status !== 1 || t.remain_quota <= 0);
+
+    const list = document.getElementById('token-list');
+    let html = '';
+
+    if (validTokens.length > 0) {
+      html += `<div class="token-section">
+        <div class="token-section-title valid">✓ 可合成 (${validTokens.length})</div>`;
+      html += validTokens.map(t => `
+        <div class="token-item">
+          <div>
+            <div class="token-name">${escapeHtml(t.name || '(unnamed)')}</div>
+            <div class="token-meta">${UNIT_NAMES[t.interval_unit] || '未知类型'} · ${escapeHtml(t.group || '')}</div>
+          </div>
+          <div class="token-quota">${formatQuota(t.remain_quota)}</div>
+        </div>
+      `).join('');
+      html += '</div>';
+    }
+
+    if (invalidTokens.length > 0) {
+      html += `<div class="token-section">
+        <div class="token-section-title invalid">⚠ 不可合成 (${invalidTokens.length})</div>`;
+      html += invalidTokens.map(t => {
+        const reason = t.status !== 1 ? '已禁用' : '无额度';
+        const showDelete = t.status !== 1 && userRole !== 'guest';
+        return `
+        <div class="token-item disabled">
+          <div>
+            <div class="token-name">${escapeHtml(t.name || '(unnamed)')}</div>
+            <div class="token-meta">${UNIT_NAMES[t.interval_unit] || '未知类型'} · ${escapeHtml(t.group || '')} · ${reason}</div>
+          </div>
+          <div class="token-actions">
+            <span class="token-quota" style="color:var(--warn)">${formatQuota(t.remain_quota)}</span>
+            ${showDelete ? `<button class="btn btn-danger btn-small" onclick="deleteDisabledToken(${t.id}, ${escapeJsStringForAttr(t.key)})">删除</button>` : ''}
+          </div>
+        </div>
+      `;
+      }).join('');
+      html += '</div>';
+    }
+
+    list.innerHTML = html;
+
+    // Update total
+    const total = validTokens.reduce((s, t) => s + t.remain_quota, 0);
+    document.getElementById('total-quota').textContent = formatQuota(total);
+
+    alert('删除成功');
+  } catch (e) {
+    alert('删除失败: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>

@@ -37,8 +37,8 @@ apps/**/coverage/
 # Go artifacts
 *.test
 *.out
-fufu-combine
-fufu-combine.exe
+/fufu-combine
+/fufu-combine.exe
 apps/fufu-combine/fufu-combine
 apps/fufu-combine/fufu-combine.exe
 
@@ -55,3 +55,4 @@ apps/**/backups/
 *.bak
 *.backup
 *~
+
