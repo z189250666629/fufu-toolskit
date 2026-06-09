@@ -114,14 +114,6 @@ func (s *Service) BatchSearch(ctx context.Context, raw []string) ([]string, []To
 		return nil, nil, nil, err
 	default:
 	}
-	found := []Token{}
-	missing := []string{}
-	for _, r := range results {
-		if r.Found != nil {
-			found = append(found, *r.Found)
-		} else {
-			missing = append(missing, r.Key)
-		}
-	}
+	found, missing := splitSearchResults(results)
 	return keys, found, missing, nil
 }
