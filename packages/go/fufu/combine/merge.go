@@ -175,20 +175,15 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 	deleteFailures := []string{}
 	for i, t := range verified {
 		ok, res, delErr := a.deleteToken(ctx, t.ID)
-		deleteResults = append(deleteResults, DeleteResult{ID: t.ID, Key: t.Key, OK: ok && delErr == nil})
-		deleteMessage := ""
-		if delErr != nil || !ok {
-			if delErr != nil {
-				deleteMessage = delErr.Error()
-			} else {
-				deleteMessage = upstreamStatusMessage(res, "删除失败")
-			}
-			deleteFailures = append(deleteFailures, displayKey(t.Key))
+		outcome := buildMergeDeleteOutcome(t, ok, res, delErr)
+		deleteResults = append(deleteResults, outcome.result)
+		if outcome.failureKey != "" {
+			deleteFailures = append(deleteFailures, outcome.failureKey)
 		} else {
 			oldDeleted++
 			a.setTraceDeletedCount(ctx, mergeID, oldDeleted)
 		}
-		a.setTraceTokenDeleteResult(ctx, mergeID, t, ok && delErr == nil, deleteMessage)
+		a.setTraceTokenDeleteResult(ctx, mergeID, t, outcome.result.OK, outcome.traceMessage)
 		update(MergeJobPatch{Current: intp(i + 1)})
 	}
 	if len(deleteFailures) > 0 {

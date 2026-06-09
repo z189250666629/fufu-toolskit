@@ -5,6 +5,29 @@ import (
 	"strings"
 )
 
+type mergeDeleteOutcome struct {
+	result       DeleteResult
+	failureKey   string
+	traceMessage string
+}
+
+func buildMergeDeleteOutcome(token ResolvedToken, ok bool, res APIResponse, delErr error) mergeDeleteOutcome {
+	success := ok && delErr == nil
+	out := mergeDeleteOutcome{
+		result: DeleteResult{ID: token.ID, Key: token.Key, OK: success},
+	}
+	if success {
+		return out
+	}
+	if delErr != nil {
+		out.traceMessage = delErr.Error()
+	} else {
+		out.traceMessage = upstreamStatusMessage(res, "删除失败")
+	}
+	out.failureKey = displayKey(token.Key)
+	return out
+}
+
 func formatMergeDeletionFailure(deleteFailures []string, oldDeleted int, rb *rollbackState) error {
 	if len(deleteFailures) == 0 {
 		return nil
