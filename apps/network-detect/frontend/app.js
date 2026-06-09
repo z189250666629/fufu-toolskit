@@ -14,10 +14,7 @@ import {
   formatPriceValue,
   formatShortTime,
   formatWindow,
-  formatCooldown,
-  statusFromCounts,
-  statusFromSummary,
-  successRate
+  formatCooldown
 } from './utils.js';
 import {
   SAMPLE_COUNT,
@@ -38,6 +35,11 @@ import {
   getCopyUrl,
   showCopiedFeedback
 } from './dom.js';
+import {
+  activeModelScope,
+  scopedModelRows,
+  scopedSummary
+} from './model_selectors.js';
 
 const app = document.getElementById('app');
 let filterRenderTimer = null;
@@ -420,11 +422,6 @@ function renderConnectivity() {
   `;
 }
 
-function modelSortRank(row) {
-  const rank = { down: 0, degraded: 1, operational: 2, unknown: 3 };
-  return rank[row.status] ?? 4;
-}
-
 function renderStatusPill(status, configured = true) {
   const meta = modelStatusMeta(status, configured);
   return renderChip(meta.label, meta.tone, 'status');
@@ -454,94 +451,6 @@ function renderPriceCell(pricing) {
       <small>出 ${escapeHtml(formatPriceValue(pricing.output, pricing.currency))} / 1M</small>
     </div>
   `;
-}
-
-function activeModelScope(modelStatus) {
-  const sites = modelStatus?.sites || [];
-  const preferredSite = sites.find((item) => item.site.name === state.selectedModelSite) || sites[0] || null;
-  const siteName = preferredSite?.site.name || '';
-  const groups = preferredSite?.groups || [];
-  const group = siteName === '次数fufu'
-    ? 'mix'
-    : (state.selectedTokenGroup && groups.includes(state.selectedTokenGroup) ? state.selectedTokenGroup : groups[0] || '');
-  return { site: preferredSite, siteName, group, groups };
-}
-
-function groupCellFor(row, siteName, group) {
-  const cell = row.perSite?.[siteName];
-  if (!cell?.configured || !group) return null;
-  const groupCell = cell.groupStats?.[group];
-  if (!groupCell?.configured) return null;
-  return applyManualTestDisplay({
-    ...cell,
-    ...groupCell,
-    siteName,
-    model: row.model,
-    configured: true,
-    groups: [group],
-    manualTest: cell.manualTest,
-    nextTestAllowedAt: cell.nextTestAllowedAt
-  });
-}
-
-function applyManualTestDisplay(cell) {
-  const manual = cell.manualTest;
-  if (!manual?.testedAt) return cell;
-
-  const passed = manual.ok === true || manual.status === 'operational';
-  const testedAt = Number(manual.testedAt) || 0;
-  const successCount = Number(cell.successCount) || 0;
-  const failureCount = Number(cell.failureCount) || 0;
-  const hasLogData = successCount + failureCount > 0;
-
-  if (!passed && hasLogData) return cell;
-
-  const nextSuccessCount = successCount + (passed ? 1 : 0);
-  const nextFailureCount = failureCount + (passed ? 0 : 1);
-  return {
-    ...cell,
-    manualTestTone: passed ? 'ok' : 'bad',
-    status: statusFromCounts(nextSuccessCount, nextFailureCount),
-    successRate: nextSuccessCount / (nextSuccessCount + nextFailureCount),
-    requestCount: nextSuccessCount + nextFailureCount,
-    successCount: nextSuccessCount,
-    failureCount: nextFailureCount,
-    lastSuccessAt: passed ? Math.max(Number(cell.lastSuccessAt) || 0, testedAt) : cell.lastSuccessAt,
-    lastFailureAt: passed ? cell.lastFailureAt : Math.max(Number(cell.lastFailureAt) || 0, testedAt),
-    lastSeenAt: testedAt || cell.lastSeenAt
-  };
-}
-
-function scopedModelRows(modelStatus, scope, applyTextFilter = true) {
-  const filter = state.modelFilter.trim().toLowerCase();
-  return (modelStatus?.models || [])
-    .map((row) => ({ row, cell: groupCellFor(row, scope.siteName, scope.group) }))
-    .filter((item) => item.cell)
-    .filter((item) => item.cell.enabledChannelCount > 0)
-    .filter((item) => !applyTextFilter || !filter || item.row.model.toLowerCase().includes(filter))
-    .sort((a, b) => {
-      const statusRank = modelSortRank({ status: a.cell.status }) - modelSortRank({ status: b.cell.status });
-      if (statusRank !== 0) return statusRank;
-      return a.row.model.localeCompare(b.row.model);
-    });
-}
-
-function scopedSummary(rows) {
-  const summary = rows.reduce(
-    (acc, item) => {
-      acc.modelCount += 1;
-      acc.requestCount += item.cell.requestCount;
-      acc.successCount += item.cell.successCount;
-      acc.failureCount += item.cell.failureCount;
-      acc[item.cell.status] += 1;
-      return acc;
-    },
-    { modelCount: 0, requestCount: 0, successCount: 0, failureCount: 0, operational: 0, degraded: 0, down: 0, unknown: 0 }
-  );
-  summary.successRate = successRate(summary.successCount, summary.failureCount);
-  summary.modelAvailabilityRate = summary.modelCount > 0 ? summary.operational / summary.modelCount : null;
-  summary.status = statusFromSummary(summary);
-  return summary;
 }
 
 function renderSiteStatusCard(site, group, summary, windowLabel) {
@@ -711,9 +620,9 @@ function renderModelAvailability() {
     `;
   }
 
-  const scope = activeModelScope(modelStatus);
-  const allScopedRows = scopedModelRows(modelStatus, scope, false);
-  const models = scopedModelRows(modelStatus, scope, true);
+  const scope = activeModelScope(modelStatus, state);
+  const allScopedRows = scopedModelRows(modelStatus, scope, state, false);
+  const models = scopedModelRows(modelStatus, scope, state, true);
   const summary = scopedSummary(allScopedRows);
   const windowLabel = formatWindow(modelStatus.windowSeconds);
   const scopeTabId = modelScopeTabId(scope.siteName);
