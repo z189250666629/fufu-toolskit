@@ -1,0 +1,41 @@
+.model-scope-tabs {
+  --tab-count: 2;
+  --active-tab-index: 0;
+  --tab-list-padding: 4px;
+  --tab-min: 128px;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(var(--tab-count), minmax(var(--tab-min), 1fr));
+  isolation: isolate;
+  overflow: hidden;
+  border: 0;
+  border-radius: calc(var(--radius) + 0.25rem);
+  padding: var(--tab-list-padding);
+  background: var(--default);
+}
+
+.scope-button {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 0;
+  border-radius: 9999px;
+  padding: 0 16px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  outline: none;
+  white-space: nowrap;
+  transition: color 160ms var(--ease-smooth), opacity 160ms var(--ease-smooth), box-shadow 160ms var(--ease-smooth);
+}
+
+.scope-button.active {
+  color: var(--segment-foreground);
+  background: transparent;
+  box-shadow: none;
+}

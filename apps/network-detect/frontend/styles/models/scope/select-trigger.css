@@ -1,0 +1,74 @@
+.group-select {
+  position: relative;
+  width: min(320px, 100%);
+}
+
+.heroui-select {
+  z-index: 8;
+}
+
+.heroui-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--field-background);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+  outline: none;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.heroui-select-trigger:hover {
+  border-color: var(--line);
+  background: var(--sage-accent-subtle);
+}
+
+.heroui-select-trigger:focus-visible,
+.heroui-select-trigger[aria-expanded="true"] {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px oklch(0.69 0.12 115 / 0.16);
+}
+
+.heroui-select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heroui-select-indicator {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  color: var(--muted);
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.heroui-select-indicator svg,
+.heroui-select-item-indicator svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+.heroui-select-trigger[aria-expanded="true"] .heroui-select-indicator {
+  color: var(--sage-accent-muted-text);
+  transform: rotate(180deg);
+}
