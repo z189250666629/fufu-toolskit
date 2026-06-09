@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   activeModelScope,
   applyManualTestDisplay,
+  groupCellFor,
   scopedModelRows,
   scopedSummary
 } from './model_selectors.js';
@@ -57,6 +58,50 @@ test('manual test display can override unknown cells', () => {
   assert.equal(got.status, 'operational');
   assert.equal(got.manualTestTone, 'ok');
   assert.equal(got.successCount, 1);
+});
+
+test('manual test display does not double count materialized successful manual tests', () => {
+  const got = applyManualTestDisplay({
+    status: 'operational',
+    requestCount: 1,
+    successCount: 1,
+    failureCount: 0,
+    lastSuccessAt: 100,
+    lastSeenAt: 100,
+    manualTest: { ok: true, status: 'operational', testedAt: 100 }
+  });
+
+  assert.equal(got.manualTestTone, 'ok');
+  assert.equal(got.successCount, 1);
+  assert.equal(got.failureCount, 0);
+  assert.equal(got.requestCount, 1);
+});
+
+test('groupCellFor does not double count materialized group manual tests', () => {
+  const got = groupCellFor({
+    model: 'model-a',
+    perSite: {
+      site: {
+        configured: true,
+        manualTest: { ok: true, status: 'operational', testedAt: 100 },
+        groupStats: {
+          vip: {
+            configured: true,
+            status: 'operational',
+            requestCount: 1,
+            successCount: 1,
+            failureCount: 0,
+            lastSuccessAt: 100,
+            enabledChannelCount: 1
+          }
+        }
+      }
+    }
+  }, 'site', 'vip');
+
+  assert.equal(got.manualTestTone, 'ok');
+  assert.equal(got.successCount, 1);
+  assert.equal(got.requestCount, 1);
 });
 
 test('scopedModelRows filters, sorts and summarizes rows', () => {

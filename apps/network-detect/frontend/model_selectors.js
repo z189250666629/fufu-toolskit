@@ -37,15 +37,29 @@ export function groupCellFor(row, siteName, group) {
   });
 }
 
+function manualTestAlreadyCounted(cell, testedAt, passed) {
+  const count = Number(passed ? cell.successCount : cell.failureCount) || 0;
+  const lastAt = Number(passed ? cell.lastSuccessAt : cell.lastFailureAt) || 0;
+  return count > 0 && testedAt > 0 && lastAt >= testedAt;
+}
+
 export function applyManualTestDisplay(cell) {
   const manual = cell.manualTest;
   if (!manual?.testedAt) return cell;
 
   const passed = manual.ok === true || manual.status === 'operational';
+  const manualTestTone = passed ? 'ok' : 'bad';
   const testedAt = Number(manual.testedAt) || 0;
   const successCount = Number(cell.successCount) || 0;
   const failureCount = Number(cell.failureCount) || 0;
   const hasLogData = successCount + failureCount > 0;
+
+  if (manualTestAlreadyCounted(cell, testedAt, passed)) {
+    return {
+      ...cell,
+      manualTestTone
+    };
+  }
 
   if (!passed && hasLogData) return cell;
 
@@ -53,7 +67,7 @@ export function applyManualTestDisplay(cell) {
   const nextFailureCount = failureCount + (passed ? 0 : 1);
   return {
     ...cell,
-    manualTestTone: passed ? 'ok' : 'bad',
+    manualTestTone,
     status: statusFromCounts(nextSuccessCount, nextFailureCount),
     successRate: nextSuccessCount / (nextSuccessCount + nextFailureCount),
     requestCount: nextSuccessCount + nextFailureCount,
