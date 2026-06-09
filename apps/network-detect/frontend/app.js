@@ -30,6 +30,11 @@ import {
   motionClass as tabMotionClass,
   restoreRenderScroll
 } from './ui_motion.js';
+import {
+  activateModelSiteState,
+  activatePanelState,
+  selectTokenGroupState
+} from './app_state.js';
 
 const app = document.getElementById('app');
 let filterRenderTimer = null;
@@ -163,28 +168,17 @@ async function testModelCell(siteName, model, group = '') {
 }
 
 function activatePanelTab(nextPanel, focusAfterRender = false) {
-  if (state.activePanel === nextPanel) return;
-  const shouldLoadModelStatus = nextPanel === 'models' && !state.modelStatus && !state.loading;
-  state.activePanel = nextPanel || 'url';
-  state.groupSelectOpen = false;
-  if (shouldLoadModelStatus) {
-    state.loading = true;
-    state.error = '';
-    state.modelTestMessage = '';
-  }
+  const { changed, shouldLoadModelStatus, panel } = activatePanelState(state, nextPanel);
+  if (!changed) return;
   renderWithMotion('panel');
   if (focusAfterRender) {
-    requestAnimationFrame(() => document.querySelector(`[data-panel="${nextPanel}"]`)?.focus());
+    requestAnimationFrame(() => document.querySelector(`[data-panel="${panel}"]`)?.focus());
   }
   if (shouldLoadModelStatus) loadModelStatus(false, { renderStart: false });
 }
 
 function activateModelSiteTab(siteName, focusAfterRender = false) {
-  if (!siteName || state.selectedModelSite === siteName) return;
-  state.selectedModelSite = siteName;
-  state.modelFilter = '';
-  state.modelTestMessage = '';
-  state.groupSelectOpen = false;
+  if (!activateModelSiteState(state, siteName)) return;
   renderWithMotion('scope');
   if (focusAfterRender) {
     requestAnimationFrame(() => document.querySelector(`[data-model-site="${CSS.escape(siteName)}"]`)?.focus());
@@ -239,10 +233,7 @@ function bindEvents() {
 
   document.querySelectorAll('[data-token-group-option]').forEach((button) => {
     button.addEventListener('click', () => {
-      state.selectedTokenGroup = button.dataset.tokenGroupOption || '';
-      state.modelFilter = '';
-      state.modelTestMessage = '';
-      state.groupSelectOpen = false;
+      selectTokenGroupState(state, button.dataset.tokenGroupOption || '');
       renderWithMotion('scope');
     });
   });
