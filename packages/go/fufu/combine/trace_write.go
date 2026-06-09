@@ -107,7 +107,7 @@ func (a *App) upsertTraceToken(ctx context.Context, mergeID int64, kind string, 
 	if a.db == nil || mergeID == 0 {
 		return nil
 	}
-	key := ensureFullKey(token.Key)
+	key := traceTokenKeys(token)
 	now := time.Now().UnixMilli()
 	_, err := a.db.ExecContext(ctx, `
 		INSERT INTO merge_tokens (
@@ -126,7 +126,7 @@ func (a *App) upsertTraceToken(ctx context.Context, mergeID int64, kind string, 
 			group_name = excluded.group_name,
 			status = excluded.status,
 			updated_at = excluded.updated_at
-	`, mergeID, kind, token.ID, key, keyHash(key), keyMask(key), token.Name, token.RemainQuota, token.UsedQuota, token.IntervalUnit, token.Group, token.Status, now, now)
+	`, mergeID, kind, token.ID, key.full, key.hash, key.mask, token.Name, token.RemainQuota, token.UsedQuota, token.IntervalUnit, token.Group, token.Status, now, now)
 	return err
 }
 
@@ -134,11 +134,12 @@ func (a *App) setTraceTokenDeleteResult(ctx context.Context, mergeID int64, toke
 	if a.db == nil || mergeID == 0 {
 		return
 	}
+	key := traceTokenKeys(token)
 	if _, err := a.db.ExecContext(ctx, `
 		UPDATE merge_tokens
 		SET delete_ok = ?, delete_error = ?, updated_at = ?
 		WHERE merge_id = ? AND kind = 'source' AND key_hash = ?
-	`, boolInt(ok), errText, time.Now().UnixMilli(), mergeID, keyHash(token.Key)); err != nil {
+	`, boolInt(ok), errText, time.Now().UnixMilli(), mergeID, key.hash); err != nil {
 		log.Printf("trace token delete update failed: %v", err)
 	}
 }
