@@ -109,7 +109,7 @@ func (a *App) runMergeJob(jobID string, p MergePayload, role Role) {
 			a.setMergeJob(jobID, MergeJobPatch{Status: strp("error"), StepText: strp("合并失败"), Error: strp(fmt.Sprint(x))})
 		}
 	}()
-	_, err := a.executeMerge(context.Background(), ExecuteMergeParams{Keys: p.Keys, IntervalUnit: p.IntervalUnit, TotalQuota: p.TotalQuota, Name: p.Name, CustomQuota: p.CustomQuota, Role: role, JobID: jobID})
+	_, err := a.executeMerge(context.Background(), buildRunMergeJobParams(jobID, p, role))
 	if err != nil {
 		a.setMergeJob(jobID, MergeJobPatch{Status: strp("error"), StepText: strp("合并失败"), Error: strp(err.Error())})
 	}
