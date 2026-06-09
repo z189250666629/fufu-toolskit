@@ -1,0 +1,86 @@
+package combine
+
+import "fufu/tokens"
+
+func resolvedFromToken(t tokens.Token) ResolvedToken {
+	return ResolvedToken{ID: t.ID, Key: t.Key, Name: t.Name, RemainQuota: t.RemainQuota, UsedQuota: t.UsedQuota, IntervalUnit: t.IntervalUnit, Group: t.Group, Status: t.Status, Raw: t.Raw}
+}
+
+func tokenFromRaw(raw map[string]any) ResolvedToken {
+	if raw == nil {
+		raw = map[string]any{}
+	}
+	return ResolvedToken{ID: toInt(raw["id"]), Key: ensureFullKey(getString(raw, "key")), Name: getString(raw, "name"), RemainQuota: toInt64(raw["remain_quota"]), UsedQuota: toInt64(raw["used_quota"]), IntervalUnit: toInt(raw["interval_unit"]), Group: stringOrDefault(getString(raw, "group"), "mix"), Status: intOrDefault(toIntDefault(raw["status"], 1), 1), Raw: raw}
+}
+
+func cloneMap(raw map[string]any) map[string]any {
+	out := map[string]any{}
+	for k, v := range raw {
+		out[k] = v
+	}
+	return out
+}
+
+func dataList(data map[string]any) []map[string]any {
+	raw, ok := data["data"].([]any)
+	if !ok {
+		return nil
+	}
+	out := []map[string]any{}
+	for _, item := range raw {
+		if obj, ok := item.(map[string]any); ok {
+			out = append(out, obj)
+		}
+	}
+	return out
+}
+
+func findTokenByName(data map[string]any, name string) map[string]any {
+	for _, item := range dataList(data) {
+		if getString(item, "name") == name {
+			return item
+		}
+	}
+	return nil
+}
+
+func findResolvedByID(tokens []ResolvedToken, id int) *ResolvedToken {
+	for i := range tokens {
+		if tokens[i].ID == id {
+			return &tokens[i]
+		}
+	}
+	return nil
+}
+
+func uniqueIDs(tokens []ResolvedToken) []int {
+	seen := map[int]bool{}
+	ids := []int{}
+	for _, t := range tokens {
+		if !seen[t.ID] {
+			seen[t.ID] = true
+			ids = append(ids, t.ID)
+		}
+	}
+	return ids
+}
+
+func majorityGroup(tokens []ResolvedToken) string {
+	counts := map[string]int{}
+	for _, t := range tokens {
+		g := t.Group
+		if g == "" {
+			g = "mix"
+		}
+		counts[g]++
+	}
+	winner := "mix"
+	max := 0
+	for g, c := range counts {
+		if c > max {
+			winner = g
+			max = c
+		}
+	}
+	return winner
+}
