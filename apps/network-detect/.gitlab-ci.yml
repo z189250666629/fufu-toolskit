@@ -204,7 +204,6 @@ deploy_production:
       NEWAPI_TOKEN_SITE_URL=${NEWAPI_TOKEN_SITE_URL:-}
       CONNECTIVITY_API_URLS=${CONNECTIVITY_API_URLS:-}
       CONNECTIVITY_TOKEN_URLS=${CONNECTIVITY_TOKEN_URLS:-}
-      NEWAPI_DASHBOARD_VIEW_KEY=${NEWAPI_DASHBOARD_VIEW_KEY:-}
       EOF
 
       # Always upload the compose file so the remote host does not depend on manual drift.

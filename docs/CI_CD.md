@@ -149,7 +149,6 @@ scripts/deploy-docker-app.sh
 | `NEWAPI_API_SITE_TOKEN` | network-detect / fallback token |
 | `NEWAPI_TOKEN_SITE_TOKEN` | network-detect token 站 token |
 | `NEWAPI_MANAGED_API_SITES` | network-detect 完整 JSON 配置，可选 |
-| `NEWAPI_DASHBOARD_VIEW_KEY` | network-detect 浏览器查看密钥，可选 |
 | `MCY_COOKIE` | fufu-act 商城 session cookie，可选 |
 | `MCY_USERNAME` | fufu-act 商城账号，可选 |
 | `MCY_PASSWORD` | fufu-act 商城密码，可选 |

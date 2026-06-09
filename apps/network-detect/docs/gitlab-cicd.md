@@ -70,7 +70,6 @@ Set these in `Settings -> CI/CD -> Variables`.
 | `NEWAPI_TOKEN_SITE_URL` | No | `https://token.fufuflower.top` | Optional Token 站 URL override. |
 | `CONNECTIVITY_API_URLS` | No | comma-separated URLs | Optional URL detection targets for API sites. |
 | `CONNECTIVITY_TOKEN_URLS` | No | comma-separated URLs | Optional URL detection targets for Token sites. |
-| `NEWAPI_DASHBOARD_VIEW_KEY` | No | `long-random-key` | Optional browser view key for `/api/newapi/*`. Mark as `Masked` and `Protected`. |
 | `DEPLOY_REGISTRY_USER` | No | `gitlab+deploy-token-123` | Recommended when the target host should use a long-lived registry credential instead of the short-lived job token. |
 | `DEPLOY_REGISTRY_PASSWORD` | No | Token text | Paired with `DEPLOY_REGISTRY_USER`. Mark as `Masked` and `Protected`. |
 

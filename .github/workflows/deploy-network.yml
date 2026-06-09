@@ -134,7 +134,6 @@ jobs:
       NEWAPI_TOKEN_SITE_URL: ${{ vars.NEWAPI_TOKEN_SITE_URL }}
       CONNECTIVITY_API_URLS: ${{ vars.CONNECTIVITY_API_URLS }}
       CONNECTIVITY_TOKEN_URLS: ${{ vars.CONNECTIVITY_TOKEN_URLS }}
-      NEWAPI_DASHBOARD_VIEW_KEY: ${{ secrets.NEWAPI_DASHBOARD_VIEW_KEY || vars.NEWAPI_DASHBOARD_VIEW_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

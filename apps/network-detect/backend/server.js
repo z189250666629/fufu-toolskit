@@ -374,27 +374,6 @@ async function readJsonBody(req, maxBytes = 16 * 1024) {
     throw error;
   }
 }
-
-function dashboardViewKey() {
-  return envValue('NEWAPI_DASHBOARD_VIEW_KEY') || envValue('NEWAPI_LOG_VIEW_KEY');
-}
-
-function isAuthorized(req) {
-  const expected = dashboardViewKey();
-  if (!expected) return true;
-  const provided = String(req.headers['x-dashboard-key'] || req.headers['x-log-key'] || '').trim();
-  return provided !== '' && provided === expected;
-}
-
-function requireAuthorized(req, res) {
-  if (isAuthorized(req)) return true;
-  sendJson(res, 401, {
-    error: '访问密钥不正确',
-    requiresKey: true
-  });
-  return false;
-}
-
 function boundedInt(searchParams, name, fallback, min, max) {
   const value = Number(searchParams.get(name));
   if (!Number.isFinite(value)) return fallback;
@@ -1104,7 +1083,6 @@ async function buildModelStatus() {
     return {
       configured: false,
       configError: config.error,
-      requiresKey: Boolean(dashboardViewKey()),
       generatedAt: now,
       expiresAt: now + MODEL_STATUS_WINDOW_SECONDS,
       windowSeconds: MODEL_STATUS_WINDOW_SECONDS,
@@ -1202,7 +1180,6 @@ async function buildModelStatus() {
   return {
     configured: true,
     configError: config.error,
-    requiresKey: Boolean(dashboardViewKey()),
     generatedAt: now,
     expiresAt: now + MODEL_STATUS_WINDOW_SECONDS,
     windowSeconds: MODEL_STATUS_WINDOW_SECONDS,
@@ -1417,7 +1394,6 @@ async function buildOverview(searchParams) {
   return {
     configured: sites.length > 0,
     configError: config.error,
-    requiresKey: Boolean(dashboardViewKey()),
     generatedAt: now,
     window: {
       hours,
@@ -1490,11 +1466,9 @@ async function handleApi(req, res, pathname, searchParams) {
       sendJson(res, 405, { error: 'Only GET is supported' });
       return;
     }
-    if (!requireAuthorized(req, res)) return;
     const config = await readManagedApiSitesConfig();
     sendJson(res, config.error && config.sites.length === 0 ? 500 : 200, {
       configured: config.sites.length > 0,
-      requiresKey: Boolean(dashboardViewKey()),
       error: config.error,
       sites: config.sites.map(publicSite)
     });
@@ -1506,7 +1480,6 @@ async function handleApi(req, res, pathname, searchParams) {
       sendJson(res, 405, { error: 'Only GET is supported' });
       return;
     }
-    if (!requireAuthorized(req, res)) return;
     const overview = await buildOverview(searchParams);
     sendJson(res, overview.configError && !overview.configured ? 500 : 200, overview);
     return;
@@ -1517,7 +1490,6 @@ async function handleApi(req, res, pathname, searchParams) {
       sendJson(res, 405, { error: 'Only GET is supported' });
       return;
     }
-    if (!requireAuthorized(req, res)) return;
     const status = await getModelStatus(searchParams.get('refresh') === '1');
     sendJson(res, status.configError && !status.configured ? 500 : 200, status);
     return;
@@ -1528,7 +1500,6 @@ async function handleApi(req, res, pathname, searchParams) {
       sendJson(res, 405, { error: 'Only POST is supported' });
       return;
     }
-    if (!requireAuthorized(req, res)) return;
 
     let body;
     try {

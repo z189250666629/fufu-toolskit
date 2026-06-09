@@ -29,7 +29,6 @@ const DEFAULT_TARGET_GROUPS = [
 const state = {
   loading: false,
   initialized: false,
-  key: sessionStorage.getItem('api-dashboard-key') || '',
   modelFilter: '',
   selectedModelSite: '次数fufu',
   selectedTokenGroup: '',
@@ -148,8 +147,7 @@ function fetchErrorText(error) {
 
 async function fetchJson(path, options = {}) {
   const headers = {
-    ...(options.headers || {}),
-    ...(state.key ? { 'X-Dashboard-Key': state.key } : {})
+    ...(options.headers || {})
   };
   const response = await fetch(path, { ...options, headers, cache: 'no-store' });
   const data = await response.json().catch(() => ({}));
@@ -189,11 +187,10 @@ async function loadModelStatus(refresh = false, options = {}) {
     state.modelStatus = await fetchJson(`/api/newapi/model-status${refresh ? '?refresh=1' : ''}`);
     state.initialized = true;
   } catch (error) {
-    state.error = error.status === 401 ? '需要输入访问密钥' : error.message;
+    state.error = error.message;
     if (error.data && typeof error.data === 'object' && Number.isFinite(Number(error.data.generatedAt))) {
       state.modelStatus = error.data;
     }
-    if (error.status === 401) state.modelStatus = { requiresKey: true, configured: true, sites: [], models: [] };
   } finally {
     state.loading = false;
     render();
@@ -874,7 +871,7 @@ function renderModelAvailability() {
     const reason = state.error || modelStatus?.configError || '当前没有可展示的管理站点或模型统计';
     return `
       <div class="model-state-empty${motionClass('panel', 'scope')}" id="modelsPanel" role="tabpanel" aria-labelledby="modelsTab" data-slot="tab-panel">
-        ${renderStateCard('暂无模型状态数据', reason, modelStatus?.requiresKey ? '需要密钥' : '未配置')}
+        ${renderStateCard('暂无模型状态数据', reason, '未配置')}
       </div>
     `;
   }

@@ -65,8 +65,6 @@ Each source supports:
 - `quotaUnit`, `currency`, `rechargeRatio`: used to convert quota to display value.
 - `skipUserHeader`: set true for instances that reject `New-Api-User`.
 
-Set `NEWAPI_DASHBOARD_VIEW_KEY` to require a browser view key before logs are shown.
-
 ### Deployment Env Vars
 
 For tagged deployments, set these variables in the deployment environment instead of editing files in the container:

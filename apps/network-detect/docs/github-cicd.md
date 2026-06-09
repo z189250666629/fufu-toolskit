@@ -46,7 +46,6 @@ If `DEPLOY_ENABLED=true` is used for tagged deployment, add these runtime secret
 | `SSH_KNOWN_HOSTS` | Recommended | Known hosts entry for the target server. |
 | `NEWAPI_API_SITE_TOKEN` | Yes | API 次数站 NewAPI token. |
 | `NEWAPI_TOKEN_SITE_TOKEN` | Yes | Token 站 NewAPI token. |
-| `NEWAPI_DASHBOARD_VIEW_KEY` | No | Optional browser view key. |
 
 The deploy job writes these values into the remote compose env file before running `docker compose`, so the running container can read them.
 
