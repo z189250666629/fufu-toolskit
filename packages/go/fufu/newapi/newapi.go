@@ -117,13 +117,7 @@ func (c *Client) Request(ctx context.Context, method, endpoint string, body any)
 		return Response{StatusCode: resp.StatusCode}, nil, err
 	}
 	apiResp := Response{StatusCode: resp.StatusCode, Body: string(respBody)}
-	decoded := map[string]any{}
-	if len(bytes.TrimSpace(respBody)) > 0 {
-		dec := json.NewDecoder(bytes.NewReader(respBody))
-		dec.UseNumber()
-		_ = dec.Decode(&decoded)
-	}
-	return apiResp, decoded, nil
+	return apiResp, decodeResponsePayload(respBody), nil
 }
 
 func (c *Client) Get(ctx context.Context, endpoint string) (Response, map[string]any, error) {
