@@ -77,6 +77,8 @@ func publicTraceResults(results []TraceResult) []TraceResult {
 	out := make([]TraceResult, len(results))
 	for i, result := range results {
 		out[i] = result
+		out[i].Error = publicTraceError(result.Error)
+		out[i].RollbackNote = publicRollbackNote(result.RollbackNote)
 		out[i].SourceKeys = publicTraceTokens(result.SourceKeys)
 		if result.ResultKey != nil {
 			token := publicTraceToken(*result.ResultKey)
@@ -105,7 +107,29 @@ func publicTraceToken(token TraceToken) TraceToken {
 		token.KeyMask = token.Key
 	}
 	token.KeyHash = ""
+	token.DeleteError = publicTraceDeleteError(token.DeleteError)
 	return token
+}
+
+func publicTraceError(message string) string {
+	if strings.TrimSpace(message) == "" {
+		return ""
+	}
+	return "合并失败，请稍后重试"
+}
+
+func publicRollbackNote(message string) string {
+	if strings.TrimSpace(message) == "" {
+		return ""
+	}
+	return "回滚状态已记录"
+}
+
+func publicTraceDeleteError(message string) string {
+	if strings.TrimSpace(message) == "" {
+		return ""
+	}
+	return "删除失败，请稍后重试"
 }
 
 func canDeleteTokenRole(role Role) bool {

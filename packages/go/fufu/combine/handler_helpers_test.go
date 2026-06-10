@@ -1,6 +1,10 @@
 package combine
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 func TestMergeStatusJobIDFromPath(t *testing.T) {
 	if got := mergeStatusJobIDFromPath("/api/merge-status/job-123"); got != "job-123" {
@@ -103,5 +107,46 @@ func TestBuildSearchKeysResponseRedactsTraceTokenFullKeys(t *testing.T) {
 	}
 	if traces[0].SourceKeys[0].Key != "sk-source-secret-1234567890" || traces[0].SourceKeys[0].KeyHash != "source-hash" {
 		t.Fatalf("redaction should not mutate stored traces: %#v", traces[0].SourceKeys[0])
+	}
+}
+
+func TestBuildSearchKeysResponseRedactsTraceErrors(t *testing.T) {
+	traces := []TraceResult{{
+		MergeID:      9,
+		Status:       "error",
+		Error:        "upstream panic sk-secret internal.example",
+		RollbackNote: "rollback failed sk-secret",
+		SourceKeys: []TraceToken{{
+			Key:         "sk-source-secret-1234567890",
+			KeyMask:     "sk-sour…7890",
+			KeyHash:     "source-hash",
+			DeleteError: "delete failed sk-secret internal.example",
+		}},
+	}}
+
+	resp := buildSearchKeysResponse([]string{"sk-source-secret-1234567890"}, nil, nil, 500000, 1, traces)
+	got := resp["traceResults"].([]TraceResult)
+	encoded, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(encoded)
+
+	if got[0].Error != "合并失败，请稍后重试" {
+		t.Fatalf("trace error should be safe, got %#v", got[0].Error)
+	}
+	if got[0].RollbackNote != "回滚状态已记录" {
+		t.Fatalf("rollback note should be safe, got %#v", got[0].RollbackNote)
+	}
+	if got[0].SourceKeys[0].DeleteError != "删除失败，请稍后重试" {
+		t.Fatalf("delete error should be safe, got %#v", got[0].SourceKeys[0].DeleteError)
+	}
+	for _, leaked := range []string{"sk-secret", "internal.example", "upstream panic", "rollback failed", "delete failed", "source-hash"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("public trace leaked %q in %s", leaked, body)
+		}
+	}
+	if traces[0].Error == "" || traces[0].RollbackNote == "" || traces[0].SourceKeys[0].DeleteError == "" {
+		t.Fatalf("redaction should not mutate stored traces: %#v", traces[0])
 	}
 }
