@@ -70,23 +70,26 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	if v, ok := testCooldowns.Load(key); ok && v.(int64) > now {
 		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: v.(int64)}
 	}
-	channels, errMsg := loadSiteChannels(ctx, *site)
-	if errMsg != "" {
-		return nil, &httpError{Status: 502, Message: errMsg}
-	}
-	candidates := selectModelTestChannels(channels, model, group)
-	if len(candidates) == 0 {
-		return nil, &httpError{Status: 400, Message: "当前单元格没有启用通道可测试"}
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	next := now + int64(modelTestCooldown/time.Second)
 	if existing, loaded := testCooldowns.LoadOrStore(key, next); loaded {
 		if until, ok := existing.(int64); ok && until > now {
 			return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: until}
 		}
 		testCooldowns.Store(key, next)
+	}
+	channels, errMsg := loadSiteChannels(ctx, *site)
+	if errMsg != "" {
+		clearModelTestCooldownReservation(key, next)
+		return nil, &httpError{Status: 502, Message: errMsg}
+	}
+	candidates := selectModelTestChannels(channels, model, group)
+	if len(candidates) == 0 {
+		clearModelTestCooldownReservation(key, next)
+		return nil, &httpError{Status: 400, Message: "当前单元格没有启用通道可测试"}
+	}
+	if err := ctx.Err(); err != nil {
+		clearModelTestCooldownReservation(key, next)
+		return nil, err
 	}
 	stream := supportsStream(model)
 	var res apiResult
@@ -104,6 +107,16 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	testResults.Store(key, rec)
 	applyManualToCachedStatus(siteName, model, group, rec, next)
 	return map[string]any{"siteName": siteName, "model": model, "group": group, "test": rec}, nil
+}
+
+func clearModelTestCooldownReservation(key string, next int64) {
+	if v, ok := testCooldowns.Load(key); ok {
+		until, ok := v.(int64)
+		if !ok || until != next {
+			return
+		}
+		testCooldowns.Delete(key)
+	}
 }
 
 func pruneManualTestCache(now int64) {

@@ -212,6 +212,9 @@ func TestTestModelAllowsOnlyOneConcurrentProbePerCell(t *testing.T) {
 	if got := probeHits.Load(); got != 1 {
 		t.Fatalf("same cell should trigger one upstream probe, got %d", got)
 	}
+	if got := searchHits.Load(); got != 1 {
+		t.Fatalf("same cell should share the cooldown before loading channels, got %d channel searches", got)
+	}
 }
 
 func TestBuildModelStatusPrunesExpiredManualTestEntries(t *testing.T) {
