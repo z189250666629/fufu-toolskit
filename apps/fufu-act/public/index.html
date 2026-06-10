@@ -1470,8 +1470,10 @@
     async function fetchPrizes() {
       try {
         const res = await fetch(API + '/prizes');
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await activityApi.readApiJson(res, {
+          serverErrorMessage: '奖池暂时无法加载',
+          clientErrorMessage: '奖池暂时无法加载',
+        });
         const weights = {
           1: 1100, 5: 2500, 10: 2000, 20: 2000,
           50: 1300, 100: 600, 200: 300, 500: 195, 1000: 5,
@@ -1482,10 +1484,15 @@
           return { dollars: p.dollars, pct: ((w / total) * 100).toFixed(2) };
         });
         renderPrizeTable(rows);
-      } catch (e) { /* silent */ }
+      } catch (e) {
+        renderPrizeLoadError();
+      }
     }
     function renderPrizeTable(rows) {
       $('prize-table').innerHTML = activityRender.buildPrizeTableHtml(rows, PRIZE_SYMBOLS);
+    }
+    function renderPrizeLoadError() {
+      $('prize-table').innerHTML = `<div class="prize-row"><div class="amount">${activityRender.escapeHtml('奖池暂时无法加载')}</div></div>`;
     }
     $('drawer-toggle').onclick = () => {
       $('drawer-toggle').classList.toggle('open');
