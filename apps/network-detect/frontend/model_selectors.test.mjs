@@ -154,3 +154,16 @@ test('scopedModelRows filters, sorts and summarizes rows', () => {
   assert.equal(summary.failureCount, 1);
   assert.equal(summary.status, 'down');
 });
+
+test('scopedSummary normalizes count fields before accumulating', () => {
+  const summary = scopedSummary([
+    { cell: { status: 'operational', requestCount: '3', successCount: '3', failureCount: '0' } },
+    { cell: { status: 'degraded', requestCount: '2', successCount: '1', failureCount: '1' } }
+  ]);
+
+  assert.equal(summary.requestCount, 5);
+  assert.equal(summary.successCount, 4);
+  assert.equal(summary.failureCount, 1);
+  assert.equal(summary.successRate, 0.8);
+  assert.equal(summary.status, 'degraded');
+});

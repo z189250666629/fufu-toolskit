@@ -92,13 +92,18 @@ export function scopedModelRows(modelStatus, scope, stateLike = {}, applyTextFil
     });
 }
 
+function countValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
 export function scopedSummary(rows) {
   const summary = rows.reduce(
     (acc, item) => {
       acc.modelCount += 1;
-      acc.requestCount += item.cell.requestCount;
-      acc.successCount += item.cell.successCount;
-      acc.failureCount += item.cell.failureCount;
+      acc.requestCount += countValue(item.cell.requestCount);
+      acc.successCount += countValue(item.cell.successCount);
+      acc.failureCount += countValue(item.cell.failureCount);
       acc[item.cell.status] += 1;
       return acc;
     },
