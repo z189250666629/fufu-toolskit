@@ -191,6 +191,9 @@ func TestStaticHandlerRejectsUnsafeOrWrongMethodRequests(t *testing.T) {
 			if w.Code != tc.status {
 				t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 			}
+			if got := w.Header().Get("Cache-Control"); got != "no-store" {
+				t.Fatalf("Cache-Control = %q", got)
+			}
 			if tc.status == http.StatusMethodNotAllowed {
 				if got := w.Header().Get("Allow"); got != "GET, HEAD" {
 					t.Fatalf("Allow = %q", got)

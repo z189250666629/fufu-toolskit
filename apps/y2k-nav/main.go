@@ -39,7 +39,7 @@ func newStaticHandler(root string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			webutil.WriteStaticError(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		path := r.URL.Path
@@ -48,15 +48,15 @@ func newStaticHandler(root string) http.Handler {
 		}
 		file, ok := webutil.SafePath(root, path)
 		if !ok {
-			http.Error(w, "forbidden", http.StatusForbidden)
+			webutil.WriteStaticError(w, "forbidden", http.StatusForbidden)
 			return
 		}
 		if !isPublicBrowserAsset(path) {
-			http.NotFound(w, r)
+			webutil.WriteStaticNotFound(w, r)
 			return
 		}
 		if _, err := os.Stat(file); err != nil {
-			http.NotFound(w, r)
+			webutil.WriteStaticNotFound(w, r)
 			return
 		}
 		webutil.ServeFile(w, r, file, strings.HasSuffix(file, ".html"))

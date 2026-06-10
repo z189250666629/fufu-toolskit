@@ -92,7 +92,7 @@ func NewStaticHandler(root string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			WriteStaticError(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		path := r.URL.Path
@@ -100,21 +100,31 @@ func NewStaticHandler(root string) http.Handler {
 			path = "/index.html"
 		}
 		if !IsPublicStaticPath(path) {
-			http.NotFound(w, r)
+			WriteStaticNotFound(w, r)
 			return
 		}
 		file, ok := SafePath(root, path)
 		if !ok {
-			http.Error(w, "forbidden", http.StatusForbidden)
+			WriteStaticError(w, "forbidden", http.StatusForbidden)
 			return
 		}
 		info, err := os.Stat(file)
 		if err != nil || info.IsDir() {
-			http.NotFound(w, r)
+			WriteStaticNotFound(w, r)
 			return
 		}
 		ServeFile(w, r, file, strings.HasSuffix(file, ".html"))
 	})
+}
+
+func WriteStaticError(w http.ResponseWriter, message string, status int) {
+	w.Header().Set("Cache-Control", "no-store")
+	http.Error(w, message, status)
+}
+
+func WriteStaticNotFound(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	http.NotFound(w, r)
 }
 
 func WriteJSON(w http.ResponseWriter, status int, payload any) {
@@ -149,7 +159,7 @@ func RequireMethodMessage(w http.ResponseWriter, r *http.Request, method, messag
 func ServeFile(w http.ResponseWriter, r *http.Request, file string, noStore bool) {
 	data, err := os.ReadFile(file)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		WriteStaticError(w, "not found", http.StatusNotFound)
 		return
 	}
 	if ct := mime.TypeByExtension(filepath.Ext(file)); ct != "" {

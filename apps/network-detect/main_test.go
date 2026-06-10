@@ -139,6 +139,9 @@ func TestStaticMissingAssetsDoNotUseSPAFallback(t *testing.T) {
 	if assetRec.Code != http.StatusNotFound {
 		t.Fatalf("missing asset code=%d body=%s", assetRec.Code, assetRec.Body.String())
 	}
+	if got := assetRec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("missing asset Cache-Control = %q", got)
+	}
 
 	spaReq := httptest.NewRequest(http.MethodGet, "/models", nil)
 	spaRec := httptest.NewRecorder()
@@ -206,6 +209,9 @@ func TestStaticRouteRejectsUnsafeMethodsWithAllowHeader(t *testing.T) {
 	}
 	if got := w.Header().Get("Allow"); got != "GET, HEAD" {
 		t.Fatalf("Allow = %q", got)
+	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q", got)
 	}
 }
 

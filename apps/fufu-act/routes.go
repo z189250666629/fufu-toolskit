@@ -67,22 +67,22 @@ func staticRoute(w http.ResponseWriter, r *http.Request) {
 		p = "/index.html"
 	}
 	if !webutil.IsPublicStaticPath(p) {
-		http.NotFound(w, r)
+		webutil.WriteStaticNotFound(w, r)
 		return
 	}
 	publicDir := filepath.Join(rootDir, "public")
 	file, ok := webutil.SafePath(publicDir, p)
 	if !ok {
-		http.Error(w, "Forbidden", 403)
+		webutil.WriteStaticError(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 	info, err := os.Stat(file)
 	if err != nil {
-		http.NotFound(w, r)
+		webutil.WriteStaticNotFound(w, r)
 		return
 	}
 	if info.IsDir() {
-		http.NotFound(w, r)
+		webutil.WriteStaticNotFound(w, r)
 		return
 	}
 	webutil.ServeFile(w, r, file, true)

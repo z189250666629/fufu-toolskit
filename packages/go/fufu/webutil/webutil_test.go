@@ -179,3 +179,32 @@ func TestServeFileSupportsHeadAndCachePolicy(t *testing.T) {
 		t.Fatalf("Content-Type = %q", got)
 	}
 }
+
+func TestStaticHandlerErrorsAreNoStore(t *testing.T) {
+	root := t.TempDir()
+	handler := NewStaticHandler(root)
+	for _, tc := range []struct {
+		name   string
+		method string
+		path   string
+		status int
+	}{
+		{name: "wrong method", method: http.MethodPost, path: "/", status: http.StatusMethodNotAllowed},
+		{name: "blocked path", method: http.MethodGet, path: "/app.test.mjs", status: http.StatusNotFound},
+		{name: "missing file", method: http.MethodGet, path: "/missing.js", status: http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != tc.status {
+				t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+			}
+			if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+				t.Fatalf("Cache-Control = %q", got)
+			}
+		})
+	}
+}

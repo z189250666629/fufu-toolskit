@@ -194,6 +194,9 @@ func TestStaticRouteRejectsUnsafeMethodsWithAllowHeader(t *testing.T) {
 	if got := w.Header().Get("Allow"); got != "GET, HEAD" {
 		t.Fatalf("Allow = %q", got)
 	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
 }
 
 func TestStaticRouteRejectsDirectoryListing(t *testing.T) {
@@ -248,6 +251,9 @@ func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
 		staticRoute(w, req)
 		if w.Code == http.StatusOK {
 			t.Fatalf("%s should not be served: body=%s", path, w.Body.String())
+		}
+		if got := w.Header().Get("Cache-Control"); got != "no-store" {
+			t.Fatalf("%s Cache-Control = %q", path, got)
 		}
 		if strings.Contains(w.Body.String(), "secret") {
 			t.Fatalf("%s leaked secret marker: %s", path, w.Body.String())
