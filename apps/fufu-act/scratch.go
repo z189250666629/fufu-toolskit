@@ -16,35 +16,44 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 		writeMissingCardKey(w)
 		return
 	}
-	card, ok := getCard(key)
-	if !ok {
-		writeJSONError(w, 404, "请先登录")
-		return
-	}
-	if int(math.Round(card.Dollars)) != 55 {
-		writeJSONError(w, 403, "此卡密不参与刮刮乐活动")
-		return
-	}
-	if g, ok := getScratch(key); ok {
-		writeJSON(w, 200, map[string]any{"cells": 9, "revealed": jsonArr(g.Revealed), "prize": g.PrizeDollars, "status": g.Status})
-		return
-	}
-	mines := []int{}
-	for len(mines) < scratchMines {
-		p := secureRandomInt(9)
-		exists := false
-		for _, m := range mines {
-			if m == p {
-				exists = true
+	res, err := withCardLock(key, func() (any, error) {
+		card, ok := getCard(key)
+		if !ok {
+			return nil, httpErr{404, "请先登录"}
+		}
+		if int(math.Round(card.Dollars)) != 55 {
+			return nil, httpErr{403, "此卡密不参与刮刮乐活动"}
+		}
+		if g, ok := getScratch(key); ok {
+			return map[string]any{"cells": 9, "revealed": jsonArr(g.Revealed), "prize": g.PrizeDollars, "status": g.Status}, nil
+		}
+		mines := []int{}
+		for len(mines) < scratchMines {
+			p := secureRandomInt(9)
+			exists := false
+			for _, m := range mines {
+				if m == p {
+					exists = true
+				}
+			}
+			if !exists {
+				mines = append(mines, p)
 			}
 		}
-		if !exists {
-			mines = append(mines, p)
+		mb, _ := json.Marshal(mines)
+		if _, err := db.Exec(`INSERT INTO scratch_games (card_key,mine_pos) VALUES (?,?)`, key, string(mb)); err != nil {
+			if g, ok := getScratch(key); ok {
+				return map[string]any{"cells": 9, "revealed": jsonArr(g.Revealed), "prize": g.PrizeDollars, "status": g.Status}, nil
+			}
+			return nil, err
 		}
+		return map[string]any{"cells": 9, "revealed": []int{}, "prize": 0, "status": "playing"}, nil
+	})
+	if err != nil {
+		writeHTTPError(w, err)
+		return
 	}
-	mb, _ := json.Marshal(mines)
-	_, _ = db.Exec(`INSERT INTO scratch_games (card_key,mine_pos) VALUES (?,?)`, key, string(mb))
-	writeJSON(w, 200, map[string]any{"cells": 9, "revealed": []int{}, "prize": 0, "status": "playing"})
+	writeJSON(w, 200, res)
 }
 
 func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
@@ -158,21 +167,27 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 		writeMissingCardKey(w)
 		return
 	}
-	card, ok := getCard(key)
-	if !ok {
-		writeJSONError(w, 404, "请先登录")
+	res, err := withCardLock(key, func() (any, error) {
+		card, ok := getCard(key)
+		if !ok {
+			return nil, httpErr{404, "请先登录"}
+		}
+		if !strings.Contains(card.CardName, "test") {
+			return nil, httpErr{403, "仅测试卡可重开"}
+		}
+		if g, ok := getScratch(key); ok && g.Status == "playing" {
+			return nil, httpErr{400, "当前游戏尚未结束"}
+		}
+		if _, err := db.Exec(`DELETE FROM scratch_games WHERE card_key=?`, key); err != nil {
+			return nil, err
+		}
+		return map[string]any{"ok": true}, nil
+	})
+	if err != nil {
+		writeHTTPError(w, err)
 		return
 	}
-	if !strings.Contains(card.CardName, "test") {
-		writeJSONError(w, 403, "仅测试卡可重开")
-		return
-	}
-	if g, ok := getScratch(key); ok && g.Status == "playing" {
-		writeJSONError(w, 400, "当前游戏尚未结束")
-		return
-	}
-	_, _ = db.Exec(`DELETE FROM scratch_games WHERE card_key=?`, key)
-	writeJSON(w, 200, map[string]any{"ok": true})
+	writeJSON(w, 200, res)
 }
 
 func getScratch(key string) (ScratchGame, bool) {
