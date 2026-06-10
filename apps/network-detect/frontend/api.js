@@ -1,3 +1,9 @@
+const SERVER_ERROR_MESSAGE = '服务暂时不可用，请稍后重试';
+
+function isServerErrorStatus(status) {
+  return Number.isInteger(status) && status >= 500;
+}
+
 export async function fetchJson(path, options = {}) {
   const { fetchImpl = globalThis.fetch, ...fetchOptions } = options;
   const headers = {
@@ -16,9 +22,14 @@ export async function fetchJson(path, options = {}) {
     }
   }
   if (!response.ok) {
-    const error = new Error(data.error || data.configError || `HTTP ${response.status}`);
+    const serverError = isServerErrorStatus(response.status);
+    const error = new Error(
+      serverError
+        ? SERVER_ERROR_MESSAGE
+        : data.error || data.configError || `HTTP ${response.status}`
+    );
     error.status = response.status;
-    error.data = data;
+    error.data = serverError ? {} : data;
     throw error;
   }
   return data;

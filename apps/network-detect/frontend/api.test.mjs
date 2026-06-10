@@ -20,19 +20,39 @@ test('fetchJson requests no-store JSON and returns decoded body', async () => {
   assert.deepEqual(calls, [['/api/test', 'no-store', 'yes']]);
 });
 
-test('fetchJson throws API error with status and data', async () => {
+test('fetchJson throws client API error with status and data', async () => {
   await assert.rejects(
     () => fetchJson('/api/test', {
       fetchImpl: async () => ({
         ok: false,
-        status: 503,
-        json: async () => ({ error: 'bad gateway' })
+        status: 400,
+        json: async () => ({ error: '请求参数不正确' })
       })
     }),
     (error) => {
-      assert.equal(error.message, 'bad gateway');
-      assert.equal(error.status, 503);
-      assert.deepEqual(error.data, { error: 'bad gateway' });
+      assert.equal(error.message, '请求参数不正确');
+      assert.equal(error.status, 400);
+      assert.deepEqual(error.data, { error: '请求参数不正确' });
+      return true;
+    }
+  );
+});
+
+test('fetchJson masks server API error payload details', async () => {
+  await assert.rejects(
+    () => fetchJson('/api/test', {
+      fetchImpl: async () => ({
+        ok: false,
+        status: 502,
+        json: async () => ({ error: 'sql: no such table tokens; stack=internal' })
+      })
+    }),
+    (error) => {
+      assert.equal(error.message, '服务暂时不可用，请稍后重试');
+      assert.equal(error.status, 502);
+      assert.deepEqual(error.data, {});
+      assert.doesNotMatch(error.message, /sql|table|stack|tokens/i);
+      assert.doesNotMatch(JSON.stringify(error.data), /sql|table|stack|tokens/i);
       return true;
     }
   );
@@ -58,7 +78,7 @@ test('fetchJson throws when successful API response is not valid JSON', async ()
   );
 });
 
-test('fetchJson preserves HTTP error status when error body is not JSON', async () => {
+test('fetchJson masks server error status when error body is not JSON', async () => {
   await assert.rejects(
     () => fetchJson('/api/test', {
       fetchImpl: async () => ({
@@ -70,7 +90,7 @@ test('fetchJson preserves HTTP error status when error body is not JSON', async 
       })
     }),
     (error) => {
-      assert.equal(error.message, 'HTTP 502');
+      assert.equal(error.message, '服务暂时不可用，请稍后重试');
       assert.equal(error.status, 502);
       assert.deepEqual(error.data, {});
       return true;
