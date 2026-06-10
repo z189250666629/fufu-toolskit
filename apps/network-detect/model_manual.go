@@ -28,13 +28,13 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, 400, "siteName 和 model 必填")
 		return
 	}
-	result, err := testModel(body.SiteName, body.Model, body.Group)
+	result, err := runModelTest(body.SiteName, body.Model, body.Group)
 	if err != nil {
 		var e *httpError
 		if errors.As(err, &e) {
 			writeJSON(w, e.Status, map[string]any{"error": e.Message, "nextAllowedAt": e.NextAllowedAt})
 		} else {
-			writeJSONError(w, 500, err.Error())
+			writeJSONError(w, 500, "模型测试失败，请稍后重试")
 		}
 		return
 	}
@@ -42,6 +42,8 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (e *httpError) Error() string { return e.Message }
+
+var runModelTest = testModel
 
 func testModel(siteName, model, group string) (map[string]any, error) {
 	sites, configMsg := config.LoadManagedSites(rootDir)
