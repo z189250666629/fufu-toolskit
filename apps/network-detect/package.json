@@ -8,7 +8,7 @@
     "start": "go run .",
     "build": "go build -o network-detect .",
     "test": "npm run test:go && npm run test:frontend",
-    "test:go": "go test ./...",
+    "test:go": "go test -count=1 ./...",
     "test:frontend": "node --test frontend/*.test.mjs"
   }
 }

@@ -6,7 +6,7 @@
     "dev": "go run .",
     "start": "go run .",
     "build": "go build -o fufu-act .",
-    "test:go": "go test ./...",
+    "test:go": "go test -count=1 ./...",
     "test:frontend": "node --test public/*.test.mjs",
     "test": "npm run test:go && npm run test:frontend"
   }
