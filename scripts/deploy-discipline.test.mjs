@@ -55,6 +55,10 @@ async function deployDisciplinePaths() {
   return [...paths].sort();
 }
 
+async function deployWorkflowPaths() {
+  return (await listRepoFiles('.github/workflows', (path) => /\/deploy-.*\.ya?ml$/i.test(path))).sort();
+}
+
 test('deploy docs and workflows do not reintroduce dashboard-key auth', async () => {
   const forbidden = [
     /NEWAPI[_-]?DASHBOARD[\w-]*KEY/i,
@@ -100,12 +104,16 @@ test('combine deploy remains a network-detect alias, not stale fufu-combine depl
   assert.doesNotMatch(networkWorkflow, /apps\/fufu-combine/i, 'deploy-network should not reference the removed standalone app path');
 });
 
-test('deploy workflows use the canonical toolskit GitHub environment', async () => {
-  for (const path of [
+test('deploy workflow gates cover every deploy workflow', async () => {
+  assert.deepEqual(await deployWorkflowPaths(), [
     '.github/workflows/deploy-act.yml',
     '.github/workflows/deploy-network.yml',
     '.github/workflows/deploy-y2k-nav.yml'
-  ]) {
+  ]);
+});
+
+test('deploy workflows use the canonical toolskit GitHub environment', async () => {
+  for (const path of await deployWorkflowPaths()) {
     const source = await readRepoFile(path);
     assert.match(source, /^\s*environment:\s*toolskit\s*$/m, `${path} should deploy through the toolskit environment`);
     assert.doesNotMatch(source, /^\s*environment:\s*docker\s*$/m, `${path} must not deploy through a docker environment`);
@@ -113,11 +121,7 @@ test('deploy workflows use the canonical toolskit GitHub environment', async () 
 });
 
 test('deploy workflow verify jobs run uncached Go tests', async () => {
-  for (const path of [
-    '.github/workflows/deploy-act.yml',
-    '.github/workflows/deploy-network.yml',
-    '.github/workflows/deploy-y2k-nav.yml'
-  ]) {
+  for (const path of await deployWorkflowPaths()) {
     const source = await readRepoFile(path);
     assert.doesNotMatch(source, /^\s*-\s*run:\s*go test \.\/\.\.\.\s*$/m, `${path} must not use cache-prone go test ./...`);
     assert.match(source, /^\s*-\s*run:\s*go test -count=1 \.\/\.\.\.\s*$/m, `${path} should disable Go test cache in deploy verification`);
@@ -131,7 +135,9 @@ test('deploy workflow verify jobs run frontend tests before packaging images', a
     ['.github/workflows/deploy-y2k-nav.yml', 'npm --prefix apps/y2k-nav run test:frontend']
   ]);
 
-  for (const [path, frontendTestCommand] of expectations) {
+  for (const path of await deployWorkflowPaths()) {
+    const frontendTestCommand = expectations.get(path);
+    assert.ok(frontendTestCommand, `${path} should be assigned an app frontend test command`);
     const source = await readRepoFile(path);
     assert.match(source, /actions\/setup-node@v4/, `${path} should install Node in deploy verification`);
     assert.match(source, new RegExp(`^\\s*-\\s*run:\\s*${frontendTestCommand.replaceAll('/', '\\/')}\\s*$`, 'm'), `${path} should run app frontend tests in deploy verification`);
