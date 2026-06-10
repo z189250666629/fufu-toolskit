@@ -107,7 +107,10 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 				safe++
 			}
 		}
-		prize := scratchRewards[safe-1]
+		prize, ok := scratchPrizeForSafeCount(safe)
+		if !ok {
+			return nil, httpErr{400, "刮刮乐进度异常，请重开"}
+		}
 		status := "playing"
 		if safe >= scratchMaxReveals {
 			status = "won"
@@ -164,7 +167,10 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 		if safe == 0 {
 			return nil, httpErr{400, "至少刮开一个安全格才能结算"}
 		}
-		prize := scratchRewards[safe-1]
+		prize, ok := scratchPrizeForSafeCount(safe)
+		if !ok {
+			return nil, httpErr{400, "刮刮乐进度异常，请重开"}
+		}
 		if _, err := db.Exec(`UPDATE scratch_games SET prize_dollars=?, status='cashout' WHERE card_key=?`, prize, key); err != nil {
 			return nil, err
 		}
@@ -238,6 +244,13 @@ func scratchStartResponse(g ScratchGame) map[string]any {
 
 func isScratchGameOver(status string) bool {
 	return status == "won" || status == "lost" || status == "cashout"
+}
+
+func scratchPrizeForSafeCount(safe int) (int, bool) {
+	if safe <= 0 || safe > len(scratchRewards) {
+		return 0, false
+	}
+	return scratchRewards[safe-1], true
 }
 
 func jsonArr(s string) []int {

@@ -73,3 +73,23 @@ func TestScratchCashoutReturnsServerErrorWhenUpdateFails(t *testing.T) {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestScratchCashoutRejectsCorruptRevealedCountWithoutPanic(t *testing.T) {
+	setupScratchLockTestDB(t)
+	seedScratchGame(t, "scratch-card", "[7,8]", "[0,1,2,3,4,5,6]", 15, "playing")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/cashout", strings.NewReader(`{"cardKey":"scratch-card"}`))
+	w := httptest.NewRecorder()
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("cashout should reject corrupt progress, not panic: %v", r)
+		}
+	}()
+
+	handleScratchCashout(w, req)
+
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "进度异常") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
