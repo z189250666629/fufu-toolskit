@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -169,6 +170,33 @@ func TestStaticHandlerServesOnlyBrowserAssets(t *testing.T) {
 				t.Fatalf("%s leaked blocked file content: %s", path, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestPublicBrowserAssetAllowlistIsDataDriven(t *testing.T) {
+	raw, err := os.ReadFile("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "switch path") {
+		t.Fatal("browser asset allowlist should be a data table so tests can cover it without duplicating switch cases")
+	}
+}
+
+func TestPublicBrowserAssetAllowlistCoversIndexModules(t *testing.T) {
+	raw, err := os.ReadFile("index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	matches := regexp.MustCompile(`(?:src|from)=?\s*["']\.?/([^"']+\.mjs)["']`).FindAllStringSubmatch(string(raw), -1)
+	if len(matches) == 0 {
+		t.Fatal("index.html should reference module scripts")
+	}
+	for _, match := range matches {
+		path := "/" + strings.TrimPrefix(match[1], "/")
+		if !isPublicBrowserAsset(path) {
+			t.Fatalf("index module %s is not allowed by the Go static handler", path)
+		}
 	}
 }
 

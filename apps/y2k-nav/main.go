@@ -11,6 +11,12 @@ import (
 
 const defaultPort = "33148"
 
+var publicBrowserAssetPaths = map[string]struct{}{
+	"/index.html":  {},
+	"/theme.mjs":   {},
+	"/latency.mjs": {},
+}
+
 func main() {
 	wd, _ := os.Getwd()
 	port, err := webutil.ResolvePort(os.Getenv("PORT"), defaultPort)
@@ -64,10 +70,6 @@ func newStaticHandler(root string) http.Handler {
 }
 
 func isPublicBrowserAsset(path string) bool {
-	switch path {
-	case "/index.html", "/theme.mjs", "/latency.mjs":
-		return true
-	default:
-		return false
-	}
+	_, ok := publicBrowserAssetPaths[path]
+	return ok
 }
