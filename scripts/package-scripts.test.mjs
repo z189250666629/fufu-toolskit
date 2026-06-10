@@ -18,6 +18,15 @@ test('root npm test includes workspace Go checks', () => {
   assert.match(scripts.test || '', /npm run test:workspace/);
 });
 
+test('root build scripts cover all deployable apps', () => {
+  const scripts = packageJson.scripts || {};
+
+  assert.equal(scripts['build:network'], 'npm --prefix apps/network-detect run build');
+  assert.equal(scripts['build:act'], 'npm --prefix apps/fufu-act run build');
+  assert.equal(scripts['build:y2k'], 'npm --prefix apps/y2k-nav run build');
+  assert.equal(scripts['build:all'], 'npm run build:network && npm run build:act && npm run build:y2k');
+});
+
 test('app npm test Go checks are uncached', async () => {
   for (const path of [
     '../apps/network-detect/package.json',
