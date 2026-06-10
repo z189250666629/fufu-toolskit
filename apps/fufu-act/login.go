@@ -28,7 +28,12 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "服务器错误")
 		return
 	}
-	if !ok {
+	if ok {
+		if err := requireCurrentTokenActive(r.Context(), key); err != nil {
+			writeHTTPError(w, err)
+			return
+		}
+	} else {
 		if tokenSvc == nil {
 			writeJSONError(w, 503, "NewAPI 未配置")
 			return

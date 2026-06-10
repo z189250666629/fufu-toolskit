@@ -30,6 +30,9 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{404, "请先登录"}
 		}
+		if err := requireCurrentTokenActive(r.Context(), key); err != nil {
+			return nil, err
+		}
 		remaining := card.TotalSpins - card.UsedSpins
 		if remaining <= 0 {
 			return nil, httpErr{403, "抽奖次数已用完"}

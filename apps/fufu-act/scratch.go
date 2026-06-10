@@ -28,6 +28,9 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{404, "请先登录"}
 		}
+		if err := requireCurrentTokenActive(r.Context(), key); err != nil {
+			return nil, err
+		}
 		if !isScratchDollarTier(card.Dollars) {
 			return nil, httpErr{403, "此卡密不参与刮刮乐活动"}
 		}
