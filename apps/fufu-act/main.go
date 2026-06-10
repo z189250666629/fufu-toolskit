@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"fufu/activity"
 	"fufu/config"
@@ -61,14 +60,17 @@ type ScratchGame struct {
 
 func main() {
 	wd, _ := os.Getwd()
-	port := strings.TrimSpace(os.Getenv("SLOT_PORT"))
-	if err := run(wd, port); err != nil {
+	if err := run(wd, os.Getenv("SLOT_PORT")); err != nil {
 		fmt.Fprintf(os.Stderr, "server stopped: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(wd, port string) error {
+func run(wd, portValue string) error {
+	port, err := webutil.ResolvePort(portValue, defaultPort)
+	if err != nil {
+		return fmt.Errorf("invalid SLOT_PORT: %w", err)
+	}
 	rootDir = wd
 	if err := initAll(); err != nil {
 		return err
@@ -77,10 +79,6 @@ func run(wd, port string) error {
 		defer db.Close()
 	}
 	go creditWorker()
-	port = strings.TrimSpace(port)
-	if port == "" {
-		port = defaultPort
-	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/", apiRoute)
 	mux.HandleFunc("/", staticRoute)

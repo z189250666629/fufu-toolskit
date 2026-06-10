@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -143,21 +142,27 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to resolve working directory: %v\n", err)
 		os.Exit(1)
 	}
-	if err := initRuntime(wd); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to initialize runtime: %v\n", err)
+	if err := run(wd, os.Getenv("PORT")); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-	port := strings.TrimSpace(os.Getenv("PORT"))
-	if port == "" {
-		port = defaultPort
+}
+
+func run(wd, portValue string) error {
+	port, err := webutil.ResolvePort(portValue, defaultPort)
+	if err != nil {
+		return fmt.Errorf("invalid PORT: %w", err)
+	}
+	if err := initRuntime(wd); err != nil {
+		return fmt.Errorf("failed to initialize runtime: %w", err)
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", route)
 	fmt.Printf("network-detect Go backend listening on :%s\n", port)
 	if err := serve(port, mux); err != nil {
-		fmt.Fprintf(os.Stderr, "server stopped: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("server stopped: %w", err)
 	}
+	return nil
 }
 
 func initRuntime(wd string) error {

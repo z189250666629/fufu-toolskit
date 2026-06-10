@@ -121,6 +121,31 @@ func TestRunReturnsInitErrorsWithoutPanic(t *testing.T) {
 	}
 }
 
+func TestRunRejectsInvalidPortBeforeInit(t *testing.T) {
+	oldRoot := rootDir
+	oldDB := db
+	t.Cleanup(func() {
+		if db != nil && db != oldDB {
+			_ = db.Close()
+		}
+		rootDir = oldRoot
+		db = oldDB
+	})
+	tmp := t.TempDir()
+
+	err := run(tmp, "abc")
+
+	if err == nil {
+		t.Fatal("run should reject invalid ports")
+	}
+	if !strings.Contains(err.Error(), "invalid SLOT_PORT") {
+		t.Fatalf("run error = %v, want invalid SLOT_PORT context", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(tmp, "data")); !os.IsNotExist(statErr) {
+		t.Fatalf("invalid port should fail before initializing data directory, stat err=%v", statErr)
+	}
+}
+
 func TestHTTPServerHasTimeouts(t *testing.T) {
 	server := newHTTPServer("18820", http.NewServeMux())
 	if server.Addr != "0.0.0.0:18820" {

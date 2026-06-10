@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fufu/webutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,7 @@ func TestDefaultPortConstant(t *testing.T) {
 }
 
 func TestResolvePortUsesDefaultWhenEmpty(t *testing.T) {
-	port, err := resolvePort(" \t ")
+	port, err := webutil.ResolvePort(" \t ", defaultPort)
 	if err != nil {
 		t.Fatalf("resolvePort returned error: %v", err)
 	}
@@ -27,7 +28,7 @@ func TestResolvePortUsesDefaultWhenEmpty(t *testing.T) {
 }
 
 func TestResolvePortTrimsValidPort(t *testing.T) {
-	port, err := resolvePort(" 18820 ")
+	port, err := webutil.ResolvePort(" 18820 ", defaultPort)
 	if err != nil {
 		t.Fatalf("resolvePort returned error: %v", err)
 	}
@@ -39,7 +40,7 @@ func TestResolvePortTrimsValidPort(t *testing.T) {
 func TestResolvePortRejectsInvalidPort(t *testing.T) {
 	for _, value := range []string{"abc", "0", "-1", "65536", "80/tcp"} {
 		t.Run(value, func(t *testing.T) {
-			if port, err := resolvePort(value); err == nil {
+			if port, err := webutil.ResolvePort(value, defaultPort); err == nil {
 				t.Fatalf("resolvePort(%q) = %q, nil; want error", value, port)
 			}
 		})

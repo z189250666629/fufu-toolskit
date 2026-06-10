@@ -76,6 +76,28 @@ func TestInitRuntimeReturnsDataDirectoryErrors(t *testing.T) {
 	}
 }
 
+func TestRunRejectsInvalidPortBeforeInit(t *testing.T) {
+	oldRoot, oldFrontend, oldCombine := rootDir, frontendDir, combineDir
+	oldApp, oldErr := combineApp, combineConfigErr
+	t.Cleanup(func() {
+		rootDir, frontendDir, combineDir = oldRoot, oldFrontend, oldCombine
+		combineApp, combineConfigErr = oldApp, oldErr
+	})
+	tmp := t.TempDir()
+
+	err := run(tmp, "abc")
+
+	if err == nil {
+		t.Fatal("run should reject invalid ports")
+	}
+	if !strings.Contains(err.Error(), "invalid PORT") {
+		t.Fatalf("run error = %v, want invalid PORT context", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(tmp, "data")); !os.IsNotExist(statErr) {
+		t.Fatalf("invalid port should fail before initializing data directory, stat err=%v", statErr)
+	}
+}
+
 func TestCombinePageServed(t *testing.T) {
 	tmp := t.TempDir()
 	rootDir = tmp

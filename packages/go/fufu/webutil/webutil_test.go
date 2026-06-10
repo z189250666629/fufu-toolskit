@@ -129,6 +129,32 @@ func TestRequireMethodMessageUsesCustomMessage(t *testing.T) {
 	}
 }
 
+func TestResolvePortUsesDefaultTrimsAndRejectsInvalidValues(t *testing.T) {
+	port, err := ResolvePort(" \t ", "8080")
+	if err != nil {
+		t.Fatalf("ResolvePort default returned error: %v", err)
+	}
+	if port != "8080" {
+		t.Fatalf("default port = %q, want 8080", port)
+	}
+
+	port, err = ResolvePort(" 18820 ", "8080")
+	if err != nil {
+		t.Fatalf("ResolvePort explicit returned error: %v", err)
+	}
+	if port != "18820" {
+		t.Fatalf("explicit port = %q, want 18820", port)
+	}
+
+	for _, value := range []string{"abc", "0", "-1", "65536", "80/tcp"} {
+		t.Run(value, func(t *testing.T) {
+			if port, err := ResolvePort(value, "8080"); err == nil {
+				t.Fatalf("ResolvePort(%q) = %q, nil; want error", value, port)
+			}
+		})
+	}
+}
+
 func TestServeFileSupportsHeadAndCachePolicy(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "index.html")

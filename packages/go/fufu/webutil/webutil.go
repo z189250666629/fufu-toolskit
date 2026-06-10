@@ -2,10 +2,12 @@ package webutil
 
 import (
 	"encoding/json"
+	"fmt"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -67,6 +69,23 @@ func NewHTTPServer(addr string, handler http.Handler) *http.Server {
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+}
+
+// ResolvePort normalizes a service port string and rejects values that would
+// otherwise fail later at listener startup.
+func ResolvePort(value, defaultPort string) (string, error) {
+	port := strings.TrimSpace(value)
+	if port == "" {
+		port = strings.TrimSpace(defaultPort)
+	}
+	number, err := strconv.Atoi(port)
+	if err != nil {
+		return "", fmt.Errorf("invalid port %q: must be a number between 1 and 65535", port)
+	}
+	if number < 1 || number > 65535 {
+		return "", fmt.Errorf("invalid port %q: must be between 1 and 65535", port)
+	}
+	return port, nil
 }
 
 func NewStaticHandler(root string) http.Handler {
