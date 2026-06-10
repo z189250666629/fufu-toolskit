@@ -88,6 +88,46 @@ func TestHandleLoginRejectsDisabledToken(t *testing.T) {
 	}
 }
 
+func TestHandleLoginRequiresExactScratchDollarTier(t *testing.T) {
+	setupScratchLockTestDB(t)
+	t.Setenv("MCY_BASE_URL", "")
+	t.Setenv("SHOP_BASE_URL", "")
+
+	key := "sk-near-scratch-card-123"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/token/search" {
+			t.Fatalf("unexpected token request %s %s", r.Method, r.URL.String())
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data": []any{map[string]any{
+				"id":             9,
+				"key":            key,
+				"name":           "55.4-act-test",
+				"interval_quota": newapi.DefaultQuotaUnit * 55,
+				"status":         1,
+				"created_time":   actStartTS + 1,
+			}},
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	oldTokenSvc := tokenSvc
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "token", UserID: "1"}))
+	t.Cleanup(func() { tokenSvc = oldTokenSvc })
+
+	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"cardKey":"`+key+`"}`))
+	w := httptest.NewRecorder()
+	handleLogin(w, req)
+
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "额度不参与活动") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if _, ok := getCard(key); ok {
+		t.Fatal("near-55 token should not be inserted as a scratch activity card")
+	}
+}
+
 func TestParseActTestTokenNameRequiresIndependentTestSegment(t *testing.T) {
 	dollars, ok := parseActTestTokenName("100-act-test")
 	if !ok || dollars != 100 {

@@ -3,7 +3,6 @@ package main
 import (
 	"fufu/activity"
 	"fufu/newapi"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -61,7 +60,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			dollars = dollarsTier(t.IntervalQuota)
 			purchaseTime = shop
 		}
-		isScratch := int(math.Round(dollars)) == 55 && (purchaseTime != "" || createdInRange)
+		isScratch := isScratchDollarTier(dollars) && (purchaseTime != "" || createdInRange)
 		if dollars == 0 || (spinMap[dollars] == 0 && !isScratch) {
 			writeJSONError(w, 403, "此卡密额度不参与活动")
 			return
@@ -83,7 +82,7 @@ func respondCard(w http.ResponseWriter, card Card) {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	isScratch := int(math.Round(card.Dollars)) == 55
+	isScratch := isScratchDollarTier(card.Dollars)
 	var sg any
 	if isScratch {
 		if g, ok := getScratch(card.CardKey); ok {
@@ -125,6 +124,10 @@ func nullString(s string) any {
 		return nil
 	}
 	return s
+}
+
+func isScratchDollarTier(dollars float64) bool {
+	return dollars == 55
 }
 
 func parseActTestTokenName(name string) (float64, bool) {

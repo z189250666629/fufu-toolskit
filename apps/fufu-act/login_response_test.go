@@ -66,3 +66,23 @@ func TestRespondCardPreservesHistoryAndSpinPayload(t *testing.T) {
 		t.Fatalf("history = %#v; body=%s", body.History, w.Body.String())
 	}
 }
+
+func TestRespondCardRequiresExactScratchDollarTier(t *testing.T) {
+	setupScratchLockTestDB(t)
+
+	w := httptest.NewRecorder()
+	respondCard(w, Card{CardKey: "near-scratch-card", CardName: "Near Scratch", Dollars: 55.4, TotalSpins: 0})
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		IsScratch bool `json:"isScratch"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.IsScratch {
+		t.Fatalf("near-55 card should not be marked scratch: body=%s", w.Body.String())
+	}
+}

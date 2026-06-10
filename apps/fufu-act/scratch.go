@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
 )
 
@@ -24,7 +23,7 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{404, "请先登录"}
 		}
-		if int(math.Round(card.Dollars)) != 55 {
+		if !isScratchDollarTier(card.Dollars) {
 			return nil, httpErr{403, "此卡密不参与刮刮乐活动"}
 		}
 		if g, ok := getScratch(key); ok {

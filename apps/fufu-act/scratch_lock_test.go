@@ -80,6 +80,24 @@ func TestScratchStartUsesCardLock(t *testing.T) {
 	}
 }
 
+func TestScratchStartRequiresExact55Dollars(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if _, err := db.Exec(`INSERT INTO cards (card_key, card_name, dollars, total_spins) VALUES (?,?,?,?)`, "near-scratch-card", "near scratch", 55.4, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/start", strings.NewReader(`{"cardKey":"near-scratch-card"}`))
+	w := httptest.NewRecorder()
+	handleScratchStart(w, req)
+
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "不参与刮刮乐") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if _, ok := getScratch("near-scratch-card"); ok {
+		t.Fatal("near-55 card should not create a scratch game")
+	}
+}
+
 func TestWithCardLockReleasesIdleLockEntry(t *testing.T) {
 	setupScratchLockTestDB(t)
 
