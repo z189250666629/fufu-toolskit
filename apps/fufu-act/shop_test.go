@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newJSONServer(t *testing.T, payload any) *httptest.Server {
@@ -84,5 +85,14 @@ func TestMCYLoginReturnsErrorForHTTPFailure(t *testing.T) {
 	}
 	if mcyCookie != "" {
 		t.Fatalf("mcyCookie should stay empty on login failure, got %q", mcyCookie)
+	}
+}
+
+func TestMCYHTTPClientUsesFiniteTimeout(t *testing.T) {
+	if mcyHTTPClient == nil {
+		t.Fatal("mcyHTTPClient is nil")
+	}
+	if mcyHTTPClient.Timeout <= 0 || mcyHTTPClient.Timeout > 30*time.Second {
+		t.Fatalf("mcyHTTPClient timeout = %s", mcyHTTPClient.Timeout)
 	}
 }

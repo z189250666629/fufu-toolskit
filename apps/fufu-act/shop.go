@@ -7,7 +7,10 @@ import (
 	"fufu/config"
 	"net/http"
 	"strings"
+	"time"
 )
+
+var mcyHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 func findShopPurchase(cardKey string) string {
 	if config.Env("MCY_BASE_URL") == "" && config.Env("SHOP_BASE_URL") == "" {
@@ -55,7 +58,12 @@ func mcyLogin() error {
 		return fmt.Errorf("missing MCY config")
 	}
 	body, _ := json.Marshal(map[string]string{"username": user, "password": pass})
-	resp, err := http.Post(base+login, "application/json", bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, base+login, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := mcyHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -91,7 +99,7 @@ func mcyPost(endpoint string, payload any) (map[string]any, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", mcyCookie)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := mcyHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
