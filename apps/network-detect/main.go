@@ -31,9 +31,10 @@ var combineApp http.Handler
 var combineConfigErr error
 var modelCache = struct {
 	sync.Mutex
-	Value   *ModelStatus
-	Expires time.Time
-	Key     string
+	Value    *ModelStatus
+	Expires  time.Time
+	Key      string
+	Inflight map[string]*modelStatusBuildCall
 }{}
 var testCooldowns sync.Map
 var testResults sync.Map
@@ -118,6 +119,11 @@ type ModelStatus struct {
 	Sites               []SiteStatus   `json:"sites"`
 	Models              []ModelRow     `json:"models"`
 	Totals              map[string]int `json:"totals"`
+}
+
+type modelStatusBuildCall struct {
+	done   chan struct{}
+	status *ModelStatus
 }
 
 type testRecord struct {

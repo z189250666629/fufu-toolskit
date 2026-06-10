@@ -1,31 +1,62 @@
 package main
 
 import (
+	"context"
 	"fufu/config"
 	"sort"
 	"time"
 )
 
-func getModelStatus(force bool) *ModelStatus {
-	now := time.Now()
+func getModelStatus(ctx context.Context, force bool) *ModelStatus {
+	ctx = contextOrBackground(ctx)
 	cacheKey := modelStatusCacheKey(rootDir)
-	modelCache.Lock()
-	if !force && modelCache.Value != nil && modelCache.Key == cacheKey && now.Before(modelCache.Expires) {
-		v := modelCache.Value
+	for {
+		now := time.Now()
+		modelCache.Lock()
+		if !force && modelCache.Value != nil && modelCache.Key == cacheKey && now.Before(modelCache.Expires) {
+			v := modelCache.Value
+			modelCache.Unlock()
+			return v
+		}
+		if modelCache.Inflight != nil {
+			if call := modelCache.Inflight[cacheKey]; call != nil {
+				done := call.done
+				modelCache.Unlock()
+				select {
+				case <-done:
+					if call.status != nil {
+						return call.status
+					}
+					force = false
+					continue
+				case <-ctx.Done():
+					return buildModelStatus(ctx)
+				}
+			}
+		}
+		if modelCache.Inflight == nil {
+			modelCache.Inflight = map[string]*modelStatusBuildCall{}
+		}
+		call := &modelStatusBuildCall{done: make(chan struct{})}
+		modelCache.Inflight[cacheKey] = call
 		modelCache.Unlock()
-		return v
+
+		status := buildModelStatus(ctx)
+
+		modelCache.Lock()
+		call.status = status
+		delete(modelCache.Inflight, cacheKey)
+		modelCache.Value = status
+		modelCache.Expires = time.Now().Add(modelStatusCacheTTL)
+		modelCache.Key = cacheKey
+		close(call.done)
+		modelCache.Unlock()
+		return status
 	}
-	modelCache.Unlock()
-	status := buildModelStatus()
-	modelCache.Lock()
-	modelCache.Value = status
-	modelCache.Expires = now.Add(modelStatusCacheTTL)
-	modelCache.Key = cacheKey
-	modelCache.Unlock()
-	return status
 }
 
-func buildModelStatus() *ModelStatus {
+func buildModelStatus(ctx context.Context) *ModelStatus {
+	ctx = contextOrBackground(ctx)
 	sites, msg := config.LoadManagedSites(rootDir)
 	publicMsg := publicManagedSiteConfigError(msg)
 	now := time.Now().Unix()
@@ -33,13 +64,13 @@ func buildModelStatus() *ModelStatus {
 	modelRows := map[string]*ModelRow{}
 	start := now - modelStatusWindowSeconds
 	for _, site := range sites {
-		successLogs, logErr := loadSiteLogs(site, logTypeConsume, start, now)
-		errorLogs, errErr := loadSiteLogs(site, logTypeError, start, now)
+		successLogs, logErr := loadSiteLogs(ctx, site, logTypeConsume, start, now)
+		errorLogs, errErr := loadSiteLogs(ctx, site, logTypeError, start, now)
 		if logErr == "" {
 			logErr = errErr
 		}
-		channels, chErr := loadSiteChannels(site)
-		pricing, priceErr := loadPricing(site)
+		channels, chErr := loadSiteChannels(ctx, site)
+		pricing, priceErr := loadPricing(ctx, site)
 		channelIndex := indexChannelsForModelStatus(channels)
 		groups := channelIndex.groups
 		ss := SiteStatus{Site: site.Public(), Groups: groups, LogError: logErr, ChannelsError: chErr, PricingError: priceErr}

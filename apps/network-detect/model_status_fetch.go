@@ -8,13 +8,14 @@ import (
 	"time"
 )
 
-func loadSiteLogs(site newapi.Site, typ int, start, end int64) ([]LogRow, string) {
+func loadSiteLogs(ctx context.Context, site newapi.Site, typ int, start, end int64) ([]LogRow, string) {
+	ctx = contextOrBackground(ctx)
 	paths := []string{"/api/log/self", "/api/log/"}
 	var last string
 	for _, p := range paths {
 		rows := []LogRow{}
 		for page := 1; len(rows) < modelLogMaxRowsPerType; page++ {
-			res := newAPIGet(context.Background(), site, logPathForPage(p, typ, start, end, page), 12*time.Second)
+			res := newAPIGet(ctx, site, logPathForPage(p, typ, start, end, page), 12*time.Second)
 			if !res.OK {
 				last = res.Error
 				if len(rows) > 0 {
@@ -52,7 +53,8 @@ func logPathForPage(path string, typ int, start, end int64, page int) string {
 	return path + "?" + q.Encode()
 }
 
-func loadSiteChannels(site newapi.Site) ([]Channel, string) {
+func loadSiteChannels(ctx context.Context, site newapi.Site) ([]Channel, string) {
+	ctx = contextOrBackground(ctx)
 	endpoints := []string{}
 	if site.ChannelListEndpoint != "" {
 		endpoints = append(endpoints, site.ChannelListEndpoint)
@@ -60,7 +62,7 @@ func loadSiteChannels(site newapi.Site) ([]Channel, string) {
 	endpoints = append(endpoints, "/api/channel/search?keyword=&p=1&page_size=500", "/api/channel/?p=1&page_size=500", "/api/channel/search?keyword=&p=0&size=500", "/api/channel/?p=0&size=500")
 	var last string
 	for _, ep := range endpoints {
-		res := newAPIGet(context.Background(), site, ep, 12*time.Second)
+		res := newAPIGet(ctx, site, ep, 12*time.Second)
 		if res.OK {
 			out := []Channel{}
 			for _, raw := range items(res.Data) {
@@ -73,8 +75,9 @@ func loadSiteChannels(site newapi.Site) ([]Channel, string) {
 	return nil, last
 }
 
-func loadPricing(site newapi.Site) (map[string]Pricing, string) {
-	res := newAPIGet(context.Background(), site, "/api/pricing", 12*time.Second)
+func loadPricing(ctx context.Context, site newapi.Site) (map[string]Pricing, string) {
+	ctx = contextOrBackground(ctx)
+	res := newAPIGet(ctx, site, "/api/pricing", 12*time.Second)
 	if !res.OK {
 		return nil, res.Error
 	}
@@ -97,4 +100,11 @@ func loadPricing(site newapi.Site) (map[string]Pricing, string) {
 		}
 	}
 	return out, ""
+}
+
+func contextOrBackground(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
 }

@@ -78,14 +78,14 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, status, map[string]any{"configured": len(sites) > 0, "error": publicMsg, "sites": publics})
 	case "/api/newapi/model-status":
 		force := r.URL.Query().Get("refresh") == "1"
-		status := getModelStatus(force)
+		status := getModelStatus(r.Context(), force)
 		code := 200
 		if status.ConfigError != "" && !status.Configured {
 			code = 500
 		}
 		writeJSON(w, code, status)
 	case "/api/newapi/overview":
-		overview := buildOverview(r.URL.Query())
+		overview := buildOverview(r.Context(), r.URL.Query())
 		writeJSON(w, 200, overview)
 	case "/api/newapi/model-status/test":
 		handleModelTest(w, r)

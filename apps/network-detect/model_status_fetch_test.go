@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -42,7 +43,7 @@ func TestLoadSiteLogsPaginatesUntilShortPage(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	rows, msg := loadSiteLogs(newapi.Site{URL: server.URL, Token: "token", UserID: "1"}, 2, 10, 20)
+	rows, msg := loadSiteLogs(context.Background(), newapi.Site{URL: server.URL, Token: "token", UserID: "1"}, 2, 10, 20)
 
 	if msg != "" {
 		t.Fatalf("msg = %q", msg)
@@ -84,7 +85,7 @@ func TestLoadSiteLogsReportsErrorWhenLaterPageFails(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	rows, msg := loadSiteLogs(newapi.Site{URL: server.URL, Token: "token", UserID: "1"}, 2, 10, 20)
+	rows, msg := loadSiteLogs(context.Background(), newapi.Site{URL: server.URL, Token: "token", UserID: "1"}, 2, 10, 20)
 
 	if msg == "" || !strings.Contains(msg, "502") {
 		t.Fatalf("expected later-page error, rows=%d msg=%q", len(rows), msg)
@@ -94,5 +95,30 @@ func TestLoadSiteLogsReportsErrorWhenLaterPageFails(t *testing.T) {
 	}
 	if strings.Join(pages, ",") != "1,2" {
 		t.Fatalf("pages = %#v", pages)
+	}
+}
+
+func TestLoadSiteFetchesHonorCanceledContext(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{}})
+	}))
+	t.Cleanup(server.Close)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	site := newapi.Site{URL: server.URL, Token: "token", UserID: "1"}
+
+	if rows, _ := loadSiteLogs(ctx, site, logTypeConsume, 10, 20); len(rows) != 0 {
+		t.Fatalf("canceled log load returned rows: %#v", rows)
+	}
+	if channels, _ := loadSiteChannels(ctx, site); len(channels) != 0 {
+		t.Fatalf("canceled channel load returned channels: %#v", channels)
+	}
+	if pricing, _ := loadPricing(ctx, site); len(pricing) != 0 {
+		t.Fatalf("canceled pricing load returned pricing: %#v", pricing)
+	}
+	if requests != 0 {
+		t.Fatalf("canceled context should not reach upstream, got %d requests", requests)
 	}
 }

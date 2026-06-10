@@ -315,12 +315,14 @@ func TestNewAPIStatusEndpointsDoNotExposeRawManagedSiteURLs(t *testing.T) {
 	oldValue := modelCache.Value
 	oldExpires := modelCache.Expires
 	oldKey := modelCache.Key
+	oldInflight := modelCache.Inflight
 	t.Cleanup(func() {
 		rootDir = oldRootDir
 		modelCache.Lock()
 		modelCache.Value = oldValue
 		modelCache.Expires = oldExpires
 		modelCache.Key = oldKey
+		modelCache.Inflight = oldInflight
 		modelCache.Unlock()
 	})
 	rootDir = t.TempDir()
@@ -328,6 +330,7 @@ func TestNewAPIStatusEndpointsDoNotExposeRawManagedSiteURLs(t *testing.T) {
 	modelCache.Value = nil
 	modelCache.Expires = time.Time{}
 	modelCache.Key = ""
+	modelCache.Inflight = nil
 	modelCache.Unlock()
 	clearManagedSiteEnv(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

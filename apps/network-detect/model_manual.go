@@ -65,7 +65,7 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	if v, ok := testCooldowns.Load(key); ok && v.(int64) > now {
 		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: v.(int64)}
 	}
-	channels, errMsg := loadSiteChannels(*site)
+	channels, errMsg := loadSiteChannels(ctx, *site)
 	if errMsg != "" {
 		return nil, &httpError{Status: 502, Message: errMsg}
 	}
@@ -150,7 +150,7 @@ func applyManual(ms *ModelStatus, siteName, model, group string, rec testRecord,
 	}
 }
 
-func buildOverview(q url.Values) map[string]any {
-	status := getModelStatus(false)
+func buildOverview(ctx context.Context, q url.Values) map[string]any {
+	status := getModelStatus(ctx, false)
 	return map[string]any{"configured": status.Configured, "configError": status.ConfigError, "generatedAt": status.GeneratedAt, "sites": status.Sites, "totals": status.Totals, "modelAvailability": status.Models, "allLogs": []any{}}
 }
