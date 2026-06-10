@@ -76,6 +76,7 @@ $env:PORT = '8080'
 $env:FUFU_API_BASE_URL = 'https://api.fufuflower.top'
 $env:FUFU_API_TOKEN = '<newapi-admin-token>'
 $env:FUFU_API_USER_ID = '1'
+$env:FUFU_QUOTA_UNIT = '500000'
 $env:SLOT_PORT = '18820'
 $env:ADMIN_TOKEN = '<activity-admin-token>'
 ```
@@ -87,6 +88,8 @@ $env:MCY_BASE_URL = 'https://shop.example.com'
 $env:MCY_COOKIE = '<session-cookie>'
 $env:MCY_USERNAME = '<username>'
 $env:MCY_PASSWORD = '<password>'
+$env:MCY_LOGIN_ENDPOINT = '/admin/login'
+$env:MCY_UPLOAD_ENDPOINT = '/plugin/virtual-card-ship/card/add'
 ```
 
 `MCY_COOKIE` 是可选会话覆盖；已配置 `MCY_BASE_URL`、`MCY_USERNAME`、`MCY_PASSWORD` 时，服务会登录商城并复用返回的 cookie。

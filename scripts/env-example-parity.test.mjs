@@ -75,3 +75,14 @@ test('CONNECTIVITY overrides are documented as optional fallbacks to NewAPI site
     assert.match(text, /CONNECTIVITY_TOKEN_URLS[\s\S]*NEWAPI_TOKEN_SITE_URL/, `${path} should document token URL fallback`);
   }
 });
+
+test('README documents fufu-act env variables passed by deploy', async () => {
+  const readme = await readRepoFile('README.md');
+  for (const variable of [
+    'FUFU_QUOTA_UNIT',
+    'MCY_LOGIN_ENDPOINT',
+    'MCY_UPLOAD_ENDPOINT'
+  ]) {
+    assert.match(readme, new RegExp(`\\b${variable}\\b`), `README.md should document ${variable} for fufu-act local setup parity`);
+  }
+});
