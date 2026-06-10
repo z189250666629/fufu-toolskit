@@ -13,15 +13,16 @@ import (
 )
 
 const (
-	defaultPort              = "8080"
-	logTypeConsume           = 2
-	logTypeError             = 5
-	channelStatusEnabled     = 1
-	modelStatusWindowSeconds = 10 * 60
-	modelStatusCacheTTL      = time.Duration(modelStatusWindowSeconds) * time.Second
-	modelTestCooldown        = time.Hour
-	modelLogPageSize         = 100
-	modelLogMaxRowsPerType   = 1000
+	defaultPort                     = "8080"
+	logTypeConsume                  = 2
+	logTypeError                    = 5
+	channelStatusEnabled            = 1
+	modelStatusWindowSeconds        = 10 * 60
+	modelStatusCacheTTL             = time.Duration(modelStatusWindowSeconds) * time.Second
+	modelStatusForceRefreshCooldown = time.Minute
+	modelTestCooldown               = time.Hour
+	modelLogPageSize                = 100
+	modelLogMaxRowsPerType          = 1000
 )
 
 var rootDir string
@@ -31,10 +32,11 @@ var combineApp http.Handler
 var combineConfigErr error
 var modelCache = struct {
 	sync.Mutex
-	Value    *ModelStatus
-	Expires  time.Time
-	Key      string
-	Inflight map[string]*modelStatusBuildCall
+	Value             *ModelStatus
+	Expires           time.Time
+	Key               string
+	ForceRefreshAfter time.Time
+	Inflight          map[string]*modelStatusBuildCall
 }{}
 var testCooldowns sync.Map
 var testResults sync.Map

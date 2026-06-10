@@ -17,6 +17,7 @@ func TestGetModelStatusInvalidatesWhenManagedSitesConfigChanges(t *testing.T) {
 	oldValue := modelCache.Value
 	oldExpires := modelCache.Expires
 	oldKey := modelCache.Key
+	oldForceRefreshAfter := modelCache.ForceRefreshAfter
 	oldInflight := modelCache.Inflight
 	t.Cleanup(func() {
 		rootDir = oldRootDir
@@ -24,6 +25,7 @@ func TestGetModelStatusInvalidatesWhenManagedSitesConfigChanges(t *testing.T) {
 		modelCache.Value = oldValue
 		modelCache.Expires = oldExpires
 		modelCache.Key = oldKey
+		modelCache.ForceRefreshAfter = oldForceRefreshAfter
 		modelCache.Inflight = oldInflight
 		modelCache.Unlock()
 	})
@@ -32,6 +34,7 @@ func TestGetModelStatusInvalidatesWhenManagedSitesConfigChanges(t *testing.T) {
 	modelCache.Value = nil
 	modelCache.Expires = time.Time{}
 	modelCache.Key = ""
+	modelCache.ForceRefreshAfter = time.Time{}
 	modelCache.Inflight = nil
 	modelCache.Unlock()
 	clearManagedSiteEnv(t)
@@ -59,6 +62,7 @@ func TestGetModelStatusCoalescesConcurrentColdLoads(t *testing.T) {
 	oldValue := modelCache.Value
 	oldExpires := modelCache.Expires
 	oldKey := modelCache.Key
+	oldForceRefreshAfter := modelCache.ForceRefreshAfter
 	oldInflight := modelCache.Inflight
 	t.Cleanup(func() {
 		rootDir = oldRootDir
@@ -66,6 +70,7 @@ func TestGetModelStatusCoalescesConcurrentColdLoads(t *testing.T) {
 		modelCache.Value = oldValue
 		modelCache.Expires = oldExpires
 		modelCache.Key = oldKey
+		modelCache.ForceRefreshAfter = oldForceRefreshAfter
 		modelCache.Inflight = oldInflight
 		modelCache.Unlock()
 	})
@@ -74,6 +79,7 @@ func TestGetModelStatusCoalescesConcurrentColdLoads(t *testing.T) {
 	modelCache.Value = nil
 	modelCache.Expires = time.Time{}
 	modelCache.Key = ""
+	modelCache.ForceRefreshAfter = time.Time{}
 	modelCache.Inflight = nil
 	modelCache.Unlock()
 	clearManagedSiteEnv(t)
@@ -120,18 +126,22 @@ func TestGetModelStatusCoalescesConcurrentColdLoads(t *testing.T) {
 	}
 }
 
-func TestGetModelStatusDoesNotCacheCanceledBuilds(t *testing.T) {
+func TestGetModelStatusReusesFreshCacheForRepeatedForcedRefreshes(t *testing.T) {
 	oldRootDir := rootDir
 	oldValue := modelCache.Value
 	oldExpires := modelCache.Expires
 	oldKey := modelCache.Key
+	oldForceRefreshAfter := modelCache.ForceRefreshAfter
 	oldInflight := modelCache.Inflight
+	oldBuild := buildModelStatusForCache
 	t.Cleanup(func() {
 		rootDir = oldRootDir
+		buildModelStatusForCache = oldBuild
 		modelCache.Lock()
 		modelCache.Value = oldValue
 		modelCache.Expires = oldExpires
 		modelCache.Key = oldKey
+		modelCache.ForceRefreshAfter = oldForceRefreshAfter
 		modelCache.Inflight = oldInflight
 		modelCache.Unlock()
 	})
@@ -140,6 +150,69 @@ func TestGetModelStatusDoesNotCacheCanceledBuilds(t *testing.T) {
 	modelCache.Value = nil
 	modelCache.Expires = time.Time{}
 	modelCache.Key = ""
+	modelCache.ForceRefreshAfter = time.Time{}
+	modelCache.Inflight = nil
+	modelCache.Unlock()
+	clearManagedSiteEnv(t)
+
+	var builds atomic.Int32
+	buildModelStatusForCache = func(ctx context.Context) *ModelStatus {
+		n := builds.Add(1)
+		return &ModelStatus{
+			Configured:    true,
+			GeneratedAt:   int64(n),
+			ExpiresAt:     time.Now().Add(modelStatusCacheTTL).Unix(),
+			WindowSeconds: modelStatusWindowSeconds,
+			Totals:        map[string]int{"siteCount": 1},
+		}
+	}
+
+	first := getModelStatus(context.Background(), false)
+	second := getModelStatus(context.Background(), true)
+
+	if got := builds.Load(); got != 1 {
+		t.Fatalf("repeated forced refresh should reuse fresh cache instead of rebuilding immediately, got %d builds", got)
+	}
+	if second.GeneratedAt != first.GeneratedAt {
+		t.Fatalf("forced refresh reused unexpected snapshot: first=%#v second=%#v", first, second)
+	}
+
+	modelCache.Lock()
+	modelCache.ForceRefreshAfter = time.Now().Add(-time.Second)
+	modelCache.Unlock()
+
+	third := getModelStatus(context.Background(), true)
+	if got := builds.Load(); got != 2 {
+		t.Fatalf("forced refresh should rebuild after the cooldown, got %d builds", got)
+	}
+	if third.GeneratedAt == first.GeneratedAt {
+		t.Fatalf("forced refresh after cooldown should return a fresh snapshot: first=%#v third=%#v", first, third)
+	}
+}
+
+func TestGetModelStatusDoesNotCacheCanceledBuilds(t *testing.T) {
+	oldRootDir := rootDir
+	oldValue := modelCache.Value
+	oldExpires := modelCache.Expires
+	oldKey := modelCache.Key
+	oldForceRefreshAfter := modelCache.ForceRefreshAfter
+	oldInflight := modelCache.Inflight
+	t.Cleanup(func() {
+		rootDir = oldRootDir
+		modelCache.Lock()
+		modelCache.Value = oldValue
+		modelCache.Expires = oldExpires
+		modelCache.Key = oldKey
+		modelCache.ForceRefreshAfter = oldForceRefreshAfter
+		modelCache.Inflight = oldInflight
+		modelCache.Unlock()
+	})
+	rootDir = t.TempDir()
+	modelCache.Lock()
+	modelCache.Value = nil
+	modelCache.Expires = time.Time{}
+	modelCache.Key = ""
+	modelCache.ForceRefreshAfter = time.Time{}
 	modelCache.Inflight = nil
 	modelCache.Unlock()
 	clearManagedSiteEnv(t)
@@ -165,6 +238,7 @@ func TestGetModelStatusClearsInflightAfterBuildPanic(t *testing.T) {
 	oldValue := modelCache.Value
 	oldExpires := modelCache.Expires
 	oldKey := modelCache.Key
+	oldForceRefreshAfter := modelCache.ForceRefreshAfter
 	oldInflight := modelCache.Inflight
 	oldBuild := buildModelStatusForCache
 	t.Cleanup(func() {
@@ -174,6 +248,7 @@ func TestGetModelStatusClearsInflightAfterBuildPanic(t *testing.T) {
 		modelCache.Value = oldValue
 		modelCache.Expires = oldExpires
 		modelCache.Key = oldKey
+		modelCache.ForceRefreshAfter = oldForceRefreshAfter
 		modelCache.Inflight = oldInflight
 		modelCache.Unlock()
 	})
@@ -182,6 +257,7 @@ func TestGetModelStatusClearsInflightAfterBuildPanic(t *testing.T) {
 	modelCache.Value = nil
 	modelCache.Expires = time.Time{}
 	modelCache.Key = ""
+	modelCache.ForceRefreshAfter = time.Time{}
 	modelCache.Inflight = nil
 	modelCache.Unlock()
 	clearManagedSiteEnv(t)

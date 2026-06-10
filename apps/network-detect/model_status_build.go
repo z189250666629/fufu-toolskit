@@ -15,7 +15,8 @@ func getModelStatus(ctx context.Context, force bool) *ModelStatus {
 	for {
 		now := time.Now()
 		modelCache.Lock()
-		if !force && modelCache.Value != nil && modelCache.Key == cacheKey && now.Before(modelCache.Expires) {
+		cacheFresh := modelCache.Value != nil && modelCache.Key == cacheKey && now.Before(modelCache.Expires)
+		if cacheFresh && (!force || now.Before(modelCache.ForceRefreshAfter)) {
 			v := modelCache.Value
 			modelCache.Unlock()
 			return v
@@ -49,9 +50,11 @@ func getModelStatus(ctx context.Context, force bool) *ModelStatus {
 			call.status = status
 			delete(modelCache.Inflight, cacheKey)
 			if status != nil && ctx.Err() == nil {
+				cachedAt := time.Now()
 				modelCache.Value = status
-				modelCache.Expires = time.Now().Add(modelStatusCacheTTL)
+				modelCache.Expires = cachedAt.Add(modelStatusCacheTTL)
 				modelCache.Key = cacheKey
+				modelCache.ForceRefreshAfter = cachedAt.Add(modelStatusForceRefreshCooldown)
 			}
 			close(call.done)
 			modelCache.Unlock()
