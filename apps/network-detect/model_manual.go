@@ -46,7 +46,7 @@ func (e *httpError) Error() string { return e.Message }
 func testModel(siteName, model, group string) (map[string]any, error) {
 	sites, configMsg := config.LoadManagedSites(rootDir)
 	if configMsg != "" && len(sites) == 0 {
-		return nil, &httpError{Status: 500, Message: configMsg}
+		return nil, &httpError{Status: 500, Message: publicManagedSiteConfigError(configMsg)}
 	}
 	var site *newapi.Site
 	for i := range sites {

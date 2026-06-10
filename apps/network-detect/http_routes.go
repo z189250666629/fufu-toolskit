@@ -66,6 +66,7 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"groups": groups})
 	case "/api/newapi/sites":
 		sites, msg := config.LoadManagedSites(rootDir)
+		publicMsg := publicManagedSiteConfigError(msg)
 		publics := []newapi.PublicSite{}
 		for _, s := range sites {
 			publics = append(publics, s.Public())
@@ -74,7 +75,7 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		if msg != "" && len(sites) == 0 {
 			status = 500
 		}
-		writeJSON(w, status, map[string]any{"configured": len(sites) > 0, "error": msg, "sites": publics})
+		writeJSON(w, status, map[string]any{"configured": len(sites) > 0, "error": publicMsg, "sites": publics})
 	case "/api/newapi/model-status":
 		force := r.URL.Query().Get("refresh") == "1"
 		status := getModelStatus(force)

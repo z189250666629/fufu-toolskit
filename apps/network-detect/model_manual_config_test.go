@@ -24,6 +24,11 @@ func TestTestModelSurfacesManagedSiteConfigErrors(t *testing.T) {
 	if strings.Contains(httpErr.Message, "站点不存在") || !strings.Contains(httpErr.Message, "不是有效 JSON") {
 		t.Fatalf("expected config JSON error, got %q", httpErr.Message)
 	}
+	for _, leaked := range []string{"invalid character", "literal", "not-json"} {
+		if strings.Contains(httpErr.Message, leaked) {
+			t.Fatalf("config JSON error leaked %q in %q", leaked, httpErr.Message)
+		}
+	}
 }
 
 func clearManagedSiteEnv(t *testing.T) {

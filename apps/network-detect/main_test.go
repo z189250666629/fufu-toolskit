@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fufu/combine"
 	"net/http"
@@ -193,6 +194,38 @@ func TestConnectivityTargetsFallsBackWhenInlineJSONUnset(t *testing.T) {
 	body := w.Body.String()
 	if w.Code != http.StatusOK || !strings.Contains(body, "api.fufuapi.top") || !strings.Contains(body, "api.fufuapi.online") || !strings.Contains(body, "token.fufuapi.online") {
 		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+}
+
+func TestNewAPISitesMasksManagedSiteConfigParseErrors(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `not-json`)
+	req := httptest.NewRequest(http.MethodGet, "/api/newapi/sites", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := strings.TrimSpace(w.Body.String())
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	var payload struct {
+		Configured bool   `json:"configured"`
+		Error      string `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("invalid JSON response: %v body=%s", err, body)
+	}
+	if payload.Configured || payload.Error != "NEWAPI_MANAGED_API_SITES 不是有效 JSON" {
+		t.Fatalf("unexpected payload: %#v body=%s", payload, body)
+	}
+	for _, leaked := range []string{"invalid character", "literal", "not-json"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("managed site config error leaked %q in %s", leaked, body)
+		}
 	}
 }
 
