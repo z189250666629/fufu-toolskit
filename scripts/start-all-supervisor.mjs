@@ -27,8 +27,26 @@ export function createStartAllSupervisor({
   let stopping = false;
   let exitCode = 0;
 
-  function prefixWrite(stream, name, chunk) {
-    stream.write(`[${name}] ${chunk}`);
+  function createPrefixWriter(stream, name) {
+    let atLineStart = true;
+    return (chunk) => {
+      const text = String(chunk);
+      let start = 0;
+      while (start < text.length) {
+        if (atLineStart) {
+          stream.write(`[${name}] `);
+          atLineStart = false;
+        }
+        const newlineIndex = text.indexOf('\n', start);
+        if (newlineIndex === -1) {
+          stream.write(text.slice(start));
+          break;
+        }
+        stream.write(text.slice(start, newlineIndex + 1));
+        atLineStart = true;
+        start = newlineIndex + 1;
+      }
+    };
   }
 
   function stopAll(signal = 'SIGTERM') {
@@ -60,8 +78,8 @@ export function createStartAllSupervisor({
         env
       });
       children.push(child);
-      child.stdout?.on('data', (chunk) => prefixWrite(stdout, item.name, chunk));
-      child.stderr?.on('data', (chunk) => prefixWrite(stderr, item.name, chunk));
+      child.stdout?.on('data', createPrefixWriter(stdout, item.name));
+      child.stderr?.on('data', createPrefixWriter(stderr, item.name));
       child.on('exit', (code, signal) => handleExit(item, child, code, signal));
     }
     return children;

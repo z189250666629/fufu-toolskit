@@ -52,3 +52,23 @@ test('startAll stops remaining children when a service exits non-zero', () => {
   assert.equal(supervisor.exitCode, 1);
   assert.match(logs.at(-1), /\[network\] exited with code 1/);
 });
+
+test('startAll prefixes every line from multiline stdout chunks', () => {
+  const spawned = [];
+  const writes = [];
+  const supervisor = createStartAllSupervisor({
+    logger: { log: () => {} },
+    stdout: { write: (chunk) => writes.push(chunk) },
+    stderr: { write: () => {} },
+    spawn: () => {
+      const child = new FakeChild();
+      spawned.push(child);
+      return child;
+    }
+  });
+
+  supervisor.start();
+  spawned[0].stdout.emit('data', 'ready\nlistening\n');
+
+  assert.equal(writes.join(''), '[network] ready\n[network] listening\n');
+});
