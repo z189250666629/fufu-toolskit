@@ -69,6 +69,14 @@ export function renderModelAvailability({ state, panelMotionClass = '', scopeMot
     `;
   }
 
+  if (state.error && !modelStatus) {
+    return `
+      <div class="model-state-empty${panelMotionClass || scopeMotionClass}" id="modelsPanel" role="tabpanel" aria-labelledby="modelsTab" data-slot="tab-panel">
+        ${renderStateCard('模型状态加载失败', state.error, '加载失败')}
+      </div>
+    `;
+  }
+
   if (!modelStatus?.configured || !sites.length) {
     const reason = state.error || modelStatus?.configError || '当前没有可展示的管理站点或模型统计';
     return `

@@ -75,6 +75,35 @@ test('renderMonitorPanel delegates to active panel renderer', () => {
   assert.match(modelHtml, /暂无模型状态数据/);
 });
 
+test('renderMonitorPanel surfaces model status errors while URL panel is active', () => {
+  const html = renderMonitorPanel({
+    state: {
+      activePanel: 'url',
+      error: 'model status failed <html>',
+      connectivity: {
+        mode: 'pending',
+        tone: '',
+        icon: '?',
+        title: '等待测试',
+        text: '准备',
+        success: '-',
+        testedAt: '-',
+        running: false,
+        results: [],
+        progressText: '尚未开始',
+        progress: 0,
+        currentUrl: '-'
+      }
+    },
+    groups: [{ id: 'api', name: 'API', urls: ['https://api.test'] }]
+  });
+
+  assert.match(html, /role="alert"/);
+  assert.match(html, /模型状态加载失败/);
+  assert.match(html, /model status failed &lt;html&gt;/);
+  assert.match(html, /id="urlPanel"/);
+});
+
 test('renderEnvironment renders provided browser context without globals', () => {
   const html = renderEnvironment({
     client: { ip: '<127.0.0.1>', serverTime: 1_735_689_600_000 },

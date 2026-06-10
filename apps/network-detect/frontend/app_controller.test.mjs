@@ -96,6 +96,43 @@ test('boot renders shell before loading data and schedules connectivity once', a
   assert.deepEqual(listeners.map(([type]) => type), ['pointerdown', 'keydown']);
 });
 
+test('boot surfaces model status load failure while URL panel is active', async () => {
+  const { appElement, documentRef } = createDomHarness();
+  const timeouts = [];
+
+  const app = createDashboardApp({
+    documentRef,
+    windowRef: {
+      scrollX: 0,
+      scrollY: 0,
+      scrollTo: () => {},
+      setTimeout: (handler, delay) => {
+        timeouts.push({ handler, delay });
+        return timeouts.length;
+      },
+      clearTimeout: () => {},
+      setInterval: () => 1,
+      requestAnimationFrame: (callback) => callback()
+    },
+    navigatorRef: { onLine: true },
+    fetchJsonImpl: async (url) => {
+      if (url === '/api/client') return { ip: '127.0.0.1' };
+      if (url === '/api/connectivity/targets') return { groups: [] };
+      if (url === '/api/newapi/model-status') throw new Error('model status returned HTML');
+      throw new Error(`unexpected URL ${url}`);
+    },
+    postJsonImpl: async () => ({}),
+    now: () => new Date('2026-06-10T10:00:00+08:00')
+  });
+
+  await app.boot();
+
+  assert.equal(app.state.activePanel, 'url');
+  assert.match(appElement.innerHTML, /id="urlPanel"/);
+  assert.match(appElement.innerHTML, /模型状态加载失败/);
+  assert.match(appElement.innerHTML, /model status returned HTML/);
+});
+
 test('activatePanelTab applies panel motion during render', () => {
   const { appElement, documentRef } = createDomHarness();
   const app = createDashboardApp({

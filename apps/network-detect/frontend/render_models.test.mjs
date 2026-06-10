@@ -50,6 +50,24 @@ test('renderModelAvailability handles empty configured state', () => {
   assert.match(html, /missing config/);
 });
 
+test('renderModelAvailability distinguishes load failure from unconfigured model status', () => {
+  const html = renderModelAvailability({
+    state: {
+      loading: false,
+      error: 'model status upstream <html>',
+      modelStatus: null,
+      testingCells: new Set(),
+      groupSelectOpen: false,
+      modelFilter: ''
+    }
+  });
+
+  assert.match(html, /模型状态加载失败/);
+  assert.match(html, /model status upstream &lt;html&gt;/);
+  assert.doesNotMatch(html, /暂无模型状态数据/);
+  assert.doesNotMatch(html, /未配置/);
+});
+
 test('renderModelAvailability surfaces pricing errors on site card', () => {
   const html = renderModelAvailability({
     state: {

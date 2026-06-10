@@ -62,6 +62,9 @@ export function renderMonitorPanel({
   panelMotionClass = '',
   scopeMotionClass = ''
 }) {
+  const modelStatusErrorAlert = state.activePanel !== 'models' && state.error
+    ? renderAlert(`模型状态加载失败：${state.error}`, 'danger', 'model-status-banner')
+    : '';
   return `
     <section class="monitor-panel" data-slot="card">
       <div class="tabs panel-tabs" data-slot="tabs" data-orientation="horizontal">
@@ -72,6 +75,7 @@ export function renderMonitorPanel({
           </div>
           ${renderPanelToggle(state.activePanel)}
         </div>
+        ${modelStatusErrorAlert}
         <div class="monitor-content" data-slot="card-content">
           ${state.activePanel === 'url' ? renderUrlStatus({ connectivity: state.connectivity, groups, connectivityTargetError: state.connectivityTargetError, panelMotionClass }) : renderModelAvailability({ state, panelMotionClass, scopeMotionClass })}
         </div>
