@@ -123,6 +123,10 @@ func TestPublicAPIRoutes(t *testing.T) {
 	if IsAPIPath("/api/health") {
 		t.Fatalf("network health endpoint should not be a combine API path")
 	}
+	method, ok := APIMethod("/api/auth")
+	if !ok || method != http.MethodPost {
+		t.Fatalf("auth APIMethod = %q/%v, want POST/true", method, ok)
+	}
 }
 
 func TestMergeStatusRequiresSessionForNonGuestJobs(t *testing.T) {

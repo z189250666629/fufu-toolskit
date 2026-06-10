@@ -50,6 +50,10 @@ func isCombinePagePath(path string) bool {
 
 func handleAPI(w http.ResponseWriter, r *http.Request) {
 	if isCombineAPI(r.URL.Path) {
+		if method, ok := combineAPIMethod(r.URL.Path); ok && r.Method != method {
+			webutil.RequireMethodMessage(w, r, method, "Only "+method)
+			return
+		}
 		if combineApp == nil {
 			writeJSONError(w, 503, "combine is not configured")
 			return

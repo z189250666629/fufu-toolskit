@@ -275,6 +275,28 @@ func TestCombineAPIUnavailableDoesNotExposeConfigError(t *testing.T) {
 	}
 }
 
+func TestCombineAPIUnavailableStillEnforcesMethodContract(t *testing.T) {
+	oldApp, oldErr := combineApp, combineConfigErr
+	combineApp = nil
+	combineConfigErr = errors.New("secret config")
+	t.Cleanup(func() {
+		combineApp = oldApp
+		combineConfigErr = oldErr
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed || strings.TrimSpace(w.Body.String()) != `{"error":"Only POST"}` {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Allow"); got != http.MethodPost {
+		t.Fatalf("Allow = %q", got)
+	}
+}
+
 func TestNetworkAPIRouteMethods(t *testing.T) {
 	cases := []struct {
 		path   string

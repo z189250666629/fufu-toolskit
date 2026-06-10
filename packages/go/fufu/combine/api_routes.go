@@ -43,3 +43,11 @@ func IsAPIPath(path string) bool {
 	_, ok := findAPIPath(path)
 	return ok
 }
+
+func APIMethod(path string) (string, bool) {
+	route, ok := findAPIPath(path)
+	if !ok {
+		return "", false
+	}
+	return route.Method, true
+}

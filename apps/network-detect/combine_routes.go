@@ -24,3 +24,7 @@ func setupCombine() {
 func isCombineAPI(path string) bool {
 	return combine.IsAPIPath(path)
 }
+
+func combineAPIMethod(path string) (string, bool) {
+	return combine.APIMethod(path)
+}
