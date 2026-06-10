@@ -17,7 +17,14 @@ func main() {
 	if port == "" {
 		port = defaultPort
 	}
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.Handle("/", newStaticHandler(wd))
+	fmt.Printf("y2k-nav Go static server listening on :%s\n", port)
+	panic(http.ListenAndServe("0.0.0.0:"+port, mux))
+}
+
+func newStaticHandler(root string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -26,7 +33,7 @@ func main() {
 		if path == "/" {
 			path = "/index.html"
 		}
-		file, ok := webutil.SafePath(wd, path)
+		file, ok := webutil.SafePath(root, path)
 		if !ok {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
@@ -37,6 +44,4 @@ func main() {
 		}
 		http.ServeFile(w, r, file)
 	})
-	fmt.Printf("y2k-nav Go static server listening on :%s\n", port)
-	panic(http.ListenAndServe("0.0.0.0:"+port, nil))
 }
