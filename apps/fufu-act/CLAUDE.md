@@ -3,7 +3,7 @@
 ## Commands
 
 - Start server: `npm start` or `go run .` (port `SLOT_PORT`, default `18820`)
-- Test: `npm test` or `go test ./...`
+- Test: `npm test` or `go test -count=1 ./...`
 
 ## Architecture
 

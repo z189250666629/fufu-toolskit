@@ -34,7 +34,7 @@ scripts/
 ```powershell
 npm run deps
 npm test
-go test ./...
+go test -count=1 ./...
 ```
 
 ## 本地启动

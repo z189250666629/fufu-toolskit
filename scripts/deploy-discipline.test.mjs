@@ -73,6 +73,18 @@ test('deploy workflow verify jobs run uncached Go tests', async () => {
   }
 });
 
+test('repo docs and agent instructions do not recommend cache-prone Go tests', async () => {
+  for (const path of [
+    'README.md',
+    'apps/fufu-act/AGENTS.md',
+    'apps/fufu-act/CLAUDE.md'
+  ]) {
+    const source = await readRepoFile(path);
+    assert.doesNotMatch(source, /(^|`|\s)go test \.\/\.\.\.(`|\s|$)/, `${path} must not recommend cache-prone go test ./...`);
+    assert.match(source, /go test -count=1 \.\/\.\.\./, `${path} should recommend uncached Go tests when showing direct Go commands`);
+  }
+});
+
 test('network-detect compose files use the canonical deployed host port', async () => {
   for (const path of [
     'infra/deploy/network-detect/docker-compose.yml',
