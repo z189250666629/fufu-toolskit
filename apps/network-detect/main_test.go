@@ -172,8 +172,14 @@ func TestConnectivityTargetsReturnsConfigErrorForInvalidInlineJSON(t *testing.T)
 
 	handleAPI(w, req)
 
-	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "CONNECTIVITY_TARGETS") {
+	body := strings.TrimSpace(w.Body.String())
+	if w.Code != http.StatusInternalServerError || body != `{"error":"CONNECTIVITY_TARGETS 不是有效 JSON"}` {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	for _, leaked := range []string{"invalid character", "literal", "not-json"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("connectivity config error leaked %q in %s", leaked, body)
+		}
 	}
 }
 

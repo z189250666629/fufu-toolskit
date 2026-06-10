@@ -29,7 +29,7 @@ func connectivityGroupsWithError() ([]map[string]any, string) {
 	if inline := env("CONNECTIVITY_TARGETS"); inline != "" {
 		var arr []map[string]any
 		if err := json.Unmarshal([]byte(inline), &arr); err != nil {
-			return nil, "CONNECTIVITY_TARGETS 不是有效 JSON: " + err.Error()
+			return nil, "CONNECTIVITY_TARGETS 不是有效 JSON"
 		}
 		return arr, ""
 	}
