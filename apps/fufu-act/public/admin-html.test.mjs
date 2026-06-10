@@ -16,3 +16,14 @@ test('admin stats load uses safe API parsing instead of exposing proxy HTML or s
   assert.doesNotMatch(loadSource, /render\(await r\.json\(\)\)/);
   assert.doesNotMatch(loadSource, /errEl\.textContent = 'ERROR: ' \+ e\.message/);
 });
+
+test('admin stats uses Authorization header instead of query token', async () => {
+  const source = await readFile(new URL('./admin.html', import.meta.url), 'utf8');
+  const loadStart = source.indexOf('async function load()');
+  const loadEnd = source.indexOf('function render(d)');
+  const loadSource = source.slice(loadStart, loadEnd);
+
+  assert.match(loadSource, /fetch\('\/api\/admin\/stats',\s*\{/);
+  assert.match(loadSource, /Authorization:\s*'Bearer '\s*\+\s*tok/);
+  assert.doesNotMatch(loadSource, /\/api\/admin\/stats\?token=/);
+});

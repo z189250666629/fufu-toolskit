@@ -370,7 +370,9 @@
       const errEl = document.getElementById('err');
       errEl.textContent = '';
       try {
-        const r = await fetch('/api/admin/stats?token=' + encodeURIComponent(tok));
+        const r = await fetch('/api/admin/stats', {
+          headers: { Authorization: 'Bearer ' + tok }
+        });
         const data = await activityApi.readApiJson(r, {
           serverErrorMessage: '统计加载失败，请稍后重试',
           clientErrorMessage: '统计加载失败，请稍后重试',

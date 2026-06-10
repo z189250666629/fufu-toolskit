@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func handleAdminStats(w http.ResponseWriter, r *http.Request) {
-	if !auth.CheckAdminToken(r.URL.Query().Get("token"), os.Getenv("ADMIN_TOKEN"), "Chukayu98") {
+	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
 		writeJSONError(w, 401, "未授权")
 		return
 	}
@@ -20,6 +21,18 @@ func handleAdminStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, stats)
+}
+
+func adminBearerToken(r *http.Request) string {
+	value := strings.TrimSpace(r.Header.Get("Authorization"))
+	if value == "" {
+		return ""
+	}
+	scheme, token, ok := strings.Cut(value, " ")
+	if !ok || !strings.EqualFold(scheme, "Bearer") {
+		return ""
+	}
+	return strings.TrimSpace(token)
 }
 
 func handlePrizes(w http.ResponseWriter, r *http.Request) {

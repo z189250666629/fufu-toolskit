@@ -11,18 +11,47 @@ import (
 
 func TestHandleAdminStatsReturns500OnStatsQueryError(t *testing.T) {
 	setupScratchLockTestDB(t)
-	t.Setenv("ADMIN_TOKEN", "")
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/admin/stats?token=Chukayu98", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/stats", nil)
+	req.Header.Set("Authorization", "Bearer test-admin-token")
 	w := httptest.NewRecorder()
 
 	handleAdminStats(w, req)
 
 	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleAdminStatsRejectsQueryToken(t *testing.T) {
+	setupScratchLockTestDB(t)
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/stats?token=test-admin-token", nil)
+	w := httptest.NewRecorder()
+
+	handleAdminStats(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("query token should be rejected: code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleAdminStatsRejectsDefaultTokenWhenAdminTokenUnset(t *testing.T) {
+	setupScratchLockTestDB(t)
+	t.Setenv("ADMIN_TOKEN", "")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/stats?token=Chukayu98", nil)
+	w := httptest.NewRecorder()
+
+	handleAdminStats(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("default token should be rejected when ADMIN_TOKEN is unset: code=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
