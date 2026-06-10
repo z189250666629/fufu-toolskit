@@ -71,15 +71,11 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func respondCard(w http.ResponseWriter, card Card) {
-	hist := []map[string]any{}
-	rows, _ := db.Query(`SELECT prize_dollars, created_at FROM spin_log WHERE card_key=? AND is_retry=0 AND prize_dollars>0 ORDER BY id DESC`, card.CardKey)
-	for rows.Next() {
-		var p int
-		var at string
-		_ = rows.Scan(&p, &at)
-		hist = append(hist, map[string]any{"prize_dollars": p, "created_at": at})
+	hist, err := loadSpinHistory(card.CardKey)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
-	rows.Close()
 	isScratch := int(math.Round(card.Dollars)) == 55
 	var sg any
 	if isScratch {
@@ -88,6 +84,27 @@ func respondCard(w http.ResponseWriter, card Card) {
 		}
 	}
 	writeJSON(w, 200, map[string]any{"cardKey": card.CardKey, "cardName": card.CardName, "dollars": card.Dollars, "totalSpins": card.TotalSpins, "usedSpins": card.UsedSpins, "remainingSpins": card.TotalSpins - card.UsedSpins, "totalWon": card.TotalWon, "wonJackpot": card.WonJackpot != 0, "history": hist, "isScratch": isScratch, "scratchGame": sg})
+}
+
+func loadSpinHistory(cardKey string) ([]map[string]any, error) {
+	hist := []map[string]any{}
+	rows, err := db.Query(`SELECT prize_dollars, created_at FROM spin_log WHERE card_key=? AND is_retry=0 AND prize_dollars>0 ORDER BY id DESC`, cardKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p int
+		var at string
+		if err := rows.Scan(&p, &at); err != nil {
+			return nil, err
+		}
+		hist = append(hist, map[string]any{"prize_dollars": p, "created_at": at})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return hist, nil
 }
 
 func getCard(key string) (Card, bool) {
