@@ -44,6 +44,7 @@ async function runDeployPortValidationCase(t, { hostPort }) {
   const fakeBinRel = `${tmpName}/bin`;
   const composeRel = `${tmpName}/docker-compose.yml`;
   const composeEnvRel = `${tmpName}/compose.env`;
+  const sshMarkerRel = `${tmpName}/ssh-called.txt`;
   const sshMarkerUrl = new URL('ssh-called.txt', tmpUrl);
 
   t.after(() => rm(tmpUrl, { recursive: true, force: true }));
@@ -79,7 +80,7 @@ async function runDeployPortValidationCase(t, { hostPort }) {
     COMPOSE_SERVICE_NAME: 'app',
     COMPOSE_ENV_FILE: composeEnvRel,
     HOME: `${tmpName}/home`,
-    SSH_CALLED_MARKER: fileURLToPath(sshMarkerUrl)
+    SSH_CALLED_MARKER: sshMarkerRel
   };
   if (hostPort !== undefined) {
     envAssignments.HOST_PORT = hostPort;
