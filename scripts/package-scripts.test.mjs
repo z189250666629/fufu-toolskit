@@ -9,6 +9,7 @@ const packageJson = JSON.parse(
 test('root npm test includes workspace Go checks', () => {
   const scripts = packageJson.scripts || {};
 
-  assert.equal(scripts['test:workspace'], 'go test .');
+  assert.equal(scripts['test:workspace'], 'go test -count=1 .');
+  assert.equal(scripts['test:shared'], 'go test -count=1 ./packages/go/fufu/...');
   assert.match(scripts.test || '', /npm run test:workspace/);
 });
