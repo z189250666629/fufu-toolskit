@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -469,6 +470,46 @@ func TestHandleSearchKeysRejectsConcurrentRequestFromSameClient(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("first search did not finish after releasing upstream")
+	}
+}
+
+func TestHandleSearchKeysRateLimitsRepeatedRequestsFromSameClient(t *testing.T) {
+	var hits int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
+	}))
+	defer server.Close()
+	app := NewApp(Config{URL: server.URL, Token: "token", UserID: "1", QuotaUnit: 500000}, nil)
+	remoteAddr := "203.0.113.88:5000"
+
+	for i := 0; i < maxSearchRequestsPerClientWindow; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/search-keys", strings.NewReader(`{"keys":["sk-repeated-client-search-`+strconv.Itoa(i)+`"]}`))
+		req.RemoteAddr = remoteAddr
+		w := httptest.NewRecorder()
+		app.handleSearchKeys(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("allowed attempt %d code=%d body=%s", i+1, w.Code, w.Body.String())
+		}
+	}
+	blockedReq := httptest.NewRequest(http.MethodPost, "/api/search-keys", strings.NewReader(`{"keys":["sk-repeated-client-search-blocked"]}`))
+	blockedReq.RemoteAddr = remoteAddr
+	blocked := httptest.NewRecorder()
+
+	app.handleSearchKeys(blocked, blockedReq)
+
+	if blocked.Code != http.StatusTooManyRequests {
+		t.Fatalf("rate limited search code=%d body=%s", blocked.Code, blocked.Body.String())
+	}
+	if got := blocked.Header().Get("Retry-After"); got == "" {
+		t.Fatal("rate limited search should include Retry-After")
+	}
+	if strings.Contains(blocked.Body.String(), "sk-repeated-client-search-blocked") {
+		t.Fatalf("rate limited search leaked key: %s", blocked.Body.String())
+	}
+	if got := atomic.LoadInt32(&hits); got != int32(maxSearchRequestsPerClientWindow) {
+		t.Fatalf("rate-limited request should not hit upstream token search, got %d hits", got)
 	}
 }
 

@@ -15,6 +15,8 @@ const (
 	traceRetention                    = 30 * 24 * time.Hour
 	maxJSONBodyBytes                  = int64(1 << 20)
 	maxKeysPerRequest                 = 200
+	maxSearchRequestsPerClientWindow  = 3
+	searchRequestWindow               = 10 * time.Second
 	maxActiveMergeJobs                = 20
 	maxActivePublicMergeJobsPerClient = 2
 	publicSourceUnit                  = 3

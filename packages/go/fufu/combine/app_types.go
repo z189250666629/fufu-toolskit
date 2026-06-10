@@ -25,6 +25,7 @@ type App struct {
 	authFailures     map[string]authFailureRecord
 	authFailureDelay time.Duration
 	activeSearches   map[string]struct{}
+	searchRequests   map[string]searchRequestRecord
 	mergeJobTimeout  time.Duration
 	mergeJobs        map[string]MergeJob
 	mergeLocks       map[int]struct{}
@@ -35,6 +36,11 @@ type authFailureRecord struct {
 	Count        int
 	FirstAttempt time.Time
 	BlockedUntil time.Time
+}
+
+type searchRequestRecord struct {
+	Count       int
+	WindowStart time.Time
 }
 
 type contextKey string
