@@ -236,7 +236,8 @@ func (a *App) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	}
 	ok, res, err := a.deleteToken(r.Context(), id)
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		log.Printf("combine delete token failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "删除失败，请稍后重试"})
 		return
 	}
 	if !ok {

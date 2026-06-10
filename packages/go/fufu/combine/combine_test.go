@@ -259,6 +259,29 @@ func TestHandleSearchKeysRedactsLookupErrorsFromPublicAPI(t *testing.T) {
 	}
 }
 
+func TestHandleDeleteTokenRedactsUpstreamErrors(t *testing.T) {
+	app := NewApp(Config{URL: "http://internal.example.local/%zz", Token: "secret-token", UserID: "1"}, nil)
+	app.sessions["admin-session"] = SessionInfo{Expiry: time.Now().Add(time.Hour), Role: RoleAdmin}
+	req := httptest.NewRequest(http.MethodDelete, "/api/token/7", nil)
+	req.Header.Set("X-Session-Token", "admin-session")
+	w := httptest.NewRecorder()
+
+	app.handleAPI(w, req)
+
+	body := strings.TrimSpace(w.Body.String())
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	if body != `{"error":"删除失败，请稍后重试"}` {
+		t.Fatalf("expected safe delete error, got %s", body)
+	}
+	for _, leaked := range []string{"internal.example.local", "%zz", "parse", "invalid URL", "secret-token"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("delete error leaked %q in %s", leaked, body)
+		}
+	}
+}
+
 func TestHandleMergeRejectsEmptyKeysBeforeQueuing(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/merge", strings.NewReader(`{"keys":["  ","sk-"]}`))
