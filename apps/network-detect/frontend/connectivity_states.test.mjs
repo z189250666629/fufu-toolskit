@@ -36,13 +36,23 @@ test('flattenConnectivityTargets trims URLs and drops empty or malformed groups'
 });
 
 test('connectivity base states expose stable UI copy', () => {
-  assert.equal(buildRunningState().title, '测试中');
-  assert.equal(buildRunningState().running, true);
-  assert.equal(buildNoTargetsState('now').title, '没有测试目标');
+ assert.equal(buildRunningState().title, '测试中');
+ assert.equal(buildRunningState().running, true);
+ assert.equal(buildNoTargetsState('now').title, '没有测试目标');
 
-  const errState = buildConnectivityErrorState(new Error('boom'), [{ reachable: false }], 'done');
+  const errState = buildConnectivityErrorState(new Error('浏览器执行检测时发生异常。'), [{ reachable: false }], 'done');
   assert.equal(errState.title, '测试异常');
-  assert.equal(errState.text, 'boom');
+  assert.equal(errState.text, '浏览器执行检测时发生异常。');
   assert.equal(errState.testedAt, 'done');
   assert.deepEqual(errState.results, [{ reachable: false }]);
+});
+
+test('buildConnectivityErrorState masks raw exception details', () => {
+  const errState = buildConnectivityErrorState(new Error('failed https://10.0.0.5?token=sk-secret'), [], 'done');
+
+  assert.equal(errState.title, '测试异常');
+  assert.equal(errState.text, '浏览器执行检测时发生异常。');
+  for (const leaked of ['10.0.0.5', 'sk-secret', 'token=', 'failed']) {
+    assert.ok(!errState.text.includes(leaked), `error state leaked ${leaked}: ${errState.text}`);
+  }
 });

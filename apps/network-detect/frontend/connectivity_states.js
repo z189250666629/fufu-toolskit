@@ -96,7 +96,7 @@ export function buildConnectivityErrorState(error, results, testedAt) {
     tone: 'bad',
     icon: 'x',
     title: '测试异常',
-    text: error.message || '浏览器执行检测时发生异常。',
+    text: '浏览器执行检测时发生异常。',
     progress: 100,
     progressText: '测试异常',
     currentUrl: '-',
