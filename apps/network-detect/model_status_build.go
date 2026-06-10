@@ -46,9 +46,11 @@ func getModelStatus(ctx context.Context, force bool) *ModelStatus {
 		modelCache.Lock()
 		call.status = status
 		delete(modelCache.Inflight, cacheKey)
-		modelCache.Value = status
-		modelCache.Expires = time.Now().Add(modelStatusCacheTTL)
-		modelCache.Key = cacheKey
+		if ctx.Err() == nil {
+			modelCache.Value = status
+			modelCache.Expires = time.Now().Add(modelStatusCacheTTL)
+			modelCache.Key = cacheKey
+		}
 		close(call.done)
 		modelCache.Unlock()
 		return status

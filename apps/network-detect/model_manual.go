@@ -73,6 +73,9 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	if len(candidates) == 0 {
 		return nil, &httpError{Status: 400, Message: "当前单元格没有启用通道可测试"}
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	next := now + int64(modelTestCooldown/time.Second)
 	testCooldowns.Store(key, next)
 	stream := supportsStream(model)
@@ -82,6 +85,10 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 		if res.OK {
 			break
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		testCooldowns.Delete(key)
+		return nil, err
 	}
 	rec := testRecord{OK: res.OK, Status: map[bool]string{true: "operational", false: "down"}[res.OK], Group: group, Stream: stream, TestedAt: time.Now().Unix(), Message: truncate(testMessage(res), 180), NextAllowedAt: next}
 	testResults.Store(key, rec)

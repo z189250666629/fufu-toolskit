@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -53,5 +54,58 @@ func TestHandleModelTestPassesRequestContext(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestTestModelDoesNotStoreCooldownOrResultWhenCanceledDuringProbe(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	siteName := "cancel-site"
+	modelName := "gpt-cancel-probe"
+	key := modelManualKey(siteName, modelName, "")
+	testCooldowns.Delete(key)
+	testResults.Delete(key)
+	t.Cleanup(func() {
+		testCooldowns.Delete(key)
+		testResults.Delete(key)
+	})
+	var cancel context.CancelFunc
+	probeReached := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/channel/search"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+				map[string]any{"id": 7, "status": channelStatusEnabled, "models": []any{modelName}, "groups": []any{"default"}},
+			}})
+		case strings.HasPrefix(r.URL.Path, "/api/channel/test/"):
+			close(probeReached)
+			cancel()
+			<-r.Context().Done()
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.String())
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", managedSiteConfigJSON(siteName, server.URL))
+	ctx, cancelFn := context.WithCancel(context.Background())
+	cancel = cancelFn
+
+	_, err := testModel(ctx, siteName, modelName, "")
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %T %v", err, err)
+	}
+	select {
+	case <-probeReached:
+	default:
+		t.Fatal("manual model probe was not reached")
+	}
+	if value, ok := testCooldowns.Load(key); ok {
+		t.Fatalf("canceled probe should not leave cooldown: %#v", value)
+	}
+	if value, ok := testResults.Load(key); ok {
+		t.Fatalf("canceled probe should not leave manual test result: %#v", value)
 	}
 }

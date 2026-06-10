@@ -120,6 +120,46 @@ func TestGetModelStatusCoalescesConcurrentColdLoads(t *testing.T) {
 	}
 }
 
+func TestGetModelStatusDoesNotCacheCanceledBuilds(t *testing.T) {
+	oldRootDir := rootDir
+	oldValue := modelCache.Value
+	oldExpires := modelCache.Expires
+	oldKey := modelCache.Key
+	oldInflight := modelCache.Inflight
+	t.Cleanup(func() {
+		rootDir = oldRootDir
+		modelCache.Lock()
+		modelCache.Value = oldValue
+		modelCache.Expires = oldExpires
+		modelCache.Key = oldKey
+		modelCache.Inflight = oldInflight
+		modelCache.Unlock()
+	})
+	rootDir = t.TempDir()
+	modelCache.Lock()
+	modelCache.Value = nil
+	modelCache.Expires = time.Time{}
+	modelCache.Key = ""
+	modelCache.Inflight = nil
+	modelCache.Unlock()
+	clearManagedSiteEnv(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	t.Setenv("NEWAPI_MANAGED_API_SITES", managedSiteConfigJSON("site-a", "http://127.0.0.1:1"))
+
+	canceled := getModelStatus(ctx, false)
+	if len(canceled.Sites) != 1 || canceled.Sites[0].LogError == "" {
+		t.Fatalf("canceled build should return an uncached error snapshot: %#v", canceled)
+	}
+	modelCache.Lock()
+	cached := modelCache.Value
+	modelCache.Unlock()
+	if cached != nil {
+		t.Fatalf("canceled model-status build should not populate cache: %#v", cached)
+	}
+}
+
 func managedSiteConfigJSON(name, url string) string {
 	return fmt.Sprintf(`[{"name":%q,"url":%q,"token":"token"}]`, name, strings.TrimRight(url, "/"))
 }
