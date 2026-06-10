@@ -17,16 +17,22 @@ func (a *App) cleanMergeJobs() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for id, job := range a.mergeJobs {
-		if !isTerminalMergeJobStatus(job.Status) {
-			continue
-		}
 		base := time.UnixMilli(job.CreatedAt)
 		if job.UpdatedAt != 0 {
 			base = time.UnixMilli(job.UpdatedAt)
 		}
-		if base.Add(mergeJobTTL).Before(now) {
-			delete(a.mergeJobs, id)
+		if !base.Add(mergeJobTTL).Before(now) {
+			continue
 		}
+		if isTerminalMergeJobStatus(job.Status) {
+			delete(a.mergeJobs, id)
+			continue
+		}
+		job.Status = "error"
+		job.StepText = "合并超时"
+		job.Error = "合并任务超时，请重试"
+		job.UpdatedAt = now.UnixMilli()
+		a.mergeJobs[id] = job
 	}
 }
 
