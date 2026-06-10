@@ -34,7 +34,7 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 		if g, ok, lookupErr := lookupScratch(key); lookupErr != nil {
 			return nil, lookupErr
 		} else if ok {
-			return scratchStartResponse(g), nil
+			return scratchStartResponse(g)
 		}
 		mines := []int{}
 		for len(mines) < scratchMines {
@@ -54,7 +54,7 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 			if g, ok, lookupErr := lookupScratch(key); lookupErr != nil {
 				return nil, lookupErr
 			} else if ok {
-				return scratchStartResponse(g), nil
+				return scratchStartResponse(g)
 			}
 			return nil, err
 		}
@@ -97,13 +97,19 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		if g.Status != "playing" {
 			return nil, httpErr{403, "游戏已结束"}
 		}
-		revealed := jsonArr(g.Revealed)
+		revealed, err := parseScratchIntArray(g.Revealed)
+		if err != nil {
+			return nil, err
+		}
 		for _, v := range revealed {
 			if v == cellIndex {
 				return nil, httpErr{400, "此格已刮开"}
 			}
 		}
-		mines := jsonArr(g.MinePos)
+		mines, err := parseScratchIntArray(g.MinePos)
+		if err != nil {
+			return nil, err
+		}
 		revealed = append(revealed, cellIndex)
 		if intContains(mines, cellIndex) {
 			rb, _ := json.Marshal(revealed)
@@ -178,8 +184,14 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 		if g.Status != "playing" {
 			return nil, httpErr{403, "游戏已结束"}
 		}
-		revealed := jsonArr(g.Revealed)
-		mines := jsonArr(g.MinePos)
+		revealed, err := parseScratchIntArray(g.Revealed)
+		if err != nil {
+			return nil, err
+		}
+		mines, err := parseScratchIntArray(g.MinePos)
+		if err != nil {
+			return nil, err
+		}
 		safe := 0
 		for _, v := range revealed {
 			if !intContains(mines, v) {
@@ -274,18 +286,29 @@ func lookupScratch(key string) (ScratchGame, bool, error) {
 	return ScratchGame{}, false, err
 }
 
-func scratchGameResponse(g ScratchGame) map[string]any {
-	response := map[string]any{"revealed": jsonArr(g.Revealed), "prize": g.PrizeDollars, "status": g.Status}
-	if isScratchGameOver(g.Status) {
-		response["mines"] = jsonArr(g.MinePos)
+func scratchGameResponse(g ScratchGame) (map[string]any, error) {
+	revealed, err := parseScratchIntArray(g.Revealed)
+	if err != nil {
+		return nil, err
 	}
-	return response
+	response := map[string]any{"revealed": revealed, "prize": g.PrizeDollars, "status": g.Status}
+	if isScratchGameOver(g.Status) {
+		mines, err := parseScratchIntArray(g.MinePos)
+		if err != nil {
+			return nil, err
+		}
+		response["mines"] = mines
+	}
+	return response, nil
 }
 
-func scratchStartResponse(g ScratchGame) map[string]any {
-	response := scratchGameResponse(g)
+func scratchStartResponse(g ScratchGame) (map[string]any, error) {
+	response, err := scratchGameResponse(g)
+	if err != nil {
+		return nil, err
+	}
 	response["cells"] = 9
-	return response
+	return response, nil
 }
 
 func isScratchGameOver(status string) bool {
@@ -299,13 +322,15 @@ func scratchPrizeForSafeCount(safe int) (int, bool) {
 	return scratchRewards[safe-1], true
 }
 
-func jsonArr(s string) []int {
+func parseScratchIntArray(s string) ([]int, error) {
 	var a []int
-	_ = json.Unmarshal([]byte(s), &a)
-	if a == nil {
-		return []int{}
+	if err := json.Unmarshal([]byte(s), &a); err != nil {
+		return nil, err
 	}
-	return a
+	if a == nil {
+		return []int{}, nil
+	}
+	return a, nil
 }
 
 func intContains(a []int, v int) bool {

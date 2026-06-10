@@ -18,9 +18,15 @@ func TestSpinGuaranteeForThousandCard(t *testing.T) {
 }
 
 func TestScratchJSONHelpers(t *testing.T) {
-	arr := jsonArr(`[1,2]`)
+	arr, err := parseScratchIntArray(`[1,2]`)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(arr) != 2 || !intContains(arr, 2) || intContains(arr, 3) {
 		t.Fatalf("bad json helpers: %#v", arr)
+	}
+	if _, err := parseScratchIntArray(`not-json`); err == nil {
+		t.Fatal("corrupt scratch JSON should be rejected")
 	}
 }
 

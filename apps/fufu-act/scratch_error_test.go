@@ -59,6 +59,28 @@ func TestScratchRevealRequiresCellIndex(t *testing.T) {
 	}
 }
 
+func TestScratchRevealRejectsCorruptMinePositions(t *testing.T) {
+	setupScratchLockTestDB(t)
+	seedScratchGame(t, "scratch-card", "not-json", "[]", 0, "playing")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/reveal", strings.NewReader(`{"cardKey":"scratch-card","cellIndex":0}`))
+	w := httptest.NewRecorder()
+
+	handleScratchReveal(w, req)
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var status string
+	var revealed string
+	if err := db.QueryRow(`SELECT status,revealed FROM scratch_games WHERE card_key=?`, "scratch-card").Scan(&status, &revealed); err != nil {
+		t.Fatal(err)
+	}
+	if status != "playing" || revealed != "[]" {
+		t.Fatalf("corrupt mine positions should not mutate game, status=%q revealed=%s", status, revealed)
+	}
+}
+
 func TestScratchCashoutReturnsServerErrorWhenUpdateFails(t *testing.T) {
 	setupScratchLockTestDB(t)
 	seedScratchGame(t, "scratch-card", "[7,8]", "[0]", 2, "playing")
@@ -71,6 +93,27 @@ func TestScratchCashoutReturnsServerErrorWhenUpdateFails(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestScratchCashoutRejectsCorruptRevealedJSON(t *testing.T) {
+	setupScratchLockTestDB(t)
+	seedScratchGame(t, "scratch-card", "[7,8]", "not-json", 2, "playing")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/cashout", strings.NewReader(`{"cardKey":"scratch-card"}`))
+	w := httptest.NewRecorder()
+
+	handleScratchCashout(w, req)
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var status string
+	if err := db.QueryRow(`SELECT status FROM scratch_games WHERE card_key=?`, "scratch-card").Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != "playing" {
+		t.Fatalf("corrupt revealed JSON should not cash out, status=%q", status)
 	}
 }
 

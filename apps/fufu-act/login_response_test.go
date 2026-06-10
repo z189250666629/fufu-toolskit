@@ -104,3 +104,18 @@ func TestRespondCardReturns500WhenScratchLookupFails(t *testing.T) {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestRespondCardReturns500WhenScratchJSONIsCorrupt(t *testing.T) {
+	setupScratchLockTestDB(t)
+	seedScratchGame(t, "scratch-card", "[1,2]", "not-json", 4, "cashout")
+
+	w := httptest.NewRecorder()
+	respondCard(w, Card{CardKey: "scratch-card", CardName: "Scratch Card", Dollars: 55, TotalSpins: 0})
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "not-json") {
+		t.Fatalf("scratch JSON parse details should be masked: %s", w.Body.String())
+	}
+}

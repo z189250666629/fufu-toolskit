@@ -101,7 +101,11 @@ func respondCard(w http.ResponseWriter, card Card) {
 			return
 		}
 		if ok {
-			sg = scratchGameResponse(g)
+			sg, err = scratchGameResponse(g)
+			if err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "服务器错误")
+				return
+			}
 		}
 	}
 	writeJSON(w, 200, map[string]any{"cardKey": card.CardKey, "cardName": card.CardName, "dollars": card.Dollars, "totalSpins": card.TotalSpins, "usedSpins": card.UsedSpins, "remainingSpins": card.TotalSpins - card.UsedSpins, "totalWon": card.TotalWon, "wonJackpot": card.WonJackpot != 0, "history": hist, "isScratch": isScratch, "scratchGame": sg})
