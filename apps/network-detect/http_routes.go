@@ -28,6 +28,7 @@ func route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
 		writeJSONError(w, 405, "Only GET is supported")
 		return
 	}

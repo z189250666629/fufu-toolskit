@@ -173,6 +173,20 @@ func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
 	}
 }
 
+func TestStaticRouteRejectsUnsafeMethodsWithAllowHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	w := httptest.NewRecorder()
+
+	route(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed || strings.TrimSpace(w.Body.String()) != `{"error":"Only GET is supported"}` {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Allow"); got != "GET, HEAD" {
+		t.Fatalf("Allow = %q", got)
+	}
+}
+
 func TestCombineAPIRoutes(t *testing.T) {
 	for _, path := range []string{
 		"/api/auth",
