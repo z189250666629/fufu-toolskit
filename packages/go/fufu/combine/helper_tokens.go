@@ -1,6 +1,9 @@
 package combine
 
-import "fufu/tokens"
+import (
+	"fufu/newapi"
+	"fufu/tokens"
+)
 
 func resolvedFromToken(t tokens.Token) ResolvedToken {
 	return ResolvedToken{ID: t.ID, Key: t.Key, Name: t.Name, RemainQuota: t.RemainQuota, UsedQuota: t.UsedQuota, IntervalUnit: t.IntervalUnit, Group: t.Group, Status: t.Status, Raw: t.Raw}
@@ -22,17 +25,7 @@ func cloneMap(raw map[string]any) map[string]any {
 }
 
 func dataList(data map[string]any) []map[string]any {
-	raw, ok := data["data"].([]any)
-	if !ok {
-		return nil
-	}
-	out := []map[string]any{}
-	for _, item := range raw {
-		if obj, ok := item.(map[string]any); ok {
-			out = append(out, obj)
-		}
-	}
-	return out
+	return newapi.PayloadItemsTopLevel(data, "data")
 }
 
 func findTokenByName(data map[string]any, name string) map[string]any {

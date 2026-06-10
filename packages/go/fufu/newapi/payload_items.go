@@ -14,7 +14,21 @@ func PayloadItems(data map[string]any, keys ...string) []map[string]any {
 			candidates = append(candidates, nested[key])
 		}
 	}
+	return payloadItemsFromCandidates(candidates)
+}
 
+func PayloadItemsTopLevel(data map[string]any, keys ...string) []map[string]any {
+	if len(keys) == 0 {
+		keys = []string{"data", "items"}
+	}
+	candidates := make([]any, 0, len(keys))
+	for _, key := range keys {
+		candidates = append(candidates, data[key])
+	}
+	return payloadItemsFromCandidates(candidates)
+}
+
+func payloadItemsFromCandidates(candidates []any) []map[string]any {
 	for _, candidate := range candidates {
 		items, ok := candidate.([]any)
 		if !ok {
