@@ -220,6 +220,25 @@ func TestSearchCreateUpdateDelete(t *testing.T) {
 	}
 }
 
+func TestDeleteTokenTreatsSuccessFalseAsFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete || r.URL.Path != "/api/token/2" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "delete denied"})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	ok, res, err := svc.DeleteToken(context.Background(), 2)
+	if err == nil || !strings.Contains(err.Error(), "delete denied") {
+		t.Fatalf("expected payload error, got ok=%v res=%+v err=%v", ok, res, err)
+	}
+	if ok || !res.OK() {
+		t.Fatalf("ok=%v res=%+v", ok, res)
+	}
+}
+
 func TestSearchTokenByKeySkipsBlankKeyWithoutRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("blank key should not issue request: %s", r.URL.String())

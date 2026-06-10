@@ -67,11 +67,17 @@ func (s *Service) DeleteToken(ctx context.Context, id int) (bool, newapi.Respons
 	if err != nil {
 		return false, newapi.Response{}, err
 	}
-	res, _, err := client.Request(ctx, http.MethodDelete, fmt.Sprintf("/api/token/%d", id), nil)
+	res, data, err := client.Request(ctx, http.MethodDelete, fmt.Sprintf("/api/token/%d", id), nil)
 	if err != nil {
 		return false, newapi.Response{}, err
 	}
-	return res.OK(), res, nil
+	if !res.OK() {
+		return false, res, nil
+	}
+	if !newapi.IsSuccess(data) {
+		return false, res, fmt.Errorf("%s", newapi.ErrorMessage(data, res.StatusCode, fmt.Sprintf("Token %d 删除失败", id)))
+	}
+	return true, res, nil
 }
 
 func (s *Service) AddQuota(ctx context.Context, key string, dollars int64) error {
