@@ -13,3 +13,15 @@ apps/**/data/*.db*
 *.temp
 apps/**/dist
 apps/**/build
+apps/network-detect/frontend/*.test.*
+apps/network-detect/frontend/**/*.test.*
+apps/network-detect/frontend/.*
+apps/network-detect/frontend/**/.*
+apps/network-detect/combine/*.test.*
+apps/network-detect/combine/**/*.test.*
+apps/network-detect/combine/.*
+apps/network-detect/combine/**/.*
+apps/fufu-act/public/*.test.*
+apps/fufu-act/public/**/*.test.*
+apps/fufu-act/public/.*
+apps/fufu-act/public/**/.*

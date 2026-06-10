@@ -175,6 +175,25 @@ test('deploy workflow verify jobs run root script discipline tests', async () =>
   }
 });
 
+test('docker context excludes non-production static assets from runtime app roots', async () => {
+  const dockerignore = await readRepoFile('.dockerignore');
+  const patterns = dockerignore
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+
+  for (const staticRoot of [
+    'apps/network-detect/frontend',
+    'apps/network-detect/combine',
+    'apps/fufu-act/public'
+  ]) {
+    for (const suffix of ['*.test.*', '**/*.test.*', '.*', '**/.*']) {
+      const pattern = `${staticRoot}/${suffix}`;
+      assert.equal(patterns.includes(pattern), true, `.dockerignore should exclude ${pattern}`);
+    }
+  }
+});
+
 test('repo docs and agent instructions do not recommend cache-prone Go tests', async () => {
   for (const path of [
     'README.md',
