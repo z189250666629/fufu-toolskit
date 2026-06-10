@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fufu/webutil"
 	"io"
 	"net/http"
@@ -8,7 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"unicode"
 )
+
+const maxCardKeyLength = 256
+
+var errInvalidCardKey = errors.New("invalid card key")
 
 func apiRoute(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
@@ -86,7 +92,30 @@ func readCardKeyRequest(r *http.Request, out any, cardKey func() string) (string
 		return "", false, err
 	}
 	key := strings.TrimSpace(cardKey())
+	if key != "" && !isValidCardKey(key) {
+		return "", false, errInvalidCardKey
+	}
 	return key, key != "", nil
+}
+
+func isValidCardKey(key string) bool {
+	if len([]rune(key)) > maxCardKeyLength {
+		return false
+	}
+	for _, r := range key {
+		if unicode.IsControl(r) || unicode.IsSpace(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func writeCardKeyRequestError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errInvalidCardKey) {
+		writeJSONError(w, http.StatusBadRequest, "卡密格式错误")
+		return
+	}
+	writeMalformedCardKeyRequest(w)
 }
 
 func writeMalformedCardKeyRequest(w http.ResponseWriter) {

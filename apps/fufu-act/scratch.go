@@ -13,7 +13,7 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 	}
 	key, ok, err := readCardKeyRequest(r, &b, func() string { return b.CardKey })
 	if err != nil {
-		writeMalformedCardKeyRequest(w)
+		writeCardKeyRequestError(w, err)
 		return
 	}
 	if !ok {
@@ -77,7 +77,7 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 	}
 	key, ok, err := readCardKeyRequest(r, &b, func() string { return b.CardKey })
 	if err != nil {
-		writeMalformedCardKeyRequest(w)
+		writeCardKeyRequestError(w, err)
 		return
 	}
 	if !ok {
@@ -172,7 +172,7 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 	}
 	key, ok, err := readCardKeyRequest(r, &b, func() string { return b.CardKey })
 	if err != nil {
-		writeMalformedCardKeyRequest(w)
+		writeCardKeyRequestError(w, err)
 		return
 	}
 	if !ok {
@@ -243,7 +243,7 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 	}
 	key, ok, err := readCardKeyRequest(r, &b, func() string { return b.CardKey })
 	if err != nil {
-		writeMalformedCardKeyRequest(w)
+		writeCardKeyRequestError(w, err)
 		return
 	}
 	if !ok {

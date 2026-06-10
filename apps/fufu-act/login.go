@@ -16,7 +16,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	key, ok, err := readCardKeyRequest(r, &body, func() string { return body.CardKey })
 	if err != nil {
-		writeMalformedCardKeyRequest(w)
+		writeCardKeyRequestError(w, err)
 		return
 	}
 	if !ok {
