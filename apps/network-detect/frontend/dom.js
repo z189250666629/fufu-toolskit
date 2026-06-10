@@ -53,15 +53,19 @@ export async function copyText(value, deps = {}) {
 export function showCopiedFeedback(button, text = '已复制', deps = {}) {
   const {
     documentLike = globalThis.document,
-    windowLike = globalThis.window
+    windowLike = globalThis.window,
+    status = 'success'
   } = deps;
 
   const tip = button.querySelector('.copy-tip');
   if (tip) tip.textContent = text;
-  documentLike.querySelectorAll('.url-copy.copied').forEach((item) => item.classList.remove('copied'));
-  button.classList.add('copied');
+  documentLike.querySelectorAll('.url-copy.copied, .url-copy.copy-failed').forEach((item) => {
+    item.classList.remove('copied', 'copy-failed');
+  });
+  const feedbackClass = status === 'error' ? 'copy-failed' : 'copied';
+  button.classList.add(feedbackClass);
   windowLike.clearTimeout(button._copiedTimer);
-  button._copiedTimer = windowLike.setTimeout(() => button.classList.remove('copied'), 1200);
+  button._copiedTimer = windowLike.setTimeout(() => button.classList.remove('copied', 'copy-failed'), 1200);
 }
 
 export function formatNetworkType(navigatorLike = globalThis.navigator) {

@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   bindTabKeyboard,
   formatNetworkType,
-  getCopyUrl
+  getCopyUrl,
+  showCopiedFeedback
 } from './dom.js';
 
 test('getCopyUrl only returns fixed allowed URLs', () => {
@@ -33,6 +34,31 @@ test('getCopyUrl trims candidate URL values before allow-list lookup', () => {
     getAttribute: (name) => (name === 'data-copy-value' ? '\nhttps://api.example.test\t' : ''),
     querySelector: () => null
   }, allowed), 'https://api.example.test');
+});
+
+test('showCopiedFeedback marks copy failure separately', () => {
+  const classes = new Set(['url-copy']);
+  const button = {
+    classList: {
+      add: (name) => classes.add(name),
+      remove: (name) => classes.delete(name),
+      contains: (name) => classes.has(name)
+    },
+    querySelector: () => ({ textContent: '' }),
+    _copiedTimer: null
+  };
+
+  showCopiedFeedback(button, '复制失败', {
+    status: 'error',
+    documentLike: { querySelectorAll: () => [] },
+    windowLike: {
+      clearTimeout: () => {},
+      setTimeout: () => 1
+    }
+  });
+
+  assert.equal(classes.has('copy-failed'), true);
+  assert.equal(classes.has('copied'), false);
 });
 
 test('formatNetworkType formats browser network connection details', () => {

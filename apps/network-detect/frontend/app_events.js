@@ -101,7 +101,7 @@ export function bindAppEvents({
       await copyText(getCopyUrl(button, fixedTargetUrls()));
       showCopiedFeedback(button);
     } catch {
-      showCopiedFeedback(button, '复制失败');
+      showCopiedFeedback(button, '复制失败', { status: 'error' });
     }
   });
 }

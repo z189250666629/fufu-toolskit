@@ -58,6 +58,11 @@
   white-space: nowrap;
 }
 
-.url-copy.copied .copy-tip {
+.url-copy.copied .copy-tip,
+.url-copy.copy-failed .copy-tip {
   display: inline-flex;
+}
+
+.url-copy.copy-failed .copy-tip {
+  background: var(--warn);
 }
