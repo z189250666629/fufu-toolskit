@@ -68,6 +68,16 @@ func TestWriteHTTPErrorMapsKnownError(t *testing.T) {
 	}
 }
 
+func TestWriteJSONErrorUsesStablePayload(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	writeJSONError(w, http.StatusTeapot, "bad card")
+
+	if w.Code != http.StatusTeapot || strings.TrimSpace(w.Body.String()) != `{"error":"bad card"}` {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestReadCardKeyRequestTrimsAndRejectsInvalidInput(t *testing.T) {
 	var body struct {
 		CardKey string `json:"cardKey"`

@@ -21,16 +21,16 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	card, ok := getCard(key)
 	if !ok {
 		if tokenSvc == nil {
-			writeJSON(w, 503, map[string]string{"error": "NewAPI 未配置: " + errString(tokenConfigErr)})
+			writeJSONError(w, 503, "NewAPI 未配置: "+errString(tokenConfigErr))
 			return
 		}
 		t, err := tokenSvc.SearchTokenByKey(r.Context(), key)
 		if err != nil {
-			writeJSON(w, 500, map[string]string{"error": err.Error()})
+			writeJSONError(w, 500, err.Error())
 			return
 		}
 		if t == nil {
-			writeJSON(w, 404, map[string]string{"error": "卡密不存在"})
+			writeJSONError(w, 404, "卡密不存在")
 			return
 		}
 		isActTest := strings.Contains(t.Name, "-act-") && strings.Contains(t.Name, "test")
@@ -48,7 +48,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			shop := findShopPurchase(key)
 			purchased := shop != "" && shop >= actStart && shop <= actEnd
 			if !createdInRange && !purchased {
-				writeJSON(w, 403, map[string]string{"error": "此卡密不在活动期间内，不参与活动"})
+				writeJSONError(w, 403, "此卡密不在活动期间内，不参与活动")
 				return
 			}
 			dollars = dollarsTier(t.IntervalQuota)
@@ -56,13 +56,13 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		isScratch := int(math.Round(dollars)) == 55 && (purchaseTime != "" || createdInRange)
 		if dollars == 0 || (spinMap[dollars] == 0 && !isScratch) {
-			writeJSON(w, 403, map[string]string{"error": "此卡密额度不参与活动"})
+			writeJSONError(w, 403, "此卡密额度不参与活动")
 			return
 		}
 		total := spinMap[dollars]
 		_, err = db.Exec(`INSERT INTO cards (card_key,card_name,dollars,total_spins,source,purchase_time) VALUES (?,?,?,?,?,?)`, key, t.Name, dollars, total, source, nullString(purchaseTime))
 		if err != nil {
-			writeJSON(w, 500, map[string]string{"error": err.Error()})
+			writeJSONError(w, 500, err.Error())
 			return
 		}
 		card, _ = getCard(key)

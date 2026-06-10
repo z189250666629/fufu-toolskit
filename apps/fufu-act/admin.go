@@ -10,7 +10,7 @@ import (
 
 func handleAdminStats(w http.ResponseWriter, r *http.Request) {
 	if !auth.CheckAdminToken(r.URL.Query().Get("token"), os.Getenv("ADMIN_TOKEN"), "Chukayu98") {
-		writeJSON(w, 401, map[string]string{"error": "未授权"})
+		writeJSONError(w, 401, "未授权")
 		return
 	}
 	writeJSON(w, 200, map[string]any{"prizeRows": queryRows(`SELECT prize_dollars, COUNT(*) as count, SUM(prize_dollars) as total FROM spin_log WHERE is_retry=0 AND prize_dollars>0 GROUP BY prize_dollars ORDER BY prize_dollars ASC`), "totalSpins": scalarInt(`SELECT COUNT(*) FROM spin_log WHERE is_retry=0`), "totalWon": scalarInt(`SELECT COALESCE(SUM(prize_dollars),0) FROM spin_log WHERE is_retry=0`), "ev": ev(), "tierRows": queryRows(`SELECT dollars, COUNT(*) as cards, SUM(total_spins) as total_spins, SUM(used_spins) as used_spins, SUM(total_won) as total_won FROM cards GROUP BY dollars ORDER BY dollars ASC`), "queueRows": queryRows(`SELECT status, COUNT(*) as count, SUM(prize_dollars) as total FROM credit_queue GROUP BY status`), "scratchRows": queryRows(`SELECT status, COUNT(*) as count, SUM(prize_dollars) as total FROM scratch_games GROUP BY status`)})

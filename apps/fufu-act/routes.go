@@ -26,24 +26,24 @@ func apiRoute(w http.ResponseWriter, r *http.Request) {
 		post(w, r, handleScratchReset)
 	case "/api/admin/stats":
 		if r.Method != http.MethodGet {
-			writeJSON(w, 405, map[string]string{"error": "Only GET"})
+			writeJSONError(w, 405, "Only GET")
 			return
 		}
 		handleAdminStats(w, r)
 	case "/api/prizes":
 		if r.Method != http.MethodGet {
-			writeJSON(w, 405, map[string]string{"error": "Only GET"})
+			writeJSONError(w, 405, "Only GET")
 			return
 		}
 		handlePrizes(w, r)
 	default:
-		writeJSON(w, 404, map[string]string{"error": "Not found"})
+		writeJSONError(w, 404, "Not found")
 	}
 }
 
 func post(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWriter, *http.Request)) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, 405, map[string]string{"error": "Only POST"})
+		writeJSONError(w, 405, "Only POST")
 		return
 	}
 	fn(w, r)
@@ -51,7 +51,7 @@ func post(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWriter, *
 
 func staticRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		writeJSON(w, 405, map[string]string{"error": "Only GET"})
+		writeJSONError(w, 405, "Only GET")
 		return
 	}
 	p := r.URL.Path
@@ -75,6 +75,10 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	webutil.WriteJSON(w, status, payload)
 }
 
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
+}
+
 func readBody(r *http.Request, out any) error {
 	return webutil.DecodeJSON(io.LimitReader(r.Body, 1<<20), out)
 }
@@ -88,16 +92,16 @@ func readCardKeyRequest(r *http.Request, out any, cardKey func() string) (string
 }
 
 func writeMissingCardKey(w http.ResponseWriter) {
-	writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请输入卡密"})
+	writeJSONError(w, http.StatusBadRequest, "请输入卡密")
 }
 
 func (e httpErr) Error() string { return e.Message }
 
 func writeHTTPError(w http.ResponseWriter, err error) {
 	if e, ok := err.(httpErr); ok {
-		writeJSON(w, e.Status, map[string]string{"error": e.Message})
+		writeJSONError(w, e.Status, e.Message)
 	} else {
-		writeJSON(w, 500, map[string]string{"error": "服务器错误"})
+		writeJSONError(w, 500, "服务器错误")
 	}
 }
 

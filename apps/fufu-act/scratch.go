@@ -18,11 +18,11 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 	}
 	card, ok := getCard(key)
 	if !ok {
-		writeJSON(w, 404, map[string]string{"error": "请先登录"})
+		writeJSONError(w, 404, "请先登录")
 		return
 	}
 	if int(math.Round(card.Dollars)) != 55 {
-		writeJSON(w, 403, map[string]string{"error": "此卡密不参与刮刮乐活动"})
+		writeJSONError(w, 403, "此卡密不参与刮刮乐活动")
 		return
 	}
 	if g, ok := getScratch(key); ok {
@@ -58,7 +58,7 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if b.CellIndex < 0 || b.CellIndex > 8 {
-		writeJSON(w, 400, map[string]string{"error": "无效的格子"})
+		writeJSONError(w, 400, "无效的格子")
 		return
 	}
 	res, err := withCardLock(key, func() (any, error) {
@@ -160,15 +160,15 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 	}
 	card, ok := getCard(key)
 	if !ok {
-		writeJSON(w, 404, map[string]string{"error": "请先登录"})
+		writeJSONError(w, 404, "请先登录")
 		return
 	}
 	if !strings.Contains(card.CardName, "test") {
-		writeJSON(w, 403, map[string]string{"error": "仅测试卡可重开"})
+		writeJSONError(w, 403, "仅测试卡可重开")
 		return
 	}
 	if g, ok := getScratch(key); ok && g.Status == "playing" {
-		writeJSON(w, 400, map[string]string{"error": "当前游戏尚未结束"})
+		writeJSONError(w, 400, "当前游戏尚未结束")
 		return
 	}
 	_, _ = db.Exec(`DELETE FROM scratch_games WHERE card_key=?`, key)
