@@ -32,6 +32,22 @@ func TestTestModelSurfacesManagedSiteConfigErrors(t *testing.T) {
 	}
 }
 
+func TestPublicManagedSiteConfigErrorMasksUnknownRawDetails(t *testing.T) {
+	msg := publicManagedSiteConfigError(`open C:\secret\config.json token=sk-secret http://10.0.0.5:3000 failed`)
+
+	if msg == "" {
+		t.Fatal("expected a safe fallback message")
+	}
+	for _, leaked := range []string{`C:\secret`, "config.json", "sk-secret", "10.0.0.5", "http://", "failed"} {
+		if strings.Contains(msg, leaked) {
+			t.Fatalf("public config error leaked %q in %q", leaked, msg)
+		}
+	}
+	if !strings.Contains(msg, "NEWAPI_MANAGED_API_CONFIG") {
+		t.Fatalf("fallback should point users to managed config without raw internals, got %q", msg)
+	}
+}
+
 func clearManagedSiteEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{

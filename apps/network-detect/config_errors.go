@@ -16,5 +16,5 @@ func publicManagedSiteConfigError(message string) string {
 			return "NEWAPI_MANAGED_API_CONFIG" + marker
 		}
 	}
-	return message
+	return "NEWAPI_MANAGED_API_CONFIG 配置读取失败"
 }
