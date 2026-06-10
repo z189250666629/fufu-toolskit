@@ -135,11 +135,26 @@ func parseActTestTokenName(name string) (float64, bool) {
 	for _, part := range strings.FieldsFunc(suffix, func(r rune) bool {
 		return r == '-' || r == '_' || r == ' ' || r == '.'
 	}) {
-		if strings.EqualFold(part, "test") {
+		if isTestCardSegment(part) {
 			return dollars, true
 		}
 	}
 	return 0, false
+}
+
+func isTestCardName(name string) bool {
+	for _, part := range strings.FieldsFunc(strings.TrimSpace(name), func(r rune) bool {
+		return r == '-' || r == '_' || r == ' ' || r == '.'
+	}) {
+		if isTestCardSegment(part) {
+			return true
+		}
+	}
+	return false
+}
+
+func isTestCardSegment(value string) bool {
+	return strings.EqualFold(strings.TrimSpace(value), "test")
 }
 
 func dollarsTier(q int64) float64 {

@@ -134,3 +134,23 @@ func TestScratchResetAllowsCaseInsensitiveTestCard(t *testing.T) {
 		t.Fatalf("scratch game should be deleted after reset")
 	}
 }
+
+func TestScratchResetRejectsTestSubstringInNonTestCard(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if _, err := db.Exec(`INSERT INTO cards (card_key, card_name, dollars, total_spins) VALUES (?,?,?,?)`, "scratch-card", "55-act-contest", 55, 0); err != nil {
+		t.Fatal(err)
+	}
+	seedScratchGame(t, "scratch-card", "[1,2]", "[0]", 1, "cashout")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/reset", strings.NewReader(`{"cardKey":"scratch-card"}`))
+	w := httptest.NewRecorder()
+
+	handleScratchReset(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if _, ok := getScratch("scratch-card"); !ok {
+		t.Fatalf("scratch game should not be deleted")
+	}
+}

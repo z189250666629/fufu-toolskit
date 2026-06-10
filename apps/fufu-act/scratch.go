@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
-	"strings"
 )
 
 func handleScratchStart(w http.ResponseWriter, r *http.Request) {
@@ -199,7 +198,7 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{404, "请先登录"}
 		}
-		if !strings.Contains(strings.ToLower(card.CardName), "test") {
+		if !isTestCardName(card.CardName) {
 			return nil, httpErr{403, "仅测试卡可重开"}
 		}
 		if g, ok := getScratch(key); ok && g.Status == "playing" {
