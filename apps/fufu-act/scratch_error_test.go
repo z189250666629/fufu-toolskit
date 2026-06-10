@@ -74,6 +74,57 @@ func TestScratchCashoutReturnsServerErrorWhenUpdateFails(t *testing.T) {
 	}
 }
 
+func TestScratchRevealDoesNotMarkWonWhenCreditEnqueueFails(t *testing.T) {
+	setupScratchLockTestDB(t)
+	seedScratchGame(t, "scratch-card", "[7,8]", "[0,1,2,3,4]", 12, "playing")
+	if _, err := db.Exec(`DROP TABLE credit_queue`); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/reveal", strings.NewReader(`{"cardKey":"scratch-card","cellIndex":5}`))
+	w := httptest.NewRecorder()
+
+	handleScratchReveal(w, req)
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var status string
+	var prize int
+	var revealed string
+	if err := db.QueryRow(`SELECT status,prize_dollars,revealed FROM scratch_games WHERE card_key=?`, "scratch-card").Scan(&status, &prize, &revealed); err != nil {
+		t.Fatal(err)
+	}
+	if status != "playing" || prize != 12 || revealed != "[0,1,2,3,4]" {
+		t.Fatalf("scratch game should be rolled back, status=%q prize=%d revealed=%s", status, prize, revealed)
+	}
+}
+
+func TestScratchCashoutDoesNotMarkCashoutWhenCreditEnqueueFails(t *testing.T) {
+	setupScratchLockTestDB(t)
+	seedScratchGame(t, "scratch-card", "[7,8]", "[0]", 2, "playing")
+	if _, err := db.Exec(`DROP TABLE credit_queue`); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/cashout", strings.NewReader(`{"cardKey":"scratch-card"}`))
+	w := httptest.NewRecorder()
+
+	handleScratchCashout(w, req)
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var status string
+	var prize int
+	if err := db.QueryRow(`SELECT status,prize_dollars FROM scratch_games WHERE card_key=?`, "scratch-card").Scan(&status, &prize); err != nil {
+		t.Fatal(err)
+	}
+	if status != "playing" || prize != 2 {
+		t.Fatalf("scratch cashout should be rolled back, status=%q prize=%d", status, prize)
+	}
+}
+
 func TestScratchCashoutRejectsCorruptRevealedCountWithoutPanic(t *testing.T) {
 	setupScratchLockTestDB(t)
 	seedScratchGame(t, "scratch-card", "[7,8]", "[0,1,2,3,4,5,6]", 15, "playing")

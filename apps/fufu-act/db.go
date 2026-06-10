@@ -61,3 +61,24 @@ func migrateCol(d *sql.DB, table, col, typ string) error {
 	_, err = d.Exec("ALTER TABLE " + table + " ADD COLUMN " + col + " " + typ)
 	return err
 }
+
+func withTx(fn func(*sql.Tx) error) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}

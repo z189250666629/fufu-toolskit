@@ -127,11 +127,19 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 			status = "won"
 		}
 		rb, _ := json.Marshal(revealed)
-		if _, err := db.Exec(`UPDATE scratch_games SET revealed=?, prize_dollars=?, status=? WHERE card_key=?`, string(rb), prize, status, key); err != nil {
-			return nil, err
-		}
 		if status == "won" && prize > 0 {
-			enqueueCredit(key, prize)
+			if err := withTx(func(tx *sql.Tx) error {
+				if _, err := tx.Exec(`UPDATE scratch_games SET revealed=?, prize_dollars=?, status=? WHERE card_key=?`, string(rb), prize, status, key); err != nil {
+					return err
+				}
+				return enqueueCreditWith(tx, key, prize)
+			}); err != nil {
+				return nil, err
+			}
+		} else {
+			if _, err := db.Exec(`UPDATE scratch_games SET revealed=?, prize_dollars=?, status=? WHERE card_key=?`, string(rb), prize, status, key); err != nil {
+				return nil, err
+			}
 		}
 		response := map[string]any{"hit": false, "prize": prize, "status": status, "revealed": revealed}
 		if isScratchGameOver(status) {
@@ -185,11 +193,19 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{400, "刮刮乐进度异常，请重开"}
 		}
-		if _, err := db.Exec(`UPDATE scratch_games SET prize_dollars=?, status='cashout' WHERE card_key=?`, prize, key); err != nil {
-			return nil, err
-		}
 		if prize > 0 {
-			enqueueCredit(key, prize)
+			if err := withTx(func(tx *sql.Tx) error {
+				if _, err := tx.Exec(`UPDATE scratch_games SET prize_dollars=?, status='cashout' WHERE card_key=?`, prize, key); err != nil {
+					return err
+				}
+				return enqueueCreditWith(tx, key, prize)
+			}); err != nil {
+				return nil, err
+			}
+		} else {
+			if _, err := db.Exec(`UPDATE scratch_games SET prize_dollars=?, status='cashout' WHERE card_key=?`, prize, key); err != nil {
+				return nil, err
+			}
 		}
 		return map[string]any{"prize": prize, "status": "cashout", "revealed": revealed, "mines": mines}, nil
 	})

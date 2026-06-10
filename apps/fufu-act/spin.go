@@ -65,6 +65,8 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 				_ = tx.Rollback()
 			}
 		}()
+		newRem := remaining - 1
+		creditPrize := card.TotalWon
 		if sr.Type == "miss" {
 			if _, err := tx.Exec(`UPDATE cards SET used_spins=used_spins+1,last_spin_at=datetime('now') WHERE card_key=?`, key); err != nil {
 				return nil, err
@@ -83,6 +85,12 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 			if _, err := tx.Exec(`INSERT INTO spin_log (card_key,prize_dollars,is_retry) VALUES (?,?,0)`, key, sr.Dollars); err != nil {
 				return nil, err
 			}
+			creditPrize += sr.Dollars
+		}
+		if newRem <= 0 && creditPrize > 0 {
+			if err := enqueueCreditWith(tx, key, creditPrize); err != nil {
+				return nil, err
+			}
 		}
 		if err := tx.Commit(); err != nil {
 			return nil, err
@@ -95,10 +103,7 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{500, "服务器错误"}
 		}
-		newRem := updated.TotalSpins - updated.UsedSpins
-		if newRem <= 0 && updated.TotalWon > 0 {
-			enqueueCredit(key, updated.TotalWon)
-		}
+		newRem = updated.TotalSpins - updated.UsedSpins
 		if sr.Type == "miss" {
 			return map[string]any{"isRetry": false, "isMiss": true, "prize": 0, "remainingSpins": newRem, "totalWon": updated.TotalWon}, nil
 		}
