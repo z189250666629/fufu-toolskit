@@ -8,9 +8,11 @@ import {
   renderPriceCell,
   renderStatusPill
 } from './render_components.js';
+import { modelCellKey } from './model_test_runner.js';
 
 export function renderModelTestAction(cell, stateLike = {}) {
-  const key = `${cell.siteName}\u0000${cell.model}`;
+  const group = cell.groups?.[0] || '';
+  const key = modelCellKey(cell.siteName, cell.model, group);
   const testing = stateLike.testingCells?.has(key);
   const cooldown = formatCooldown(cell.nextTestAllowedAt);
 
@@ -22,7 +24,7 @@ export function renderModelTestAction(cell, stateLike = {}) {
         data-model-test="1"
         data-site="${escapeHtml(cell.siteName)}"
         data-model="${escapeHtml(cell.model)}"
-        data-group="${escapeHtml(cell.groups?.[0] || '')}"
+        data-group="${escapeHtml(group)}"
         ${testing || Boolean(cooldown) ? 'disabled' : ''}
       >${testing ? '测试中' : (cooldown || '测试')}</button>
     </div>

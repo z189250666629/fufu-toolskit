@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { renderModelTableRows } from './render_model_table.js';
+import { modelCellKey } from './model_test_runner.js';
 
 test('renderModelTableRows renders escaped rows with test actions', () => {
   const html = renderModelTableRows([
@@ -18,7 +19,7 @@ test('renderModelTableRows renders escaped rows with test actions', () => {
         lastSuccessAt: 1760000000
       }
     }
-  ], { testingCells: new Set(['site\u0000<gpt-4>']) });
+  ], { testingCells: new Set([modelCellKey('site', '<gpt-4>', 'vip')]) });
 
   assert.match(html, /class="is-manual-ok"/);
   assert.match(html, /&lt;gpt-4&gt;/);

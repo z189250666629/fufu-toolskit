@@ -7,9 +7,10 @@ import {
   renderModelTestAction,
   renderTokenGroupSelect
 } from './render_models.js';
+import { modelCellKey } from './model_test_runner.js';
 
 test('renderModelTestAction reflects testing state and cooldown', () => {
-  const key = 'site\u0000model-a';
+  const key = modelCellKey('site', 'model-a', 'vip');
   const html = renderModelTestAction(
     { siteName: 'site', model: 'model-a', groups: ['vip'] },
     { testingCells: new Set([key]) }
