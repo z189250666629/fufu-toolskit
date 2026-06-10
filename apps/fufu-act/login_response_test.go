@@ -25,6 +25,9 @@ func TestRespondCardReturns500WhenHistoryQueryFails(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
+	if !strings.Contains(w.Body.String(), "服务器错误") || strings.Contains(w.Body.String(), "database is closed") {
+		t.Fatalf("history error should be masked, body=%s", w.Body.String())
+	}
 }
 
 func TestRespondCardPreservesHistoryAndSpinPayload(t *testing.T) {

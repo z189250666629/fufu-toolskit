@@ -30,12 +30,12 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if !ok {
 		if tokenSvc == nil {
-			writeJSONError(w, 503, "NewAPI 未配置: "+errString(tokenConfigErr))
+			writeJSONError(w, 503, "NewAPI 未配置")
 			return
 		}
 		t, err := tokenSvc.SearchTokenByKey(r.Context(), key)
 		if err != nil {
-			writeJSONError(w, 500, err.Error())
+			writeJSONError(w, 500, "服务器错误")
 			return
 		}
 		if t == nil {
@@ -74,7 +74,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		total := spinMap[dollars]
 		_, err = db.Exec(`INSERT INTO cards (card_key,card_name,dollars,total_spins,source,purchase_time) VALUES (?,?,?,?,?,?)`, key, t.Name, dollars, total, source, nullString(purchaseTime))
 		if err != nil {
-			writeJSONError(w, 500, err.Error())
+			writeJSONError(w, 500, "服务器错误")
 			return
 		}
 		card, ok, lookupErr = lookupCard(key)
@@ -89,7 +89,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 func respondCard(w http.ResponseWriter, card Card) {
 	hist, err := loadSpinHistory(card.CardKey)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "服务器错误")
 		return
 	}
 	isScratch := isScratchDollarTier(card.Dollars)
