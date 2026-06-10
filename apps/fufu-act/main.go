@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -33,6 +34,10 @@ var mcyCookie string
 var spinMap = activity.DefaultSpinMap()
 var prizePool = activity.DefaultPrizePool()
 var scratchRewards = activity.DefaultScratchRewards()
+
+var startCreditWorker = func() {
+	go creditWorker()
+}
 
 const scratchMines = activity.ScratchMines
 const scratchMaxReveals = activity.ScratchMaxReveals
@@ -78,16 +83,26 @@ func run(wd, portValue string) error {
 	if db != nil {
 		defer db.Close()
 	}
-	go creditWorker()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/", apiRoute)
 	mux.HandleFunc("/", staticRoute)
 	fmt.Printf("fufu-act Go backend listening on :%s\n", port)
-	return serve(port, mux)
+	return serveAfterListen(port, mux, startCreditWorker)
 }
 
 func serve(port string, handler http.Handler) error {
-	return newHTTPServer(port, handler).ListenAndServe()
+	return serveAfterListen(port, handler, nil)
+}
+
+func serveAfterListen(port string, handler http.Handler, afterListen func()) error {
+	listener, err := net.Listen("tcp", "0.0.0.0:"+port)
+	if err != nil {
+		return err
+	}
+	if afterListen != nil {
+		afterListen()
+	}
+	return newHTTPServer(port, handler).Serve(listener)
 }
 
 func newHTTPServer(port string, handler http.Handler) *http.Server {

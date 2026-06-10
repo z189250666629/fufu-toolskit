@@ -146,6 +146,43 @@ func TestRunRejectsInvalidPortBeforeInit(t *testing.T) {
 	}
 }
 
+func TestRunDoesNotStartCreditWorkerWhenListenFails(t *testing.T) {
+	oldRoot := rootDir
+	oldDB := db
+	oldStartCreditWorker := startCreditWorker
+	t.Cleanup(func() {
+		if db != nil && db != oldDB {
+			_ = db.Close()
+		}
+		rootDir = oldRoot
+		db = oldDB
+		startCreditWorker = oldStartCreditWorker
+	})
+	tmp := t.TempDir()
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := false
+	startCreditWorker = func() {
+		started = true
+	}
+
+	err = run(tmp, port)
+
+	if err == nil {
+		t.Fatal("run should return listen errors")
+	}
+	if started {
+		t.Fatal("credit worker should not start when the HTTP listener cannot bind")
+	}
+}
+
 func TestHTTPServerHasTimeouts(t *testing.T) {
 	server := newHTTPServer("18820", http.NewServeMux())
 	if server.Addr != "0.0.0.0:18820" {
