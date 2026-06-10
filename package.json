@@ -16,8 +16,9 @@
     "start:y2k": "npm --prefix apps/y2k-nav start",
     "test:y2k": "npm --prefix apps/y2k-nav test",
     "test:scripts": "node --test scripts/*.test.mjs",
+    "test:workspace": "go test .",
     "test:shared": "go test ./packages/go/fufu/...",
-    "test": "npm run test:shared && npm run test:network && npm run test:act && npm run test:y2k && npm run test:scripts"
+    "test": "npm run test:workspace && npm run test:shared && npm run test:network && npm run test:act && npm run test:y2k && npm run test:scripts"
   },
   "engines": {
     "node": ">=20"
