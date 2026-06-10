@@ -37,14 +37,13 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, 404, "卡密不存在")
 			return
 		}
-		isActTest := strings.Contains(t.Name, "-act-") && strings.Contains(t.Name, "test")
 		dollars := 0.0
 		source := "shop"
 		purchaseTime := ""
 		createdInRange := false
+		actTestDollars, isActTest := parseActTestTokenName(t.Name)
 		if isActTest {
-			parts := strings.Split(t.Name, "-act-")
-			dollars, _ = strconv.ParseFloat(parts[0], 64)
+			dollars = actTestDollars
 			source = "act"
 			createdInRange = true
 		} else {
@@ -122,6 +121,25 @@ func nullString(s string) any {
 		return nil
 	}
 	return s
+}
+
+func parseActTestTokenName(name string) (float64, bool) {
+	prefix, suffix, ok := strings.Cut(strings.TrimSpace(name), "-act-")
+	if !ok {
+		return 0, false
+	}
+	dollars, err := strconv.ParseFloat(strings.TrimSpace(prefix), 64)
+	if err != nil || dollars <= 0 {
+		return 0, false
+	}
+	for _, part := range strings.FieldsFunc(suffix, func(r rune) bool {
+		return r == '-' || r == '_' || r == ' ' || r == '.'
+	}) {
+		if strings.EqualFold(part, "test") {
+			return dollars, true
+		}
+	}
+	return 0, false
 }
 
 func dollarsTier(q int64) float64 {
