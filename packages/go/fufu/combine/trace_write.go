@@ -62,7 +62,7 @@ func (a *App) setTraceRollback(ctx context.Context, mergeID int64, succeeded boo
 		UPDATE merge_records
 		SET rollback_attempted = 1, rollback_succeeded = ?, rollback_note = ?, updated_at = ?
 		WHERE id = ?
-	`, boolInt(succeeded), note, time.Now().UnixMilli(), mergeID); err != nil {
+	`, boolInt(succeeded), redactTraceDiagnostic(note), time.Now().UnixMilli(), mergeID); err != nil {
 		log.Printf("trace rollback update failed: %v", err)
 	}
 }
@@ -98,7 +98,7 @@ func (a *App) finishTrace(ctx context.Context, mergeID int64, status, errText st
 		UPDATE merge_records
 		SET status = ?, error = ?, updated_at = ?, completed_at = ?
 		WHERE id = ?
-	`, status, errText, now, now, mergeID); err != nil {
+	`, status, redactTraceDiagnostic(errText), now, now, mergeID); err != nil {
 		log.Printf("trace finish update failed: %v", err)
 	}
 }
@@ -139,7 +139,7 @@ func (a *App) setTraceTokenDeleteResult(ctx context.Context, mergeID int64, toke
 		UPDATE merge_tokens
 		SET delete_ok = ?, delete_error = ?, updated_at = ?
 		WHERE merge_id = ? AND kind = 'source' AND key_hash = ?
-	`, boolInt(ok), errText, time.Now().UnixMilli(), mergeID, key.hash); err != nil {
+	`, boolInt(ok), redactTraceDiagnostic(errText), time.Now().UnixMilli(), mergeID, key.hash); err != nil {
 		log.Printf("trace token delete update failed: %v", err)
 	}
 }

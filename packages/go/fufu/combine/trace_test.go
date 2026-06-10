@@ -159,6 +159,46 @@ func TestGeneratedTokenCacheDoesNotPersistRawJSONOrFullKey(t *testing.T) {
 	}
 }
 
+func TestTraceDiagnosticFieldsRedactSecretsBeforePersisting(t *testing.T) {
+	ctx := context.Background()
+	app := newTraceTestApp(t)
+	mergeID, err := app.createMergeTrace(ctx, "job-diagnostic-redaction", RoleUser, 60)
+	if err != nil {
+		t.Fatalf("createMergeTrace: %v", err)
+	}
+	source := ResolvedToken{ID: 222, Key: "sk-source-secret-1234567890", Name: "source", RemainQuota: 10, Status: 1}
+	if err := app.upsertTraceToken(ctx, mergeID, "source", source); err != nil {
+		t.Fatalf("upsertTraceToken: %v", err)
+	}
+	rawDiagnostic := "Get https://internal.example.local/api/token/search?keyword=&token=source-secret-1234567890&p=0: Authorization: Bearer upstream-secret-token failed for sk-source-secret-1234567890"
+
+	app.finishTrace(ctx, mergeID, "error", rawDiagnostic)
+	app.setTraceRollback(ctx, mergeID, false, rawDiagnostic)
+	app.setTraceTokenDeleteResult(ctx, mergeID, source, false, rawDiagnostic)
+
+	var traceError, rollbackNote, deleteError string
+	if err := app.db.QueryRowContext(ctx, `SELECT error, rollback_note FROM merge_records WHERE id = ?`, mergeID).Scan(&traceError, &rollbackNote); err != nil {
+		t.Fatalf("query merge diagnostics: %v", err)
+	}
+	if err := app.db.QueryRowContext(ctx, `SELECT delete_error FROM merge_tokens WHERE merge_id = ? AND kind = 'source'`, mergeID).Scan(&deleteError); err != nil {
+		t.Fatalf("query token diagnostics: %v", err)
+	}
+	for name, value := range map[string]string{
+		"error":         traceError,
+		"rollback_note": rollbackNote,
+		"delete_error":  deleteError,
+	} {
+		for _, leaked := range []string{"sk-source-secret-1234567890", "source-secret-1234567890", "internal.example.local", "upstream-secret-token"} {
+			if strings.Contains(value, leaked) {
+				t.Fatalf("%s persisted sensitive diagnostic %q in %q", name, leaked, value)
+			}
+		}
+		if !strings.Contains(value, "sk-sour…7890") {
+			t.Fatalf("%s should keep masked key context, got %q", name, value)
+		}
+	}
+}
+
 func TestGeneratedTokenCacheIgnoresUnserializableRawSnapshot(t *testing.T) {
 	ctx := context.Background()
 	app := newTraceTestApp(t)
