@@ -17,6 +17,9 @@ func loadSiteLogs(site newapi.Site, typ int, start, end int64) ([]LogRow, string
 			res := newAPIGet(context.Background(), site, logPathForPage(p, typ, start, end, page), 12*time.Second)
 			if !res.OK {
 				last = res.Error
+				if len(rows) > 0 {
+					return rows, last
+				}
 				break
 			}
 			before := len(rows)
