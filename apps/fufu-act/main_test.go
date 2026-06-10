@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fufu/tokens"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -59,6 +60,72 @@ func TestStaticRouteServesPublicIndex(t *testing.T) {
 	}
 	if got := w.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("Cache-Control = %q", got)
+	}
+}
+
+func TestInitAllResetsTokenConfigStateOnPrimarySiteError(t *testing.T) {
+	oldRoot := rootDir
+	oldDB := db
+	oldTokenSvc := tokenSvc
+	oldTokenConfigErr := tokenConfigErr
+	tempRoot := t.TempDir()
+	t.Cleanup(func() {
+		if db != nil && db != oldDB {
+			_ = db.Close()
+		}
+		rootDir = oldRoot
+		db = oldDB
+		tokenSvc = oldTokenSvc
+		tokenConfigErr = oldTokenConfigErr
+	})
+	clearActPrimaryEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `not-json`)
+	rootDir = tempRoot
+	tokenSvc = &tokens.Service{}
+	tokenConfigErr = nil
+
+	if err := initAll(); err != nil {
+		t.Fatal(err)
+	}
+	if tokenSvc != nil {
+		t.Fatalf("tokenSvc should be reset on config error, got %#v", tokenSvc)
+	}
+	if tokenConfigErr == nil || !strings.Contains(tokenConfigErr.Error(), "NEWAPI_MANAGED_API_SITES 不是有效 JSON") {
+		t.Fatalf("tokenConfigErr = %v", tokenConfigErr)
+	}
+}
+
+func clearActPrimaryEnv(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{
+		"FUFU_COMBINE_API_URL",
+		"FUFU_COMBINE_API_TOKEN",
+		"FUFU_COMBINE_USER_ID",
+		"FUFU_COMBINE_QUOTA_UNIT",
+		"FUFU_COMBINE_NAME",
+		"FUFU_API_BASE_URL",
+		"FUFU_API_TOKEN",
+		"FUFU_API_USER_ID",
+		"FUFU_QUOTA_UNIT",
+		"NEWAPI_API_SITE_URL",
+		"NEWAPI_API_SITE_TOKEN",
+		"NEWAPI_API_SITE_ACCESS_TOKEN",
+		"NEWAPI_TOKEN_SITE_URL",
+		"NEWAPI_TOKEN_SITE_TOKEN",
+		"NEWAPI_TOKEN_SITE_ACCESS_TOKEN",
+		"NEWAPI_MANAGED_API_SITES",
+		"NEWAPI_MANAGED_API_CONFIG",
+	} {
+		t.Setenv(name, "")
+	}
+	for i := 1; i <= 10; i++ {
+		prefix := "NEWAPI_MANAGED_SITE_" + string(rune('0'+i))
+		if i == 10 {
+			prefix = "NEWAPI_MANAGED_SITE_10"
+		}
+		t.Setenv(prefix+"_URL", "")
+		t.Setenv(prefix+"_TOKEN", "")
+		t.Setenv(prefix+"_ACCESS_TOKEN", "")
 	}
 }
 

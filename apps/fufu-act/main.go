@@ -77,6 +77,8 @@ func main() {
 	panic(http.ListenAndServe("0.0.0.0:"+port, mux))
 }
 func initAll() error {
+	tokenSvc = nil
+	tokenConfigErr = nil
 	var err error
 	db, err = initDB(filepath.Join(rootDir, "data", "slot.db"))
 	if err != nil {
