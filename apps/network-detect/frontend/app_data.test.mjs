@@ -7,7 +7,7 @@ import {
 } from './app_data.js';
 
 test('loadStaticContextState stores client and target groups with fallbacks', async () => {
-  const state = { client: null, targets: [] };
+  const state = { client: null, targets: [], connectivityTargetError: 'old error' };
   const calls = [];
 
   await loadStaticContextState(state, async (path) => {
@@ -20,10 +20,11 @@ test('loadStaticContextState stores client and target groups with fallbacks', as
   assert.deepEqual(calls.sort(), ['/api/client', '/api/connectivity/targets'].sort());
   assert.deepEqual(state.client, { ip: '127.0.0.1' });
   assert.deepEqual(state.targets, [{ id: 'api', urls: ['https://api.test'] }]);
+  assert.equal(state.connectivityTargetError, '');
 });
 
 test('loadStaticContextState tolerates failed optional requests', async () => {
-  const state = { client: { old: true }, targets: [{ old: true }] };
+  const state = { client: { old: true }, targets: [{ old: true }], connectivityTargetError: '' };
 
   await loadStaticContextState(state, async () => {
     throw new Error('offline');
@@ -31,6 +32,21 @@ test('loadStaticContextState tolerates failed optional requests', async () => {
 
   assert.equal(state.client, null);
   assert.deepEqual(state.targets, []);
+  assert.equal(state.connectivityTargetError, 'offline');
+});
+
+test('loadStaticContextState records connectivity targets error without losing client context', async () => {
+  const state = { client: null, targets: [{ old: true }], connectivityTargetError: '' };
+
+  await loadStaticContextState(state, async (path) => {
+    if (path === '/api/client') return { ip: '127.0.0.1' };
+    if (path === '/api/connectivity/targets') throw new Error('CONNECTIVITY_TARGETS 不是有效 JSON');
+    throw new Error(`unexpected ${path}`);
+  });
+
+  assert.deepEqual(state.client, { ip: '127.0.0.1' });
+  assert.deepEqual(state.targets, []);
+  assert.equal(state.connectivityTargetError, 'CONNECTIVITY_TARGETS 不是有效 JSON');
 });
 
 test('loadModelStatusState sets loading, clears errors and stores status', async () => {

@@ -70,7 +70,7 @@ export function renderMonitorPanel({
           ${renderPanelToggle(state.activePanel)}
         </div>
         <div class="monitor-content" data-slot="card-content">
-          ${state.activePanel === 'url' ? renderUrlStatus({ connectivity: state.connectivity, groups, panelMotionClass }) : renderModelAvailability({ state, panelMotionClass, scopeMotionClass })}
+          ${state.activePanel === 'url' ? renderUrlStatus({ connectivity: state.connectivity, groups, connectivityTargetError: state.connectivityTargetError, panelMotionClass }) : renderModelAvailability({ state, panelMotionClass, scopeMotionClass })}
         </div>
       </div>
     </section>

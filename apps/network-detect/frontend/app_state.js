@@ -12,6 +12,7 @@ export function createInitialAppState() {
     testingCells: new Set(),
     client: null,
     targets: [],
+    connectivityTargetError: '',
     connectivity: {
       running: false,
       mode: 'pending',

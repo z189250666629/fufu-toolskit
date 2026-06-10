@@ -56,3 +56,29 @@ test('renderUrlStatus renders progress and action state', () => {
   assert.match(html, /disabled/);
   assert.match(html, /采样中/);
 });
+
+test('renderUrlStatus surfaces connectivity target load errors', () => {
+  const html = renderUrlStatus({
+    connectivity: {
+      mode: 'pending',
+      tone: '',
+      icon: '?',
+      title: '等待测试',
+      text: '准备',
+      success: '-',
+      testedAt: '-',
+      running: false,
+      results: [],
+      progressText: '尚未开始',
+      progress: 0,
+      currentUrl: '-'
+    },
+    groups,
+    connectivityTargetError: 'CONNECTIVITY_TARGETS <bad> 不是有效 JSON'
+  });
+
+  assert.match(html, /role="alert"/);
+  assert.match(html, /连通性目标配置读取失败/);
+  assert.match(html, /将使用内置默认目标/);
+  assert.match(html, /CONNECTIVITY_TARGETS &lt;bad&gt; 不是有效 JSON/);
+});

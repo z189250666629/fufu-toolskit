@@ -45,7 +45,8 @@ test('renderMonitorPanel delegates to active panel renderer', () => {
         progressText: '尚未开始',
         progress: 0,
         currentUrl: '-'
-      }
+      },
+      connectivityTargetError: 'targets failed'
     },
     groups: [{ id: 'api', name: 'API', urls: ['https://api.test'] }],
     panelMotionClass: ' motion-enter'
@@ -53,6 +54,7 @@ test('renderMonitorPanel delegates to active panel renderer', () => {
 
   assert.match(urlHtml, /当前浏览器网络的 URL 连通性/);
   assert.match(urlHtml, /id="urlPanel"/);
+  assert.match(urlHtml, /targets failed/);
 
   const modelHtml = renderMonitorPanel({
     state: {

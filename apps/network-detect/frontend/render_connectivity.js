@@ -2,6 +2,7 @@ import {
   escapeHtml
 } from './utils.js';
 import {
+  renderAlert,
   renderChip,
   renderMetric
 } from './render_components.js';
@@ -62,8 +63,11 @@ export function renderConnectivityResults({ results = [], groups = [] }) {
   }).join('');
 }
 
-export function renderUrlStatus({ connectivity, groups, panelMotionClass = '' }) {
+export function renderUrlStatus({ connectivity, groups, connectivityTargetError = '', panelMotionClass = '' }) {
   const current = connectivity;
+  const targetErrorAlert = connectivityTargetError
+    ? renderAlert(`连通性目标配置读取失败：${connectivityTargetError}。将使用内置默认目标。`, 'danger', 'connectivity-target-alert')
+    : '';
   return `
     <div class="url-monitor-grid${panelMotionClass}" id="urlPanel" role="tabpanel" aria-labelledby="urlTab" data-slot="tab-panel">
       <article class="verdict-card ${escapeHtml(current.mode)}" id="verdictCard" data-slot="card">
@@ -74,6 +78,7 @@ export function renderUrlStatus({ connectivity, groups, panelMotionClass = '' })
             <p id="verdictText" data-slot="card-description">${escapeHtml(current.text)}</p>
           </div>
           <div class="verdict-main" data-slot="card-content">
+          ${targetErrorAlert}
           <div class="connectivity-metrics">
             ${renderMetric('可达率', current.success, '固定 Base URL', '')}
             ${renderMetric('最后测试', current.testedAt, '当前浏览器网络', '')}
