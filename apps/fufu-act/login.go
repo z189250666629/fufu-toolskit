@@ -37,6 +37,10 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, 404, "卡密不存在")
 			return
 		}
+		if t.Status != 1 {
+			writeJSONError(w, 403, "此卡密已被禁用，无法参与活动")
+			return
+		}
 		dollars := 0.0
 		source := "shop"
 		purchaseTime := ""
