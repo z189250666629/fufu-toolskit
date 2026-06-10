@@ -75,3 +75,25 @@ test('history refresh marks stale state without clearing previous rows', async (
   assert.doesNotMatch(refreshSource, /if \(res\.ok\) \{\s*const data = await res\.json\(\);/);
   assert.doesNotMatch(refreshSource, /catch \(e\) \{ \/\* silent \*\/ \}/);
 });
+
+test('scratch API calls do not expose server 5xx error fields', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const scratchSource = source.slice(
+    source.indexOf('async function startScratchGame()'),
+    source.indexOf('/* ============================================================\n       Login icon mini reels'),
+  );
+  const slices = [
+    scratchSource.slice(scratchSource.indexOf('async function startScratchGame()'), scratchSource.indexOf('function shuffleUnrevealed()')),
+    scratchSource.slice(scratchSource.indexOf('async function revealCell'), scratchSource.indexOf("$('btn-scratch-cashout').onclick")),
+    scratchSource.slice(scratchSource.indexOf("$('btn-scratch-cashout').onclick"), scratchSource.indexOf("$('btn-scratch-reset').onclick")),
+    scratchSource.slice(scratchSource.indexOf("$('btn-scratch-reset').onclick")),
+  ];
+
+  assert.match(source, /function readScratchApi\(res,\s*serverErrorMessage,\s*clientErrorMessage\)/);
+  for (const slice of slices) {
+    assert.match(slice, /readScratchApi\(res,\s*'/);
+    assert.doesNotMatch(slice, /await res\.json\(\)/);
+    assert.doesNotMatch(slice, /\$\('scratch-progress'\)\.textContent = data\.error \|\|/);
+    assert.doesNotMatch(slice, /\$\('scratch-progress'\)\.textContent = '网络错误'/);
+  }
+});

@@ -1730,15 +1730,15 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardKey: currentCardKey }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          $('scratch-progress').textContent = data.error || '启动失败';
-          return;
-        }
+        const data = await readScratchApi(res, '刮刮乐启动失败，请稍后重试', '启动失败');
         renderScratchState(data);
       } catch (e) {
-        $('scratch-progress').textContent = '网络错误';
+        $('scratch-progress').textContent = activityApi.safeErrorMessage(e, '刮刮乐启动失败，请稍后重试');
       }
+    }
+
+    function readScratchApi(res, serverErrorMessage, clientErrorMessage) {
+      return activityApi.readApiJson(res, { serverErrorMessage, clientErrorMessage });
     }
 
     function shuffleUnrevealed() {
@@ -1866,12 +1866,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardKey: currentCardKey, cellIndex: idx }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          $('scratch-progress').textContent = data.error || '操作失败';
-          scratchBusy = false;
-          return;
-        }
+        const data = await readScratchApi(res, '刮格失败，请稍后重试', '操作失败');
 
         if (data.hit) {
           renderScratchState(data);
@@ -1896,7 +1891,7 @@
           }
         }
       } catch (e) {
-        $('scratch-progress').textContent = '网络错误';
+        $('scratch-progress').textContent = activityApi.safeErrorMessage(e, '刮格失败，请稍后重试');
       }
       scratchBusy = false;
     }
@@ -1911,19 +1906,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardKey: currentCardKey }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          $('scratch-progress').textContent = data.error || '结算失败';
-          scratchBusy = false;
-          return;
-        }
+        const data = await readScratchApi(res, '结算失败，请稍后重试', '结算失败');
         renderScratchState(data);
         emitGridCorners({
           count: 80,
           palette: ['#f4d837', '#fff04d', '#00d4d4', '#4cc24f'],
         });
       } catch (e) {
-        $('scratch-progress').textContent = '网络错误';
+        $('scratch-progress').textContent = activityApi.safeErrorMessage(e, '结算失败，请稍后重试');
       }
       scratchBusy = false;
     };
@@ -1938,18 +1928,13 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardKey: currentCardKey }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          $('scratch-progress').textContent = data.error || '重置失败';
-          scratchBusy = false;
-          return;
-        }
+        await readScratchApi(res, '重置失败，请稍后重试', '重置失败');
         scratchPosMap = [0,1,2,3,4,5,6,7,8];
         scratchRevealed = [];
         scratchMines = [];
         await startScratchGame();
       } catch (e) {
-        $('scratch-progress').textContent = '网络错误';
+        $('scratch-progress').textContent = activityApi.safeErrorMessage(e, '重置失败，请稍后重试');
       }
       scratchBusy = false;
     };
