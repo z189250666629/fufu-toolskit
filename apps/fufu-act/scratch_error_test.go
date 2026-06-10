@@ -18,6 +18,9 @@ func makeScratchDBReadOnlyForTest(t *testing.T) {
 
 func seedScratchGame(t *testing.T, key string, minePos string, revealed string, prize int, status string) {
 	t.Helper()
+	if _, err := db.Exec(`INSERT OR IGNORE INTO cards (card_key, card_name, dollars, total_spins) VALUES (?,?,?,?)`, key, "scratch-test", 55, 0); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := db.Exec(`INSERT INTO scratch_games (card_key, mine_pos, revealed, prize_dollars, status) VALUES (?,?,?,?,?)`, key, minePos, revealed, prize, status); err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +84,29 @@ func TestScratchRevealRejectsCorruptMinePositions(t *testing.T) {
 	}
 }
 
+func TestScratchRevealRequiresEligibleScratchCard(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if _, err := db.Exec(`INSERT INTO scratch_games (card_key, mine_pos, revealed, prize_dollars, status) VALUES (?,?,?,?,?)`, "orphan-scratch", "[7,8]", "[]", 0, "playing"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/reveal", strings.NewReader(`{"cardKey":"orphan-scratch","cellIndex":0}`))
+	w := httptest.NewRecorder()
+
+	handleScratchReveal(w, req)
+
+	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "请先登录") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var status, revealed string
+	if err := db.QueryRow(`SELECT status,revealed FROM scratch_games WHERE card_key=?`, "orphan-scratch").Scan(&status, &revealed); err != nil {
+		t.Fatal(err)
+	}
+	if status != "playing" || revealed != "[]" {
+		t.Fatalf("ineligible scratch should not mutate game, status=%q revealed=%s", status, revealed)
+	}
+}
+
 func TestScratchCashoutReturnsServerErrorWhenUpdateFails(t *testing.T) {
 	setupScratchLockTestDB(t)
 	seedScratchGame(t, "scratch-card", "[7,8]", "[0]", 2, "playing")
@@ -114,6 +140,31 @@ func TestScratchCashoutRejectsCorruptRevealedJSON(t *testing.T) {
 	}
 	if status != "playing" {
 		t.Fatalf("corrupt revealed JSON should not cash out, status=%q", status)
+	}
+}
+
+func TestScratchCashoutRequiresEligibleScratchCard(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if _, err := db.Exec(`INSERT INTO cards (card_key, card_name, dollars, total_spins) VALUES (?,?,?,?)`, "near-scratch-card", "near scratch", 55.4, 0); err != nil {
+		t.Fatal(err)
+	}
+	seedScratchGame(t, "near-scratch-card", "[7,8]", "[0]", 2, "playing")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/cashout", strings.NewReader(`{"cardKey":"near-scratch-card"}`))
+	w := httptest.NewRecorder()
+
+	handleScratchCashout(w, req)
+
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "不参与刮刮乐") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var status string
+	var prize int
+	if err := db.QueryRow(`SELECT status,prize_dollars FROM scratch_games WHERE card_key=?`, "near-scratch-card").Scan(&status, &prize); err != nil {
+		t.Fatal(err)
+	}
+	if status != "playing" || prize != 2 {
+		t.Fatalf("ineligible scratch should not cash out, status=%q prize=%d", status, prize)
 	}
 }
 

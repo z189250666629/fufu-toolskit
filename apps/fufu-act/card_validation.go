@@ -21,3 +21,20 @@ func requireCurrentTokenActive(ctx context.Context, key string) error {
 	}
 	return nil
 }
+
+func requireScratchEligibleCard(ctx context.Context, key string) (Card, error) {
+	card, ok, err := lookupCard(key)
+	if err != nil {
+		return Card{}, err
+	}
+	if !ok {
+		return Card{}, httpErr{http.StatusNotFound, "请先登录"}
+	}
+	if err := requireCurrentTokenActive(ctx, key); err != nil {
+		return Card{}, err
+	}
+	if !isScratchDollarTier(card.Dollars) {
+		return Card{}, httpErr{http.StatusForbidden, "此卡密不参与刮刮乐活动"}
+	}
+	return card, nil
+}

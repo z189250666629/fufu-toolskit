@@ -100,6 +100,9 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		if g.Status != "playing" {
 			return nil, httpErr{403, "游戏已结束"}
 		}
+		if _, err := requireScratchEligibleCard(r.Context(), key); err != nil {
+			return nil, err
+		}
 		revealed, err := parseScratchIntArray(g.Revealed)
 		if err != nil {
 			return nil, err
@@ -186,6 +189,9 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 		}
 		if g.Status != "playing" {
 			return nil, httpErr{403, "游戏已结束"}
+		}
+		if _, err := requireScratchEligibleCard(r.Context(), key); err != nil {
+			return nil, err
 		}
 		revealed, err := parseScratchIntArray(g.Revealed)
 		if err != nil {
