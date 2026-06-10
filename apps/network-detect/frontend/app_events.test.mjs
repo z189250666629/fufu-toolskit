@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  bindActivatableTabs,
   bindAppEvents,
   nextTokenGroupOptionIndex as nextTokenGroupOptionIndexFromAppEvents
 } from './app_events.js';
@@ -11,6 +12,40 @@ import {
 
 test('app events re-exports token group option navigation helper', () => {
   assert.equal(nextTokenGroupOptionIndexFromAppEvents, nextTokenGroupOptionIndex);
+});
+
+test('bindActivatableTabs wires click activation and keyboard activation', () => {
+  const calls = [];
+  const focused = [];
+  const prevented = [];
+  const listeners = new Map();
+  const buttons = [
+    { dataset: { panel: '' }, name: 'fallback' },
+    { dataset: { panel: 'models' }, name: 'models' }
+  ].map((button) => ({
+    ...button,
+    addEventListener: (type, handler) => listeners.set(`${button.name}:${type}`, handler),
+    closest: () => ({ querySelectorAll: () => buttons }),
+    focus: () => focused.push(button.name)
+  }));
+
+  bindActivatableTabs({
+    buttons,
+    selector: '[data-panel]',
+    fallbackValue: 'url',
+    getValue: (button) => button.dataset.panel,
+    activate: (...args) => calls.push(args)
+  });
+
+  listeners.get('fallback:click')();
+  listeners.get('fallback:keydown')({
+    key: 'ArrowRight',
+    preventDefault: () => prevented.push('prevented')
+  });
+
+  assert.deepEqual(calls, [['url'], ['models', true]]);
+  assert.deepEqual(prevented, ['prevented']);
+  assert.deepEqual(focused, ['models']);
 });
 
 test('bindAppEvents lets token group options move focus with arrow keys', () => {

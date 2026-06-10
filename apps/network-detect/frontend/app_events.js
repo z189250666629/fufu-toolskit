@@ -12,6 +12,24 @@ export { nextTokenGroupOptionIndex } from './app_event_keys.js';
 
 let filterRenderTimer = null;
 
+export function bindActivatableTabs({
+  buttons,
+  selector,
+  fallbackValue,
+  getValue,
+  activate
+}) {
+  buttons.forEach((button) => {
+    const valueFor = (item) => getValue(item) || fallbackValue;
+    button.addEventListener('click', () => {
+      activate(valueFor(button));
+    });
+    bindTabKeyboard(button, selector, (nextTab) => {
+      activate(valueFor(nextTab), true);
+    });
+  });
+}
+
 export function bindAppEvents({
   documentRef = document,
   windowRef = window,
@@ -46,13 +64,12 @@ export function bindAppEvents({
 
   runConnectivityBtn?.addEventListener('click', runConnectivityTests);
 
-  documentRef.querySelectorAll('[data-model-site]').forEach((button) => {
-    button.addEventListener('click', () => {
-      activateModelSiteTab(button.dataset.modelSite || '次数fufu');
-    });
-    bindTabKeyboard(button, '[data-model-site]', (nextTab) => {
-      activateModelSiteTab(nextTab.dataset.modelSite || '次数fufu', true);
-    });
+  bindActivatableTabs({
+    buttons: documentRef.querySelectorAll('[data-model-site]'),
+    selector: '[data-model-site]',
+    fallbackValue: '次数fufu',
+    getValue: (button) => button.dataset.modelSite,
+    activate: activateModelSiteTab
   });
 
   bindTokenGroupSelectEvents({
@@ -62,13 +79,12 @@ export function bindAppEvents({
     renderWithMotion
   });
 
-  toggleButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      activatePanelTab(button.dataset.panel || 'url');
-    });
-    bindTabKeyboard(button, '[data-panel]', (nextTab) => {
-      activatePanelTab(nextTab.dataset.panel || 'url', true);
-    });
+  bindActivatableTabs({
+    buttons: toggleButtons,
+    selector: '[data-panel]',
+    fallbackValue: 'url',
+    getValue: (button) => button.dataset.panel,
+    activate: activatePanelTab
   });
 
   appElement.querySelectorAll('[data-model-test]').forEach((button) => {
