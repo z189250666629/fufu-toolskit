@@ -17,6 +17,9 @@ func (a *App) cleanMergeJobs() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for id, job := range a.mergeJobs {
+		if !isTerminalMergeJobStatus(job.Status) {
+			continue
+		}
 		base := time.UnixMilli(job.CreatedAt)
 		if job.UpdatedAt != 0 {
 			base = time.UnixMilli(job.UpdatedAt)
@@ -25,6 +28,10 @@ func (a *App) cleanMergeJobs() {
 			delete(a.mergeJobs, id)
 		}
 	}
+}
+
+func isTerminalMergeJobStatus(status string) bool {
+	return status == "done" || status == "error"
 }
 
 func (a *App) setMergeJob(jobID string, p MergeJobPatch) {
