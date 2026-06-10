@@ -192,6 +192,13 @@ test('docker context excludes non-production static assets from runtime app root
       assert.equal(patterns.includes(pattern), true, `.dockerignore should exclude ${pattern}`);
     }
   }
+  for (const pattern of [
+    'apps/**/*.test.*',
+    'apps/**/*_test.go',
+    'scripts/*.test.mjs'
+  ]) {
+    assert.equal(patterns.includes(pattern), true, `.dockerignore should exclude ${pattern}`);
+  }
 });
 
 test('repo docs and agent instructions do not recommend cache-prone Go tests', async () => {

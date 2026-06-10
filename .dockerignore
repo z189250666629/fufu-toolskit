@@ -13,6 +13,9 @@ apps/**/data/*.db*
 *.temp
 apps/**/dist
 apps/**/build
+apps/**/*.test.*
+apps/**/*_test.go
+scripts/*.test.mjs
 apps/network-detect/frontend/*.test.*
 apps/network-detect/frontend/**/*.test.*
 apps/network-detect/frontend/.*
