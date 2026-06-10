@@ -27,21 +27,19 @@ type Site struct {
 }
 
 type PublicSite struct {
-	Name                string  `json:"name"`
-	URL                 string  `json:"url,omitempty"`
-	DisplayURL          string  `json:"displayUrl"`
-	UserID              string  `json:"userId"`
-	Kind                string  `json:"kind,omitempty"`
-	SkipUserHeader      bool    `json:"skipUserHeader,omitempty"`
-	QuotaUnit           int64   `json:"quotaUnit"`
-	Currency            string  `json:"currency"`
-	RechargeRatio       float64 `json:"rechargeRatio"`
-	ChannelListEndpoint string  `json:"channelListEndpoint,omitempty"`
-	Note                string  `json:"note,omitempty"`
+	Name           string  `json:"name"`
+	URL            string  `json:"url,omitempty"`
+	DisplayURL     string  `json:"displayUrl"`
+	UserID         string  `json:"userId"`
+	Kind           string  `json:"kind,omitempty"`
+	SkipUserHeader bool    `json:"skipUserHeader,omitempty"`
+	QuotaUnit      int64   `json:"quotaUnit"`
+	Currency       string  `json:"currency"`
+	RechargeRatio  float64 `json:"rechargeRatio"`
 }
 
 func (s Site) Public() PublicSite {
-	return PublicSite{Name: s.Name, DisplayURL: "地址已隐藏", UserID: s.UserID, Kind: s.Kind, SkipUserHeader: s.SkipUserHeader, QuotaUnit: s.QuotaUnit, Currency: s.Currency, RechargeRatio: s.RechargeRatio, ChannelListEndpoint: s.ChannelListEndpoint, Note: s.Note}
+	return PublicSite{Name: s.Name, DisplayURL: "地址已隐藏", UserID: s.UserID, Kind: s.Kind, SkipUserHeader: s.SkipUserHeader, QuotaUnit: s.QuotaUnit, Currency: s.Currency, RechargeRatio: s.RechargeRatio}
 }
 
 type Client struct {

@@ -310,6 +310,28 @@ func TestNewAPISitesDoesNotExposeRawManagedSiteURLs(t *testing.T) {
 	}
 }
 
+func TestNewAPISitesDoesNotExposeManagedSiteMetadataSecrets(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `[{"name":"private-site","url":"http://127.0.0.1:3000","token":"sk-private","channelListEndpoint":"/api/channel/search?token=sk-endpoint-secret","note":"internal note sk-note-secret http://10.0.0.9"}]`)
+	req := httptest.NewRequest(http.MethodGet, "/api/newapi/sites", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := w.Body.String()
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	for _, leaked := range []string{"channelListEndpoint", "note", "sk-endpoint-secret", "sk-note-secret", "10.0.0.9", "/api/channel/search"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("public managed-site metadata leaked %q in %s", leaked, body)
+		}
+	}
+}
+
 func TestNewAPIStatusEndpointsDoNotExposeRawManagedSiteURLs(t *testing.T) {
 	oldRootDir := rootDir
 	oldValue := modelCache.Value
@@ -337,7 +359,7 @@ func TestNewAPIStatusEndpointsDoNotExposeRawManagedSiteURLs(t *testing.T) {
 		writeJSON(w, http.StatusOK, map[string]any{"success": true, "data": []any{}})
 	}))
 	defer server.Close()
-	t.Setenv("NEWAPI_MANAGED_API_SITES", managedSiteConfigJSON("private-site", server.URL))
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `[{"name":"private-site","url":"`+server.URL+`","token":"token","channelListEndpoint":"/api/channel/search?token=sk-status-endpoint","note":"internal status note sk-status-note http://10.0.0.9"}]`)
 
 	for _, path := range []string{"/api/newapi/model-status", "/api/newapi/overview"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -349,7 +371,7 @@ func TestNewAPIStatusEndpointsDoNotExposeRawManagedSiteURLs(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("%s code=%d body=%s", path, w.Code, body)
 		}
-		for _, leaked := range []string{server.URL, "127.0.0.1", "localhost"} {
+		for _, leaked := range []string{server.URL, "127.0.0.1", "localhost", "channelListEndpoint", "note", "sk-status-endpoint", "sk-status-note", "10.0.0.9"} {
 			if strings.Contains(body, leaked) {
 				t.Fatalf("%s leaked raw managed-site URL detail %q in %s", path, leaked, body)
 			}
