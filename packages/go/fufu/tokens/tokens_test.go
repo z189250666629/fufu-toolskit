@@ -51,6 +51,22 @@ func TestQuotaConversion(t *testing.T) {
 	}
 }
 
+func TestQuotaConversionUsesDefaultQuotaUnitForNilService(t *testing.T) {
+	var svc *Service
+	defer func() {
+		if x := recover(); x != nil {
+			t.Fatalf("quota conversion should use default unit, not panic: %v", x)
+		}
+	}()
+
+	if got := svc.DollarsToQuota(2); got != int64(newapi.DefaultQuotaUnit*2) {
+		t.Fatalf("DollarsToQuota nil service = %d", got)
+	}
+	if got := svc.QuotaToDollars(int64(newapi.DefaultQuotaUnit * 3)); got != 3 {
+		t.Fatalf("QuotaToDollars nil service = %v", got)
+	}
+}
+
 func TestFromRawNormalizesKeyStatusAndNumbers(t *testing.T) {
 	token := FromRaw(map[string]any{
 		"id":             float64(9),

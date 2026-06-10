@@ -104,7 +104,10 @@ func (s *Service) AddQuota(ctx context.Context, key string, dollars int64) error
 }
 
 func (s *Service) DollarsToQuota(dollars float64) int64 {
-	unit := s.QuotaUnit
+	unit := int64(0)
+	if s != nil {
+		unit = s.QuotaUnit
+	}
 	if unit <= 0 {
 		unit = newapi.DefaultQuotaUnit
 	}
@@ -112,7 +115,10 @@ func (s *Service) DollarsToQuota(dollars float64) int64 {
 }
 
 func (s *Service) QuotaToDollars(quota int64) float64 {
-	unit := s.QuotaUnit
+	unit := int64(0)
+	if s != nil {
+		unit = s.QuotaUnit
+	}
 	if unit <= 0 {
 		unit = newapi.DefaultQuotaUnit
 	}
