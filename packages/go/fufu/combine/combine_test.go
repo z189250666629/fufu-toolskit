@@ -254,6 +254,28 @@ func TestHandleAuthCreatesSession(t *testing.T) {
 	}
 }
 
+func TestHandleAuthRejectsOversizedJSONBody(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	app.passwords = map[string]struct {
+		Hash string
+		Role Role
+	}{
+		"admin": {Hash: sha256Hex("test-admin"), Role: RoleAdmin},
+	}
+	body := `{"password":"test-admin","padding":"` + strings.Repeat("x", 1<<20) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	app.ServeHTTP(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(app.sessions) != 0 {
+		t.Fatalf("oversized auth body should not create session: %#v", app.sessions)
+	}
+}
+
 func TestHandleSearchKeysRejectsBlankOnlyKeys(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/search-keys", strings.NewReader(`{"keys":["  ","sk-"]}`))

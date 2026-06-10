@@ -12,8 +12,8 @@ func (a *App) handleAuth(w http.ResponseWriter, r *http.Request) {
 	var p struct {
 		Password string `json:"password"`
 	}
-	if err := decodeJSON(r.Body, &p); err != nil {
-		writeBadJSONRequest(w)
+	if err := decodeJSONRequest(w, r, &p); err != nil {
+		writeJSONDecodeError(w, err)
 		return
 	}
 	matched, ok := matchRoleByPassword(a.passwords, p.Password)
@@ -44,8 +44,8 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 	var p struct {
 		Keys []string `json:"keys"`
 	}
-	if err := decodeJSON(r.Body, &p); err != nil {
-		writeBadJSONRequest(w)
+	if err := decodeJSONRequest(w, r, &p); err != nil {
+		writeJSONDecodeError(w, err)
 		return
 	}
 	keys := normalizeKeys(p.Keys)
@@ -71,8 +71,8 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleMerge(w http.ResponseWriter, r *http.Request) {
 	a.cleanMergeJobs()
 	var p MergePayload
-	if err := decodeJSON(r.Body, &p); err != nil {
-		writeBadJSONRequest(w)
+	if err := decodeJSONRequest(w, r, &p); err != nil {
+		writeJSONDecodeError(w, err)
 		return
 	}
 	p.Keys = normalizeKeys(p.Keys)
@@ -96,8 +96,8 @@ func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
 	var p struct {
 		Keys []string `json:"keys"`
 	}
-	if err := decodeJSON(r.Body, &p); err != nil {
-		writeBadJSONRequest(w)
+	if err := decodeJSONRequest(w, r, &p); err != nil {
+		writeJSONDecodeError(w, err)
 		return
 	}
 	keys := normalizeKeys(p.Keys)
@@ -169,8 +169,8 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		IntervalUnit int     `json:"intervalUnit"`
 		Group        string  `json:"group"`
 	}
-	if err := decodeJSON(r.Body, &p); err != nil {
-		writeBadJSONRequest(w)
+	if err := decodeJSONRequest(w, r, &p); err != nil {
+		writeJSONDecodeError(w, err)
 		return
 	}
 	if !validateGenerateParams(p.Count, p.Quota, p.IntervalUnit, a.quotaUnit) {

@@ -1,9 +1,9 @@
 package combine
 
 import (
+	"errors"
 	"fmt"
 	"fufu/webutil"
-	"io"
 	"net/http"
 )
 
@@ -26,6 +26,15 @@ func writeBadJSONRequest(w http.ResponseWriter) {
 	writeJSONError(w, http.StatusBadRequest, "请求格式错误")
 }
 
-func decodeJSON(r io.Reader, out any) error {
-	return webutil.DecodeJSON(r, out, webutil.WithUseNumber())
+func writeJSONDecodeError(w http.ResponseWriter, err error) {
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		writeJSONError(w, http.StatusRequestEntityTooLarge, "请求体过大")
+		return
+	}
+	writeBadJSONRequest(w)
+}
+
+func decodeJSONRequest(w http.ResponseWriter, r *http.Request, out any) error {
+	return webutil.DecodeJSON(http.MaxBytesReader(w, r.Body, maxJSONBodyBytes), out, webutil.WithUseNumber())
 }
