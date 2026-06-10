@@ -59,17 +59,18 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		CardKey   string `json:"cardKey"`
-		CellIndex int    `json:"cellIndex"`
+		CellIndex *int   `json:"cellIndex"`
 	}
 	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
 	if !ok {
 		writeMissingCardKey(w)
 		return
 	}
-	if b.CellIndex < 0 || b.CellIndex > 8 {
+	if b.CellIndex == nil || *b.CellIndex < 0 || *b.CellIndex > 8 {
 		writeJSONError(w, 400, "无效的格子")
 		return
 	}
+	cellIndex := *b.CellIndex
 	res, err := withCardLock(key, func() (any, error) {
 		g, ok := getScratch(key)
 		if !ok {
@@ -80,13 +81,13 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		}
 		revealed := jsonArr(g.Revealed)
 		for _, v := range revealed {
-			if v == b.CellIndex {
+			if v == cellIndex {
 				return nil, httpErr{400, "此格已刮开"}
 			}
 		}
 		mines := jsonArr(g.MinePos)
-		revealed = append(revealed, b.CellIndex)
-		if intContains(mines, b.CellIndex) {
+		revealed = append(revealed, cellIndex)
+		if intContains(mines, cellIndex) {
 			rb, _ := json.Marshal(revealed)
 			if _, err := db.Exec(`UPDATE scratch_games SET revealed=?, prize_dollars=0, status='lost' WHERE card_key=?`, string(rb), key); err != nil {
 				return nil, err
