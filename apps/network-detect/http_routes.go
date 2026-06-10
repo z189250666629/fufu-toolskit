@@ -32,11 +32,20 @@ func route(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, 405, "Only GET is supported")
 		return
 	}
-	if path == "/combine" || path == "/combine/" {
+	if isCombinePagePath(path) {
 		serveFile(w, r, filepath.Join(combineDir, "index.html"), true)
 		return
 	}
 	serveStatic(w, r, path)
+}
+
+func isCombinePagePath(path string) bool {
+	switch path {
+	case "/combine", "/combine/", "/combine/index.html":
+		return true
+	default:
+		return false
+	}
 }
 
 func handleAPI(w http.ResponseWriter, r *http.Request) {

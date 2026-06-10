@@ -109,11 +109,18 @@ func TestCombinePageServed(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(combineDir, "index.html"), []byte("combine page"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest(http.MethodGet, "/combine", nil)
-	w := httptest.NewRecorder()
-	route(w, req)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), "combine page") {
-		t.Fatalf("combine page code=%d body=%s", w.Code, w.Body.String())
+	for _, path := range []string{"/combine", "/combine/", "/combine/index.html"} {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			route(w, req)
+			if w.Code != 200 || !strings.Contains(w.Body.String(), "combine page") {
+				t.Fatalf("combine page code=%d body=%s", w.Code, w.Body.String())
+			}
+			if got := w.Header().Get("Cache-Control"); got != "no-store" {
+				t.Fatalf("combine page Cache-Control = %q", got)
+			}
+		})
 	}
 }
 
