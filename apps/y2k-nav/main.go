@@ -19,10 +19,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "invalid PORT: %v\n", err)
 		os.Exit(1)
 	}
+	if err := serve(wd, port); err != nil {
+		fmt.Fprintf(os.Stderr, "server stopped: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func serve(root, port string) error {
 	mux := http.NewServeMux()
-	mux.Handle("/", newStaticHandler(wd))
+	mux.Handle("/", newStaticHandler(root))
 	fmt.Printf("y2k-nav Go static server listening on :%s\n", port)
-	panic(http.ListenAndServe("0.0.0.0:"+port, mux))
+	return http.ListenAndServe("0.0.0.0:"+port, mux)
 }
 
 func resolvePort(value string) (string, error) {

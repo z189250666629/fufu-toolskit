@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -42,6 +43,27 @@ func TestResolvePortRejectsInvalidPort(t *testing.T) {
 				t.Fatalf("resolvePort(%q) = %q, nil; want error", value, port)
 			}
 		})
+	}
+}
+
+func TestServeReturnsListenerErrors(t *testing.T) {
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = serve(t.TempDir(), port)
+
+	if err == nil {
+		t.Fatal("serve should return bind errors instead of panicking")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "bind") && !strings.Contains(strings.ToLower(err.Error()), "address already in use") {
+		t.Fatalf("serve returned unexpected error: %v", err)
 	}
 }
 
