@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -38,15 +39,23 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, 503, "NewAPI 未配置")
 			return
 		}
+		client := loginClientIP(r)
+		now := time.Now()
+		if blockedUntil, allowed := unknownLoginLimiter.allow(client, key, now); !allowed {
+			writeUnknownLoginRateLimited(w, blockedUntil)
+			return
+		}
 		t, err := tokenSvc.SearchTokenByKey(r.Context(), key)
 		if err != nil {
 			writeJSONError(w, 500, "服务器错误")
 			return
 		}
 		if t == nil {
+			unknownLoginLimiter.recordUnknown(client, key, now)
 			writeJSONError(w, 404, "卡密不存在")
 			return
 		}
+		unknownLoginLimiter.clear(client, key)
 		if t.Status != 1 {
 			writeJSONError(w, 403, "此卡密已被禁用，无法参与活动")
 			return

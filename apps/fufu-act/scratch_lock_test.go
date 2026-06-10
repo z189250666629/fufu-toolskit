@@ -18,6 +18,7 @@ func setupScratchLockTestDB(t *testing.T) {
 	oldLocks := cardLocks
 	oldTokenSvc := tokenSvc
 	oldTokenConfigErr := tokenConfigErr
+	oldUnknownLoginLimiter := unknownLoginLimiter
 	testDB, err := initDB(filepath.Join(t.TempDir(), "slot.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -39,6 +40,7 @@ func setupScratchLockTestDB(t *testing.T) {
 	}))
 	db = testDB
 	cardLocks = &cardLockRegistry{}
+	unknownLoginLimiter = newLoginUnknownRateLimiter()
 	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "token", UserID: "1"}))
 	tokenConfigErr = nil
 	t.Cleanup(func() {
@@ -46,6 +48,7 @@ func setupScratchLockTestDB(t *testing.T) {
 		_ = testDB.Close()
 		db = oldDB
 		cardLocks = oldLocks
+		unknownLoginLimiter = oldUnknownLoginLimiter
 		tokenSvc = oldTokenSvc
 		tokenConfigErr = oldTokenConfigErr
 	})
