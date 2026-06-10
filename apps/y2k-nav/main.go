@@ -42,6 +42,6 @@ func newStaticHandler(root string) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		http.ServeFile(w, r, file)
+		webutil.ServeFile(w, r, file, strings.HasSuffix(file, ".html"))
 	})
 }

@@ -30,6 +30,24 @@ func TestStaticHandlerServesRootIndex(t *testing.T) {
 	}
 }
 
+func TestStaticHandlerDisablesHTMLCaching(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "index.html"), []byte("y2k home"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	newStaticHandler(root).ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
+}
+
 func TestStaticHandlerRejectsUnsafeOrWrongMethodRequests(t *testing.T) {
 	root := t.TempDir()
 	for _, tc := range []struct {
