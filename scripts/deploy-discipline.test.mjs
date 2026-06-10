@@ -74,3 +74,19 @@ test('network-detect compose files use the canonical deployed host port', async 
     );
   }
 });
+
+test('fufu-act deploy only forwards activity-consumed NewAPI site variables', async () => {
+  const actSources = [
+    '.github/workflows/deploy-act.yml',
+    'infra/deploy/fufu-act/docker-compose.yml'
+  ];
+  for (const path of actSources) {
+    const source = await readRepoFile(path);
+    assert.doesNotMatch(source, /\bNEWAPI_TOKEN_SITE_(URL|TOKEN|ACCESS_TOKEN)\b/, `${path} should not make token-site config look required for fufu-act`);
+  }
+
+  const deployScript = await readRepoFile('scripts/deploy-docker-app.sh');
+  const actCase = deployScript.match(/fufu-act\)([\s\S]*?);;\n\s*y2k-nav\)/)?.[1] ?? '';
+  assert.notEqual(actCase, '', 'deploy script should contain a fufu-act case block');
+  assert.doesNotMatch(actCase, /\bNEWAPI_TOKEN_SITE_(URL|TOKEN|ACCESS_TOKEN)\b/, 'deploy script fufu-act block should not forward token-site config');
+});

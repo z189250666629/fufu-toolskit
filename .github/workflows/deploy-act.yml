@@ -97,7 +97,6 @@ jobs:
       FUFU_QUOTA_UNIT: ${{ vars.FUFU_QUOTA_UNIT || '500000' }}
       NEWAPI_API_SITE_URL: ${{ vars.NEWAPI_API_SITE_URL }}
       NEWAPI_API_SITE_TOKEN: ${{ secrets.NEWAPI_API_SITE_TOKEN }}
-      NEWAPI_TOKEN_SITE_TOKEN: ${{ secrets.NEWAPI_TOKEN_SITE_TOKEN }}
       MCY_BASE_URL: ${{ vars.MCY_BASE_URL }}
       MCY_COOKIE: ${{ secrets.MCY_COOKIE }}
       MCY_USERNAME: ${{ secrets.MCY_USERNAME || vars.MCY_USERNAME }}
