@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"fufu/newapi"
-	"strconv"
+	"fufu/rawconv"
 	"strings"
 	"time"
 )
@@ -51,59 +50,11 @@ func items(data map[string]any) []map[string]any {
 }
 
 func toInt64(v any) int64 {
-	switch x := v.(type) {
-	case json.Number:
-		return jsonNumberToInt64(x)
-	case float64:
-		return int64(x)
-	case int:
-		return int64(x)
-	case int64:
-		return x
-	case string:
-		return parseInt64String(x)
-	default:
-		return parseInt64String(fmt.Sprint(x))
-	}
-}
-
-func parseInt64String(value string) int64 {
-	value = strings.TrimSpace(value)
-	n, err := strconv.ParseInt(value, 10, 64)
-	if err == nil {
-		return n
-	}
-	f, _ := strconv.ParseFloat(value, 64)
-	return int64(f)
-}
-
-func jsonNumberToInt64(n json.Number) int64 {
-	value, err := n.Int64()
-	if err == nil {
-		return value
-	}
-	f, _ := n.Float64()
-	return int64(f)
+	return rawconv.Int64(v)
 }
 
 func toFloat(v any) float64 {
-	switch x := v.(type) {
-	case json.Number:
-		n, _ := x.Float64()
-		return n
-	case float64:
-		return x
-	case int:
-		return float64(x)
-	case int64:
-		return float64(x)
-	case string:
-		n, _ := strconv.ParseFloat(strings.TrimSpace(x), 64)
-		return n
-	default:
-		n, _ := strconv.ParseFloat(fmt.Sprint(x), 64)
-		return n
-	}
+	return rawconv.Float64(v)
 }
 
-func toInt(v any) int { return int(toInt64(v)) }
+func toInt(v any) int { return rawconv.Int(v) }

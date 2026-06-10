@@ -3,7 +3,7 @@ package combine
 import (
 	"encoding/json"
 	"fmt"
-	"fufu/internal/rawconv"
+	"fufu/rawconv"
 	"strings"
 )
 

@@ -2,8 +2,8 @@ package tokens
 
 import (
 	"fmt"
-	"fufu/internal/rawconv"
 	"fufu/newapi"
+	"fufu/rawconv"
 	"strings"
 )
 

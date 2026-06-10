@@ -47,6 +47,40 @@ func TestY2KDockerfileCopiesSharedFufuModule(t *testing.T) {
 	}
 }
 
+func TestNetworkDetectUsesSharedRawConversions(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("apps/network-detect/newapi_client.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(raw)
+	if !strings.Contains(source, `"fufu/rawconv"`) {
+		t.Fatal("network-detect should use the shared public rawconv package")
+	}
+	for _, duplicate := range []string{
+		"func parseInt64String",
+		"func jsonNumberToInt64",
+	} {
+		if strings.Contains(source, duplicate) {
+			t.Fatalf("network-detect should not keep duplicate numeric conversion helper %q", duplicate)
+		}
+	}
+}
+
+func TestSharedPackagesDoNotUseInternalRawconv(t *testing.T) {
+	for _, path := range []string{
+		"packages/go/fufu/combine/helper_convert.go",
+		"packages/go/fufu/tokens/raw.go",
+	} {
+		raw, err := os.ReadFile(filepath.FromSlash(path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(raw), `"fufu/internal/rawconv"`) {
+			t.Fatalf("%s should use public fufu/rawconv instead of internal rawconv", path)
+		}
+	}
+}
+
 func fingerprintModule(t *testing.T, dir string) {
 	t.Helper()
 	err := filepath.WalkDir(filepath.FromSlash(dir), func(path string, d fs.DirEntry, err error) error {
