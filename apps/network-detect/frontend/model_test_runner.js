@@ -46,6 +46,14 @@ export function applyModelTestResultToState(modelStatus, siteName, model, result
   return true;
 }
 
+export function safeModelTestErrorMessage(error) {
+  const message = typeof error?.message === 'string' ? error.message.trim() : '';
+  if (error?.status >= 400 && error.status < 500 && message) {
+    return message;
+  }
+  return '测试失败，请稍后重试';
+}
+
 export async function runModelCellTest({
   state,
   siteName,
@@ -72,7 +80,7 @@ export async function runModelCellTest({
       ? row.perSite[siteName].groupStats[group]
       : row?.perSite?.[siteName];
     if (cell && error.data?.nextAllowedAt) cell.nextTestAllowedAt = error.data.nextAllowedAt;
-    state.modelTestMessage = `${siteName} / ${model} 测试失败：${error.message}`;
+    state.modelTestMessage = `${siteName} / ${model} 测试失败：${safeModelTestErrorMessage(error)}`;
   } finally {
     state.testingCells.delete(key);
     render();

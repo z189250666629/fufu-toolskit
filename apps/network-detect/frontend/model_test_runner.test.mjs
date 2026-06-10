@@ -114,6 +114,7 @@ test('runModelCellTest records cooldown and failure message on API error', async
     }
   };
   const error = new Error('too many requests');
+  error.status = 429;
   error.data = { nextAllowedAt: 123 };
 
   const started = await runModelCellTest({
@@ -128,6 +129,32 @@ test('runModelCellTest records cooldown and failure message on API error', async
   assert.equal(state.testingCells.size, 0);
   assert.equal(state.modelStatus.models[0].perSite.site.nextTestAllowedAt, 123);
   assert.equal(state.modelTestMessage, 'site / model-a 测试失败：too many requests');
+});
+
+test('runModelCellTest masks raw network error details', async () => {
+  const state = {
+    testingCells: new Set(),
+    modelTestMessage: '',
+    modelStatus: {
+      models: [{ model: 'model-a', perSite: { site: { status: 'unknown' } } }]
+    }
+  };
+  const error = new Error('fetch http://10.0.0.5/config token=sk-secret failed');
+
+  const started = await runModelCellTest({
+    state,
+    siteName: 'site',
+    model: 'model-a',
+    postJsonImpl: async () => { throw error; },
+    render: () => {}
+  });
+
+  assert.equal(started, true);
+  assert.equal(state.testingCells.size, 0);
+  assert.equal(state.modelTestMessage, 'site / model-a 测试失败：测试失败，请稍后重试');
+  for (const leaked of ['10.0.0.5', 'sk-secret', 'http://', 'fetch']) {
+    assert.equal(state.modelTestMessage.includes(leaked), false, `message leaked ${leaked}`);
+  }
 });
 
 test('runModelCellTest skips missing or already running cells', async () => {
