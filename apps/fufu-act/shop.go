@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"fufu/config"
+	"fufu/webutil"
 	"io"
 	"net/http"
 	"strings"
@@ -211,7 +212,7 @@ func mcyPost(ctx context.Context, endpoint string, payload any) (map[string]any,
 
 func decodeMCYResponse(r io.Reader, out any) error {
 	limited := &io.LimitedReader{R: r, N: maxMCYResponseBodyBytes + 1}
-	if err := json.NewDecoder(limited).Decode(out); err != nil {
+	if err := webutil.DecodeJSON(limited, out, webutil.WithUseNumber()); err != nil {
 		if limited.N <= 0 {
 			return fmt.Errorf("%w: response body too large", ErrShopInvalidResponse)
 		}

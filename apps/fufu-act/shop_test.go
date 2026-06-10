@@ -239,6 +239,14 @@ func TestMCYPostReturnsErrorForInvalidJSONResponse(t *testing.T) {
 	}
 }
 
+func TestDecodeMCYResponseRejectsTrailingJSON(t *testing.T) {
+	var data map[string]any
+	err := decodeMCYResponse(strings.NewReader(`{"data":{"list":[]}}{"extra":true}`), &data)
+	if err == nil || !errors.Is(err, ErrShopInvalidResponse) {
+		t.Fatalf("data=%#v err=%v, want ErrShopInvalidResponse", data, err)
+	}
+}
+
 func TestMCYPostRejectsOversizedResponseBody(t *testing.T) {
 	oldCookie := mcyCookie
 	t.Cleanup(func() { mcyCookie = oldCookie })
