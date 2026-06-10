@@ -68,7 +68,7 @@ export function renderModelScopeControls(modelStatus, scope, stateLike) {
     value: item.site.name,
     label: modelSiteDisplayName(item.site.name)
   }));
-  const hasTokenGroups = scope.siteName === 'token-fufu';
+  const hasTokenGroups = Array.isArray(scope.groups) && scope.groups.length > 0;
   return `
     <div class="model-scope-bar">
       ${renderSegmentedTabs({

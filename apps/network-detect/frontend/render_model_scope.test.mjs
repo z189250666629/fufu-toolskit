@@ -32,3 +32,20 @@ test('renderModelScopeControls renders active site tabs and token group slot', (
   assert.match(html, /aria-selected="true"/);
   assert.match(html, /data-token-group-option="vip"/);
 });
+
+test('renderModelScopeControls renders group select for custom grouped sites', () => {
+  const html = renderModelScopeControls(
+    {
+      sites: [
+        { site: { name: 'custom-site' } },
+        { site: { name: 'token-fufu' } }
+      ]
+    },
+    { siteName: 'custom-site', groups: ['vip', 'default'], group: 'vip' },
+    { groupSelectOpen: true }
+  );
+
+  assert.match(html, /data-model-site="custom-site"/);
+  assert.match(html, /data-token-group-option="default"/);
+  assert.doesNotMatch(html, /is-placeholder/);
+});
