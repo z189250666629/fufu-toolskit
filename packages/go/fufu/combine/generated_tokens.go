@@ -15,9 +15,12 @@ func (a *App) upsertGeneratedToken(ctx context.Context, token ResolvedToken) err
 		return nil
 	}
 	key := ensureFullKey(token.Key)
-	rawJSON, _ := json.Marshal(token.Raw)
+	rawJSON, err := json.Marshal(token.Raw)
+	if err != nil {
+		return err
+	}
 	now := time.Now().UnixMilli()
-	_, err := a.db.ExecContext(ctx, `
+	_, err = a.db.ExecContext(ctx, `
 		INSERT INTO generated_tokens (
 			token_id, key_full, key_hash, key_mask, name, remain_quota, used_quota,
 			interval_unit, group_name, status, raw_json, created_at, updated_at

@@ -93,3 +93,16 @@ func TestGeneratedTokenCacheRoundTrip(t *testing.T) {
 		t.Fatalf("generated token lookup after delete = (%d, %v), want (0, false)", id, ok)
 	}
 }
+
+func TestGeneratedTokenCacheRejectsUnserializableRawSnapshot(t *testing.T) {
+	ctx := context.Background()
+	app := newTraceTestApp(t)
+	token := ResolvedToken{ID: 88, Key: "sk-bad-generated", Name: "bad", RemainQuota: 100, Status: 1, Raw: map[string]any{"bad": func() {}}}
+
+	if err := app.upsertGeneratedToken(ctx, token); err == nil {
+		t.Fatal("upsertGeneratedToken should return raw snapshot serialization errors")
+	}
+	if id, ok, err := app.generatedTokenIDByKey(ctx, token.Key); err != nil || ok || id != 0 {
+		t.Fatalf("unserializable token should not be cached: id=%d ok=%v err=%v", id, ok, err)
+	}
+}
