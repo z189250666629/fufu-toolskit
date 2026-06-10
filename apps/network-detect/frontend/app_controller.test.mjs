@@ -95,3 +95,24 @@ test('boot renders shell before loading data and schedules connectivity once', a
   assert.deepEqual(intervals.map((timer) => timer.delay), [10 * 60 * 1000, 60 * 1000]);
   assert.deepEqual(listeners.map(([type]) => type), ['pointerdown', 'keydown']);
 });
+
+test('activatePanelTab applies panel motion during render', () => {
+  const { appElement, documentRef } = createDomHarness();
+  const app = createDashboardApp({
+    documentRef,
+    windowRef: {
+      scrollX: 0,
+      scrollY: 0,
+      scrollTo: () => {},
+      requestAnimationFrame: (callback) => callback()
+    },
+    navigatorRef: { onLine: true },
+    loadModelStatusStateImpl: async () => {},
+    now: () => new Date('2026-06-10T10:00:00+08:00')
+  });
+
+  app.render();
+  app.activatePanelTab('models');
+
+  assert.match(appElement.innerHTML, /model-state-empty motion-enter/);
+});

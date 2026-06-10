@@ -122,8 +122,9 @@ export function createDashboardApp(deps = {}) {
 
   function renderWithMotion(motion) {
     const previousRects = ['panel', 'scope'].includes(motion) ? captureTabIndicatorRects(documentRef) : null;
-    renderMotion = '';
+    renderMotion = motion;
     render();
+    renderMotion = '';
     animateTabIndicators(previousRects, {
       document: documentRef,
       window: windowRef
