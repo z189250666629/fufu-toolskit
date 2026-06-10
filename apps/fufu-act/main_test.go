@@ -154,21 +154,21 @@ func TestReadCardKeyRequestTrimsAndRejectsInvalidInput(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"  sk-card  "}`))
 
-	key, ok := readCardKeyRequest(req, &body, func() string { return body.CardKey })
-	if !ok || key != "sk-card" {
-		t.Fatalf("card key = %q/%v", key, ok)
+	key, ok, err := readCardKeyRequest(req, &body, func() string { return body.CardKey })
+	if err != nil || !ok || key != "sk-card" {
+		t.Fatalf("card key = %q/%v err=%v", key, ok, err)
 	}
 
 	blankReq := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"  "}`))
-	key, ok = readCardKeyRequest(blankReq, &body, func() string { return body.CardKey })
-	if ok || key != "" {
-		t.Fatalf("blank card key = %q/%v", key, ok)
+	key, ok, err = readCardKeyRequest(blankReq, &body, func() string { return body.CardKey })
+	if err != nil || ok || key != "" {
+		t.Fatalf("blank card key = %q/%v err=%v", key, ok, err)
 	}
 
 	badReq := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey"`))
-	key, ok = readCardKeyRequest(badReq, &body, func() string { return body.CardKey })
-	if ok || key != "" {
-		t.Fatalf("bad body card key = %q/%v", key, ok)
+	key, ok, err = readCardKeyRequest(badReq, &body, func() string { return body.CardKey })
+	if err == nil || ok || key != "" {
+		t.Fatalf("bad body card key = %q/%v err=%v", key, ok, err)
 	}
 }
 
@@ -178,15 +178,15 @@ func TestReadCardKeyRequestRejectsTrailingJSON(t *testing.T) {
 	}
 
 	trailingReq := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"sk-card"} {}`))
-	key, ok := readCardKeyRequest(trailingReq, &body, func() string { return body.CardKey })
-	if ok || key != "" {
-		t.Fatalf("trailing JSON card key = %q/%v", key, ok)
+	key, ok, err := readCardKeyRequest(trailingReq, &body, func() string { return body.CardKey })
+	if err == nil || ok || key != "" {
+		t.Fatalf("trailing JSON card key = %q/%v err=%v", key, ok, err)
 	}
 
 	whitespaceReq := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader("{\"cardKey\":\"sk-card\"}\n\t "))
-	key, ok = readCardKeyRequest(whitespaceReq, &body, func() string { return body.CardKey })
-	if !ok || key != "sk-card" {
-		t.Fatalf("trailing whitespace card key = %q/%v", key, ok)
+	key, ok, err = readCardKeyRequest(whitespaceReq, &body, func() string { return body.CardKey })
+	if err != nil || !ok || key != "sk-card" {
+		t.Fatalf("trailing whitespace card key = %q/%v err=%v", key, ok, err)
 	}
 }
 
@@ -213,6 +213,34 @@ func TestCardKeyWhitespaceRejectedAcrossHandlers(t *testing.T) {
 
 			if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "请输入卡密") {
 				t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestCardKeyHandlersReportMalformedJSON(t *testing.T) {
+	cases := []struct {
+		name    string
+		handler func(http.ResponseWriter, *http.Request)
+	}{
+		{name: "login", handler: handleLogin},
+		{name: "spin", handler: handleSpin},
+		{name: "scratch start", handler: handleScratchStart},
+		{name: "scratch reveal", handler: handleScratchReveal},
+		{name: "scratch cashout", handler: handleScratchCashout},
+		{name: "scratch reset", handler: handleScratchReset},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/test", strings.NewReader(`{"cardKey"`))
+			w := httptest.NewRecorder()
+
+			tc.handler(w, req)
+
+			body := w.Body.String()
+			if w.Code != http.StatusBadRequest || !strings.Contains(body, "请求格式错误") || strings.Contains(body, "请输入卡密") {
+				t.Fatalf("code=%d body=%s", w.Code, body)
 			}
 		})
 	}

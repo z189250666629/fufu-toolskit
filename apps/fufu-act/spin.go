@@ -13,7 +13,11 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		CardKey string `json:"cardKey"`
 	}
-	key, ok := readCardKeyRequest(r, &body, func() string { return body.CardKey })
+	key, ok, err := readCardKeyRequest(r, &body, func() string { return body.CardKey })
+	if err != nil {
+		writeMalformedCardKeyRequest(w)
+		return
+	}
 	if !ok {
 		writeMissingCardKey(w)
 		return

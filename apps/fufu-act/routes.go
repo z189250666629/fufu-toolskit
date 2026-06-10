@@ -81,12 +81,16 @@ func readBody(r *http.Request, out any) error {
 	return webutil.DecodeJSON(io.LimitReader(r.Body, 1<<20), out)
 }
 
-func readCardKeyRequest(r *http.Request, out any, cardKey func() string) (string, bool) {
-	if readBody(r, out) != nil {
-		return "", false
+func readCardKeyRequest(r *http.Request, out any, cardKey func() string) (string, bool, error) {
+	if err := readBody(r, out); err != nil {
+		return "", false, err
 	}
 	key := strings.TrimSpace(cardKey())
-	return key, key != ""
+	return key, key != "", nil
+}
+
+func writeMalformedCardKeyRequest(w http.ResponseWriter) {
+	writeJSONError(w, http.StatusBadRequest, "请求格式错误")
 }
 
 func writeMissingCardKey(w http.ResponseWriter) {

@@ -11,7 +11,11 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		CardKey string `json:"cardKey"`
 	}
-	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	key, ok, err := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	if err != nil {
+		writeMalformedCardKeyRequest(w)
+		return
+	}
 	if !ok {
 		writeMissingCardKey(w)
 		return
@@ -61,7 +65,11 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		CardKey   string `json:"cardKey"`
 		CellIndex *int   `json:"cellIndex"`
 	}
-	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	key, ok, err := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	if err != nil {
+		writeMalformedCardKeyRequest(w)
+		return
+	}
 	if !ok {
 		writeMissingCardKey(w)
 		return
@@ -129,7 +137,11 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		CardKey string `json:"cardKey"`
 	}
-	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	key, ok, err := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	if err != nil {
+		writeMalformedCardKeyRequest(w)
+		return
+	}
 	if !ok {
 		writeMissingCardKey(w)
 		return
@@ -173,7 +185,11 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		CardKey string `json:"cardKey"`
 	}
-	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	key, ok, err := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	if err != nil {
+		writeMalformedCardKeyRequest(w)
+		return
+	}
 	if !ok {
 		writeMissingCardKey(w)
 		return
