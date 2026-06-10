@@ -82,7 +82,12 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 		return nil, err
 	}
 	next := now + int64(modelTestCooldown/time.Second)
-	testCooldowns.Store(key, next)
+	if existing, loaded := testCooldowns.LoadOrStore(key, next); loaded {
+		if until, ok := existing.(int64); ok && until > now {
+			return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: until}
+		}
+		testCooldowns.Store(key, next)
+	}
 	stream := supportsStream(model)
 	var res apiResult
 	for _, ch := range candidates {

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -129,6 +131,86 @@ func TestTestModelDoesNotStoreCooldownOrResultWhenCanceledDuringProbe(t *testing
 	}
 	if value, ok := testResults.Load(key); ok {
 		t.Fatalf("canceled probe should not leave manual test result: %#v", value)
+	}
+}
+
+func TestTestModelAllowsOnlyOneConcurrentProbePerCell(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	siteName := "race-site"
+	modelName := "gpt-race"
+	key := modelManualKey(siteName, modelName, "")
+	testCooldowns.Delete(key)
+	testResults.Delete(key)
+	t.Cleanup(func() {
+		testCooldowns.Delete(key)
+		testResults.Delete(key)
+	})
+
+	var searchHits atomic.Int32
+	var probeHits atomic.Int32
+	releaseSearch := make(chan struct{})
+	var releaseOnce sync.Once
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/channel/search"):
+			if searchHits.Add(1) == 1 {
+				go func() {
+					time.Sleep(200 * time.Millisecond)
+					releaseOnce.Do(func() { close(releaseSearch) })
+				}()
+			}
+			if searchHits.Load() >= 2 {
+				releaseOnce.Do(func() { close(releaseSearch) })
+			}
+			<-releaseSearch
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+				map[string]any{"id": 7, "status": channelStatusEnabled, "models": []any{modelName}, "groups": []any{"default"}},
+			}})
+		case strings.HasPrefix(r.URL.Path, "/api/channel/test/"):
+			probeHits.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.String())
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", managedSiteConfigJSON(siteName, server.URL))
+
+	errs := make(chan error, 2)
+	for range 2 {
+		go func() {
+			_, err := testModel(context.Background(), siteName, modelName, "")
+			errs <- err
+		}()
+	}
+
+	successes := 0
+	cooldowns := 0
+	for range 2 {
+		select {
+		case err := <-errs:
+			if err == nil {
+				successes++
+				continue
+			}
+			var httpErr *httpError
+			if errors.As(err, &httpErr) && httpErr.Status == http.StatusTooManyRequests {
+				cooldowns++
+				continue
+			}
+			t.Fatalf("unexpected error: %T %v", err, err)
+		case <-time.After(3 * time.Second):
+			t.Fatal("concurrent model tests did not finish")
+		}
+	}
+	if successes != 1 || cooldowns != 1 {
+		t.Fatalf("successes=%d cooldowns=%d, want exactly one success and one cooldown", successes, cooldowns)
+	}
+	if got := probeHits.Load(); got != 1 {
+		t.Fatalf("same cell should trigger one upstream probe, got %d", got)
 	}
 }
 
