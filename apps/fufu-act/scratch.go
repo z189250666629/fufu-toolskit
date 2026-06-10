@@ -266,7 +266,15 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 		} else if ok && g.Status == "playing" {
 			return nil, httpErr{400, "当前游戏尚未结束"}
 		}
-		if _, err := db.Exec(`DELETE FROM scratch_games WHERE card_key=?`, key); err != nil {
+		if err := withTx(func(tx *sql.Tx) error {
+			if _, err := tx.Exec(`UPDATE credit_queue SET status='archived', error='superseded by test scratch reset' WHERE card_key=? AND status='done'`, key); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`DELETE FROM scratch_games WHERE card_key=?`, key); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
 			return nil, err
 		}
 		return map[string]any{"ok": true}, nil

@@ -153,6 +153,39 @@ func TestScratchResetAllowsCaseInsensitiveTestCard(t *testing.T) {
 	}
 }
 
+func TestScratchResetInvalidatesPriorDoneCreditForTestCard(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if _, err := db.Exec(`INSERT INTO cards (card_key, card_name, dollars, total_spins) VALUES (?,?,?,?)`, "scratch-card", "55-act-test", 55, 0); err != nil {
+		t.Fatal(err)
+	}
+	seedScratchGame(t, "scratch-card", "[1,2]", "[0,3,4,5,6]", 12, "won")
+	if _, err := db.Exec(`INSERT INTO credit_queue (card_key, prize_dollars, status, processed_at) VALUES (?,?,?,datetime('now'))`, "scratch-card", 12, "done"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/reset", strings.NewReader(`{"cardKey":"scratch-card"}`))
+	w := httptest.NewRecorder()
+
+	handleScratchReset(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if err := enqueueCredit("scratch-card", 4); err != nil {
+		t.Fatalf("reset should allow a future scratch prize to enqueue: %v", err)
+	}
+	var pending, archived int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM credit_queue WHERE card_key=? AND status='pending'`, "scratch-card").Scan(&pending); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM credit_queue WHERE card_key=? AND status='archived'`, "scratch-card").Scan(&archived); err != nil {
+		t.Fatal(err)
+	}
+	if pending != 1 || archived != 1 {
+		t.Fatalf("pending=%d archived=%d, want one new pending and one archived old row", pending, archived)
+	}
+}
+
 func TestScratchResetRejectsTestSubstringInNonTestCard(t *testing.T) {
 	setupScratchLockTestDB(t)
 	if _, err := db.Exec(`INSERT INTO cards (card_key, card_name, dollars, total_spins) VALUES (?,?,?,?)`, "scratch-card", "55-act-contest", 55, 0); err != nil {
