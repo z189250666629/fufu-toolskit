@@ -128,6 +128,9 @@ func ErrorMessage(data map[string]any, status int, fallback string) string {
 	if value, ok := messageFromPayload(data); ok {
 		return value
 	}
+	if status >= 200 && status < 300 && strings.TrimSpace(fallback) != "" {
+		return fallback
+	}
 	if status > 0 {
 		return fmt.Sprintf("NewAPI HTTP %d", status)
 	}

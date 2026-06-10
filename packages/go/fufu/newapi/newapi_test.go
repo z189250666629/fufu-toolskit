@@ -60,3 +60,11 @@ func TestSuccessFalseErrorMessage(t *testing.T) {
 		t.Fatalf("ErrorMessage = %q", got)
 	}
 }
+
+func TestErrorMessageUsesFallbackForHTTP200WithoutPayloadMessage(t *testing.T) {
+	data := map[string]any{"success": false}
+
+	if got := ErrorMessage(data, 200, "upstream rejected request"); got != "upstream rejected request" {
+		t.Fatalf("ErrorMessage = %q", got)
+	}
+}
