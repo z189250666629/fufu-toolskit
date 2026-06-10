@@ -190,6 +190,11 @@ func TestStaticHandlerRejectsUnsafeOrWrongMethodRequests(t *testing.T) {
 			if w.Code != tc.status {
 				t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 			}
+			if tc.status == http.StatusMethodNotAllowed {
+				if got := w.Header().Get("Allow"); got != "GET, HEAD" {
+					t.Fatalf("Allow = %q", got)
+				}
+			}
 		})
 	}
 }

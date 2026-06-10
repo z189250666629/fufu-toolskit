@@ -132,6 +132,20 @@ func TestStaticRouteServesPublicIndex(t *testing.T) {
 	}
 }
 
+func TestStaticRouteRejectsUnsafeMethodsWithAllowHeader(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	w := httptest.NewRecorder()
+
+	staticRoute(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed || !strings.Contains(w.Body.String(), "Only GET") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Allow"); got != "GET, HEAD" {
+		t.Fatalf("Allow = %q", got)
+	}
+}
+
 func TestStaticRouteRejectsDirectoryListing(t *testing.T) {
 	oldRoot := rootDir
 	defer func() { rootDir = oldRoot }()

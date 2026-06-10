@@ -58,6 +58,7 @@ func post(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWriter, *
 
 func staticRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
 		writeJSONError(w, 405, "Only GET")
 		return
 	}
