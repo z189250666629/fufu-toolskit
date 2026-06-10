@@ -1,16 +1,13 @@
 package combine
 
-import "strings"
+import (
+	"strings"
+
+	tokenkeys "fufu/tokens"
+)
 
 func ensureFullKey(key string) string {
-	s := strings.TrimSpace(key)
-	if s == "" {
-		return ""
-	}
-	if strings.HasPrefix(s, "sk-") {
-		return s
-	}
-	return "sk-" + s
+	return tokenkeys.EnsureFullKey(key)
 }
 
 func displayKey(key string) string {
@@ -24,15 +21,22 @@ func displayKey(key string) string {
 }
 
 func normalizeKeys(raw []string) []string {
+	keys := tokenkeys.NormalizeKeys(raw)
+	if len(keys) > 0 {
+		return keys
+	}
+
 	seen := map[string]bool{}
-	keys := []string{}
 	for _, item := range raw {
-		key := ensureFullKey(strings.TrimSpace(item))
-		if key == "" || key == "sk-" || seen[key] {
-			continue
+		for _, part := range strings.FieldsFunc(item, func(r rune) bool { return r == '\n' || r == '\r' || r == '\t' || r == ' ' || r == ',' || r == ';' }) {
+			key := ensureFullKey(part)
+			bare := strings.TrimPrefix(key, "sk-")
+			if key == "" || key == "sk-" || seen[bare] {
+				continue
+			}
+			seen[bare] = true
+			keys = append(keys, key)
 		}
-		seen[key] = true
-		keys = append(keys, key)
 	}
 	return keys
 }
