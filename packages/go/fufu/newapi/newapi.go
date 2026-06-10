@@ -98,7 +98,11 @@ func (c *Client) Request(ctx context.Context, method, endpoint string, body any)
 		return Response{StatusCode: resp.StatusCode}, nil, err
 	}
 	apiResp := Response{StatusCode: resp.StatusCode, Body: string(respBody)}
-	return apiResp, decodeResponsePayload(respBody), nil
+	data, err := decodeResponsePayload(respBody)
+	if err != nil {
+		return apiResp, nil, err
+	}
+	return apiResp, data, nil
 }
 
 func (c *Client) Get(ctx context.Context, endpoint string) (Response, map[string]any, error) {

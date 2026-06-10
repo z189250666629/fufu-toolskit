@@ -51,6 +51,27 @@ func TestRequestKeepsHTTPErrorBody(t *testing.T) {
 	}
 }
 
+func TestRequestDoesNotTreatInvalidJSONAsSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html>bad gateway</html>`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Site{URL: server.URL, Token: "secret", UserID: "1"})
+	res, data, err := client.Get(context.Background(), "/api/test")
+
+	if err == nil {
+		t.Fatalf("expected invalid JSON error, got response=%+v data=%#v", res, data)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status code = %d", res.StatusCode)
+	}
+	if data != nil {
+		t.Fatalf("invalid JSON should not return success payload: %#v", data)
+	}
+}
+
 func TestSuccessFalseErrorMessage(t *testing.T) {
 	data := map[string]any{"success": false, "message": "bad token"}
 	if IsSuccess(data) {

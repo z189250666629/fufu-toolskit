@@ -18,6 +18,9 @@ func newAPIGet(ctx context.Context, site newapi.Site, endpoint string, timeout t
 	c.HTTPClient.Timeout = timeout
 	res, data, err := c.Get(ctx, endpoint)
 	if err != nil {
+		if res.StatusCode > 0 {
+			return apiResult{OK: false, Status: res.StatusCode, Error: newapi.UpstreamStatusMessage(res, "NewAPI 响应不是有效 JSON")}
+		}
 		return apiResult{OK: false, Status: 0, Error: "NewAPI 请求失败: " + err.Error()}
 	}
 	if !res.OK() {

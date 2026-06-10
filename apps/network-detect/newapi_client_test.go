@@ -1,9 +1,36 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
+
+	"fufu/newapi"
 )
+
+func TestNewAPIGetReportsDecodeErrorWithUpstreamStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte("page failed"))
+	}))
+	t.Cleanup(server.Close)
+
+	result := newAPIGet(context.Background(), newapi.Site{URL: server.URL, Token: "token", UserID: "1"}, "/api/log/self", time.Second)
+
+	if result.OK {
+		t.Fatalf("result should fail: %#v", result)
+	}
+	if result.Status != http.StatusBadGateway {
+		t.Fatalf("status = %d", result.Status)
+	}
+	if !strings.Contains(result.Error, "502") {
+		t.Fatalf("error should include upstream status: %q", result.Error)
+	}
+}
 
 func TestToInt64ParsesDecimalJSONNumber(t *testing.T) {
 	if got := toInt64(json.Number("42.0")); got != 42 {
