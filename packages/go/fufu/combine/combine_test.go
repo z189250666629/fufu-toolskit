@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEvaluatePublicMergeEligibility(t *testing.T) {
@@ -118,6 +119,37 @@ func TestPublicAPIRoutes(t *testing.T) {
 	}
 	if IsAPIPath("/api/health") {
 		t.Fatalf("network health endpoint should not be a combine API path")
+	}
+}
+
+func TestMergeStatusRequiresSessionForNonGuestJobs(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	guestRole := RoleGuest
+	userRole := RoleUser
+	app.setMergeJob("job-guest", MergeJobPatch{Status: strp("done"), Role: &guestRole, Result: map[string]any{"ok": true}, HasResult: true})
+	app.setMergeJob("job-user", MergeJobPatch{Status: strp("done"), Role: &userRole, Result: map[string]any{"newCard": map[string]string{"key": "sk-secret"}}, HasResult: true})
+	app.sessions["user-session"] = SessionInfo{Expiry: time.Now().Add(time.Hour), Role: RoleUser}
+
+	guestReq := httptest.NewRequest(http.MethodGet, "/api/merge-status/job-guest", nil)
+	guestRec := httptest.NewRecorder()
+	app.handleAPI(guestRec, guestReq)
+	if guestRec.Code != http.StatusOK {
+		t.Fatalf("guest status code=%d body=%s", guestRec.Code, guestRec.Body.String())
+	}
+
+	anonReq := httptest.NewRequest(http.MethodGet, "/api/merge-status/job-user", nil)
+	anonRec := httptest.NewRecorder()
+	app.handleAPI(anonRec, anonReq)
+	if anonRec.Code != http.StatusUnauthorized || strings.Contains(anonRec.Body.String(), "sk-secret") {
+		t.Fatalf("anonymous status code=%d body=%s", anonRec.Code, anonRec.Body.String())
+	}
+
+	authReq := httptest.NewRequest(http.MethodGet, "/api/merge-status/job-user", nil)
+	authReq.Header.Set("X-Session-Token", "user-session")
+	authRec := httptest.NewRecorder()
+	app.handleAPI(authRec, authReq)
+	if authRec.Code != http.StatusOK || !strings.Contains(authRec.Body.String(), "sk-secret") {
+		t.Fatalf("authenticated status code=%d body=%s", authRec.Code, authRec.Body.String())
 	}
 }
 

@@ -134,7 +134,22 @@ func (a *App) handleMergeStatus(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 404, map[string]string{"error": "任务不存在或已过期"})
 		return
 	}
+	if !a.canReadMergeJobStatus(r, job) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "未授权"})
+		return
+	}
 	writeJSON(w, 200, job)
+}
+
+func (a *App) canReadMergeJobStatus(r *http.Request, job MergeJob) bool {
+	if job.Role == RoleGuest {
+		return true
+	}
+	if roleFromContext(r.Context()) != "" {
+		return true
+	}
+	_, ok := a.authenticate(r)
+	return ok
 }
 
 func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
