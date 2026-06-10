@@ -282,6 +282,29 @@ func TestHandleDeleteTokenRedactsUpstreamErrors(t *testing.T) {
 	}
 }
 
+func TestHandleGenerateRedactsUpstreamErrors(t *testing.T) {
+	app := NewApp(Config{URL: "http://internal.example.local/%zz", Token: "secret-token", UserID: "1", QuotaUnit: 500000}, nil)
+	app.sessions["admin-session"] = SessionInfo{Expiry: time.Now().Add(time.Hour), Role: RoleAdmin}
+	req := httptest.NewRequest(http.MethodPost, "/api/generate", strings.NewReader(`{"count":1,"quota":1,"intervalUnit":60,"group":"mix"}`))
+	req.Header.Set("X-Session-Token", "admin-session")
+	w := httptest.NewRecorder()
+
+	app.handleAPI(w, req)
+
+	body := strings.TrimSpace(w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	if !strings.Contains(body, `"errors":["#1: 生成失败，请稍后重试"]`) {
+		t.Fatalf("expected safe generate error, got %s", body)
+	}
+	for _, leaked := range []string{"internal.example.local", "%zz", "parse", "invalid URL", "secret-token"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("generate error leaked %q in %s", leaked, body)
+		}
+	}
+}
+
 func TestHandleMergeRejectsEmptyKeysBeforeQueuing(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/merge", strings.NewReader(`{"keys":["  ","sk-"]}`))

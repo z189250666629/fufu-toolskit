@@ -184,7 +184,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		uniqueName := fmt.Sprintf("gen-%d-%s", time.Now().UnixMilli(), randomBase36(6))
 		res, _, err := a.createToken(r.Context(), buildGeneratedTokenCreateBody(uniqueName, totalQuota, group, p.IntervalUnit))
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("#%d: %s", i+1, err))
+			errs = appendGenerateError(errs, i, "生成失败，请稍后重试", err)
 			continue
 		}
 		if !res.OK() {
@@ -193,7 +193,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		}
 		token, err := a.searchTokenByName(r.Context(), uniqueName)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("#%d: %s", i+1, err))
+			errs = appendGenerateError(errs, i, "生成成功但查询失败，请稍后重试", err)
 			continue
 		}
 		if token == nil {
@@ -203,7 +203,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		card := cloneMap(token.Raw)
 		card["name"] = generateTokenFinalName(p.Quota)
 		if res, _, err := a.updateTokenRaw(r.Context(), card); err != nil {
-			errs = append(errs, fmt.Sprintf("#%d: %s", i+1, err))
+			errs = appendGenerateError(errs, i, "生成成功但重命名失败，请稍后重试", err)
 			continue
 		} else if !res.OK() {
 			errs = append(errs, fmt.Sprintf("#%d: 重命名失败", i+1))
@@ -212,7 +212,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		tokenID := toInt(card["id"])
 		verifiedToken, err := a.fetchVerifiedToken(r.Context(), tokenID)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("#%d: 创建成功但复查失败: %s", i+1, err))
+			errs = appendGenerateError(errs, i, "生成成功但复查失败，请稍后重试", err)
 			continue
 		}
 		if err := a.upsertGeneratedToken(r.Context(), verifiedToken); err != nil {
@@ -221,6 +221,11 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		keys = append(keys, verifiedToken.Key)
 	}
 	writeJSON(w, 200, map[string]any{"keys": keys, "errors": errs})
+}
+
+func appendGenerateError(errs []string, index int, message string, err error) []string {
+	log.Printf("combine generate token #%d failed: %v", index+1, err)
+	return append(errs, fmt.Sprintf("#%d: %s", index+1, message))
 }
 
 func (a *App) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
