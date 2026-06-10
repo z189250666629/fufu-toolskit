@@ -18,6 +18,10 @@ func serveStatic(w http.ResponseWriter, r *http.Request, path string) {
 		return
 	}
 	if _, err := os.Stat(file); err != nil {
+		if filepath.Ext(path) != "" {
+			http.NotFound(w, r)
+			return
+		}
 		file = filepath.Join(frontendDir, "index.html")
 	}
 	serveFile(w, r, file, strings.HasSuffix(file, ".html"))

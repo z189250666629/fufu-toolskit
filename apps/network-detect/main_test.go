@@ -38,6 +38,37 @@ func TestCombinePageServed(t *testing.T) {
 	}
 }
 
+func TestStaticMissingAssetsDoNotUseSPAFallback(t *testing.T) {
+	oldRoot, oldFrontend, oldCombine := rootDir, frontendDir, combineDir
+	t.Cleanup(func() {
+		rootDir, frontendDir, combineDir = oldRoot, oldFrontend, oldCombine
+	})
+	tmp := t.TempDir()
+	rootDir = tmp
+	frontendDir = filepath.Join(tmp, "frontend")
+	combineDir = filepath.Join(tmp, "combine")
+	if err := os.MkdirAll(frontendDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(frontendDir, "index.html"), []byte("spa shell"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	assetReq := httptest.NewRequest(http.MethodGet, "/missing.js", nil)
+	assetRec := httptest.NewRecorder()
+	route(assetRec, assetReq)
+	if assetRec.Code != http.StatusNotFound {
+		t.Fatalf("missing asset code=%d body=%s", assetRec.Code, assetRec.Body.String())
+	}
+
+	spaReq := httptest.NewRequest(http.MethodGet, "/models", nil)
+	spaRec := httptest.NewRecorder()
+	route(spaRec, spaReq)
+	if spaRec.Code != http.StatusOK || !strings.Contains(spaRec.Body.String(), "spa shell") {
+		t.Fatalf("spa fallback code=%d body=%s", spaRec.Code, spaRec.Body.String())
+	}
+}
+
 func TestCombineAPIRoutes(t *testing.T) {
 	for _, path := range []string{
 		"/api/auth",
