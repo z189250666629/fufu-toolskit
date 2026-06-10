@@ -55,12 +55,20 @@ func toInt64(v any) int64 {
 	case int64:
 		return x
 	case string:
-		n, _ := strconv.ParseInt(strings.TrimSpace(x), 10, 64)
-		return n
+		return parseInt64String(x)
 	default:
-		n, _ := strconv.ParseInt(fmt.Sprint(x), 10, 64)
+		return parseInt64String(fmt.Sprint(x))
+	}
+}
+
+func parseInt64String(value string) int64 {
+	value = strings.TrimSpace(value)
+	n, err := strconv.ParseInt(value, 10, 64)
+	if err == nil {
 		return n
 	}
+	f, _ := strconv.ParseFloat(value, 64)
+	return int64(f)
 }
 
 func jsonNumberToInt64(n json.Number) int64 {

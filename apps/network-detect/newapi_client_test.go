@@ -10,3 +10,9 @@ func TestToInt64ParsesDecimalJSONNumber(t *testing.T) {
 		t.Fatalf("decimal json.Number = %d", got)
 	}
 }
+
+func TestToInt64ParsesDecimalString(t *testing.T) {
+	if got := toInt64("42.0"); got != 42 {
+		t.Fatalf("decimal string = %d", got)
+	}
+}
