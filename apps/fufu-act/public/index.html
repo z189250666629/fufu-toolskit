@@ -1142,6 +1142,7 @@
 
       <div class="history">
         <h3>WIN LOG</h3>
+        <div class="history-status" id="history-status"></div>
         <div class="history-list" id="history-list"></div>
       </div>
 
@@ -1653,8 +1654,12 @@
        History
        ============================================================ */
     function renderHistory(history) {
+      $('history-status').textContent = '';
       const list = $('history-list');
       list.innerHTML = activityRender.buildHistoryHtml(history, PRIZE_SYMBOLS);
+    }
+    function renderHistoryRefreshError() {
+      $('history-status').textContent = '历史暂未刷新';
     }
     async function refreshHistory() {
       try {
@@ -1663,14 +1668,17 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardKey: currentCardKey }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          renderHistory(data.history);
-          $('info-remaining').textContent = data.remainingSpins;
-          $('info-total-won').textContent = '$' + data.totalWon;
-          updateLeverState(data.remainingSpins);
-        }
-      } catch (e) { /* silent */ }
+        const data = await activityApi.readApiJson(res, {
+          serverErrorMessage: '历史暂未刷新',
+          clientErrorMessage: '历史暂未刷新',
+        });
+        renderHistory(data.history);
+        $('info-remaining').textContent = data.remainingSpins;
+        $('info-total-won').textContent = '$' + data.totalWon;
+        updateLeverState(data.remainingSpins);
+      } catch (e) {
+        renderHistoryRefreshError();
+      }
     }
 
     /* ============================================================

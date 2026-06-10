@@ -32,3 +32,19 @@ test('prize drawer reports load failures instead of silently swallowing them', a
   assert.doesNotMatch(fetchPrizesSource, /if \(!res\.ok\) return;/);
   assert.doesNotMatch(fetchPrizesSource, /catch \(e\) \{ \/\* silent \*\/ \}/);
 });
+
+test('history refresh marks stale state without clearing previous rows', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const refreshStart = source.indexOf('async function refreshHistory()');
+  const refreshEnd = source.indexOf('/* ============================================================\n       Logout');
+  const refreshSource = source.slice(refreshStart, refreshEnd);
+
+  assert.match(source, /id="history-status"/);
+  assert.match(source, /function renderHistoryRefreshError\(\)/);
+  assert.match(refreshSource, /activityApi\.readApiJson\(res,\s*\{/);
+  assert.match(refreshSource, /serverErrorMessage: '历史暂未刷新'/);
+  assert.match(refreshSource, /catch \(e\) \{\s*renderHistoryRefreshError\(\);\s*\}/);
+  assert.match(source, /\$\('history-status'\)\.textContent = '';/);
+  assert.doesNotMatch(refreshSource, /if \(res\.ok\) \{\s*const data = await res\.json\(\);/);
+  assert.doesNotMatch(refreshSource, /catch \(e\) \{ \/\* silent \*\/ \}/);
+});
