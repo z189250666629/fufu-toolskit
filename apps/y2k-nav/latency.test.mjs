@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { measureLatency } from './latency.mjs';
+import { initLatencyProbes, measureLatency } from './latency.mjs';
 
 test('latency probe marks timeout when fetch never settles', async () => {
   let timeoutCallback;
@@ -42,4 +42,34 @@ test('latency probe marks timeout when fetch never settles', async () => {
 
   assert.deepEqual(result, { ok: false, text: '超时', className: 'latency bad', timedOut: true });
   assert.equal(clearedTimer, 'timer-1');
+});
+
+test('initLatencyProbes marks probe failed when measure rejects', async () => {
+  const element = { textContent: '--', className: 'latency' };
+  const document = {
+    querySelectorAll(selector) {
+      assert.equal(selector, 'a[data-ping]');
+      return [{
+        getAttribute(name) {
+          assert.equal(name, 'data-ping');
+          return 'https://example.test';
+        },
+        querySelector(selector) {
+          assert.equal(selector, '.latency');
+          return element;
+        }
+      }];
+    }
+  };
+
+  initLatencyProbes({
+    document,
+    measure: async () => {
+      throw new Error('network down');
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(element.textContent, '失败');
+  assert.equal(element.className, 'latency bad');
 });

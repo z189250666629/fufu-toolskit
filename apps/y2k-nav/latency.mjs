@@ -49,6 +49,13 @@ export function initLatencyProbes({
   document.querySelectorAll('a[data-ping]').forEach((anchor) => {
     const url = anchor.getAttribute('data-ping');
     const element = anchor.querySelector('.latency');
-    measure(url).then((result) => applyLatencyResult(element, result));
+    Promise.resolve()
+      .then(() => measure(url))
+      .then((result) => applyLatencyResult(element, result))
+      .catch(() => applyLatencyResult(element, {
+        ok: false,
+        text: '失败',
+        className: 'latency bad'
+      }));
   });
 }
