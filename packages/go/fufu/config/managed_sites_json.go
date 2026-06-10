@@ -1,15 +1,13 @@
 package config
 
 import (
-	"encoding/json"
+	"fufu/webutil"
 	"strings"
 )
 
 func decodeManagedSitesJSON(raw string) (any, error) {
 	var data any
-	dec := json.NewDecoder(strings.NewReader(raw))
-	dec.UseNumber()
-	if err := dec.Decode(&data); err != nil {
+	if err := webutil.DecodeJSON(strings.NewReader(raw), &data, webutil.WithUseNumber()); err != nil {
 		return nil, err
 	}
 	return data, nil

@@ -24,3 +24,16 @@ func TestDecodeManagedSitesJSONReportsInvalidJSON(t *testing.T) {
 		t.Fatalf("expected invalid JSON error, got data=%#v err=%v", data, err)
 	}
 }
+
+func TestDecodeManagedSitesJSONRejectsTrailingJSONValue(t *testing.T) {
+	if data, err := decodeManagedSitesJSON(`{"managedApiSites":[]} {}`); err == nil || data != nil {
+		t.Fatalf("expected trailing JSON error, got data=%#v err=%v", data, err)
+	}
+}
+
+func TestDecodeManagedSitesJSONAllowsTrailingWhitespace(t *testing.T) {
+	data, err := decodeManagedSitesJSON("{\"managedApiSites\":[]}\n\t ")
+	if err != nil || data == nil {
+		t.Fatalf("expected trailing whitespace to decode, got data=%#v err=%v", data, err)
+	}
+}
