@@ -92,6 +92,18 @@ func TestFromRawNormalizesKeyStatusAndNumbers(t *testing.T) {
 	}
 }
 
+func TestFromRawTreatsNilStringFieldsAsBlank(t *testing.T) {
+	token := FromRaw(map[string]any{
+		"key":   nil,
+		"name":  nil,
+		"group": nil,
+	})
+
+	if token.Key != "" || token.Name != "" || token.Group != "" {
+		t.Fatalf("nil string fields should be blank, got %#v", token)
+	}
+}
+
 func TestRawNumberInt64ParsesDecimalJSONNumberConsistently(t *testing.T) {
 	cases := []struct {
 		name string

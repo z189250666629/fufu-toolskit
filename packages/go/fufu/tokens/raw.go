@@ -20,7 +20,14 @@ func getString(obj map[string]any, key string) string {
 		return ""
 	}
 	if v, ok := obj[key]; ok {
-		return strings.TrimSpace(fmt.Sprint(v))
+		if v == nil {
+			return ""
+		}
+		text := strings.TrimSpace(fmt.Sprint(v))
+		if text == "<nil>" {
+			return ""
+		}
+		return text
 	}
 	return ""
 }
