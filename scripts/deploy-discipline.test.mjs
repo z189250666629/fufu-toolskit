@@ -61,6 +61,18 @@ test('deploy workflows use the canonical toolskit GitHub environment', async () 
   }
 });
 
+test('deploy workflow verify jobs run uncached Go tests', async () => {
+  for (const path of [
+    '.github/workflows/deploy-act.yml',
+    '.github/workflows/deploy-network.yml',
+    '.github/workflows/deploy-y2k-nav.yml'
+  ]) {
+    const source = await readRepoFile(path);
+    assert.doesNotMatch(source, /^\s*-\s*run:\s*go test \.\/\.\.\.\s*$/m, `${path} must not use cache-prone go test ./...`);
+    assert.match(source, /^\s*-\s*run:\s*go test -count=1 \.\/\.\.\.\s*$/m, `${path} should disable Go test cache in deploy verification`);
+  }
+});
+
 test('network-detect compose files use the canonical deployed host port', async () => {
   for (const path of [
     'infra/deploy/network-detect/docker-compose.yml',

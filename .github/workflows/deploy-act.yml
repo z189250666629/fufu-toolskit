@@ -41,7 +41,7 @@ jobs:
           cache-dependency-path: |
             apps/fufu-act/go.sum
             packages/go/fufu/go.sum
-      - run: go test ./...
+      - run: go test -count=1 ./...
   docker:
     needs: verify
     runs-on: ubuntu-latest

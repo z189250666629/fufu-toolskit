@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: apps/y2k-nav/go.mod
-      - run: go test ./...
+      - run: go test -count=1 ./...
   docker:
     needs: verify
     runs-on: ubuntu-latest
