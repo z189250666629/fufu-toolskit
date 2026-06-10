@@ -20,7 +20,7 @@ func LoadPrimarySite(rootDir string) (newapi.Site, error) {
 	if site, ok := managedSiteFromEnv(managedSiteEnvDef{
 		Prefix:                   "NEWAPI_API_SITE",
 		DefaultName:              "次数fufu",
-		DefaultRatio:             "1",
+		DefaultRatio:             "0.1",
 		DefaultChannelListPath:   "/api/channel/search?keyword=&p=1&page_size=500",
 		AllowAccessTokenFallback: true,
 	}); ok {

@@ -149,6 +149,24 @@ func TestLoadPrimarySiteUsesNewAPISiteEnvMetadata(t *testing.T) {
 	}
 }
 
+func TestLoadPrimarySiteUsesSameNewAPISiteDefaultsAsDeploymentSites(t *testing.T) {
+	clearPrimaryEnv(t)
+	t.Setenv("NEWAPI_API_SITE_URL", "https://api.example.test/")
+	t.Setenv("NEWAPI_API_SITE_TOKEN", "api-token")
+
+	site, err := LoadPrimarySite(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sites := DeploymentSitesFromEnv()
+	if len(sites) == 0 {
+		t.Fatal("expected NEWAPI_API_SITE env to produce deployment site")
+	}
+	if site.RechargeRatio != sites[0].RechargeRatio {
+		t.Fatalf("primary ratio=%v deployment ratio=%v", site.RechargeRatio, sites[0].RechargeRatio)
+	}
+}
+
 func TestLoadPrimarySiteReportsInvalidLegacyConfig(t *testing.T) {
 	clearPrimaryEnv(t)
 	root := t.TempDir()
