@@ -48,16 +48,17 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 		writeBadJSONRequest(w)
 		return
 	}
-	if len(p.Keys) == 0 {
+	keys := normalizeKeys(p.Keys)
+	if len(keys) == 0 {
 		writeJSON(w, 400, map[string]string{"error": "No keys provided"})
 		return
 	}
-	keys, found, missing, err := a.resolveTokensForSearch(r.Context(), p.Keys)
+	keys, found, missing, err := a.resolveTokensForSearch(r.Context(), keys)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return
 	}
-	traceResults, err := a.traceResultsForKeys(r.Context(), p.Keys)
+	traceResults, err := a.traceResultsForKeys(r.Context(), keys)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return
@@ -70,6 +71,11 @@ func (a *App) handleMerge(w http.ResponseWriter, r *http.Request) {
 	var p MergePayload
 	if err := decodeJSON(r.Body, &p); err != nil {
 		writeBadJSONRequest(w)
+		return
+	}
+	p.Keys = normalizeKeys(p.Keys)
+	if len(p.Keys) == 0 {
+		writeJSON(w, 400, map[string]string{"error": "No keys provided"})
 		return
 	}
 	role := roleFromContext(r.Context())
@@ -92,14 +98,19 @@ func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
 		writeBadJSONRequest(w)
 		return
 	}
+	keys := normalizeKeys(p.Keys)
+	if len(keys) == 0 {
+		writeJSON(w, 400, map[string]string{"error": "No keys provided"})
+		return
+	}
 	jobID, err := randomHex(16)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "创建任务失败"})
 		return
 	}
 	role := RoleGuest
-	a.setMergeJob(jobID, buildQueuedMergeJobPatch(len(p.Keys), role, "准备普通合卡..."))
-	go a.runMergeJob(jobID, MergePayload{Keys: p.Keys, IntervalUnit: publicTargetUnit}, RoleGuest)
+	a.setMergeJob(jobID, buildQueuedMergeJobPatch(len(keys), role, "准备普通合卡..."))
+	go a.runMergeJob(jobID, MergePayload{Keys: keys, IntervalUnit: publicTargetUnit}, RoleGuest)
 	writeJSON(w, 200, buildMergeAcceptedResponse(jobID))
 }
 

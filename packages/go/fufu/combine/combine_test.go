@@ -156,3 +156,45 @@ func TestHandleAuthCreatesSession(t *testing.T) {
 		t.Fatalf("sessions = %#v", app.sessions)
 	}
 }
+
+func TestHandleSearchKeysRejectsBlankOnlyKeys(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/search-keys", strings.NewReader(`{"keys":["  ","sk-"]}`))
+	w := httptest.NewRecorder()
+
+	app.handleSearchKeys(w, req)
+
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "No keys provided") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleMergeRejectsEmptyKeysBeforeQueuing(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/merge", strings.NewReader(`{"keys":["  ","sk-"]}`))
+	w := httptest.NewRecorder()
+
+	app.handleMerge(w, req)
+
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "No keys provided") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(app.mergeJobs) != 0 {
+		t.Fatalf("blank keys should not queue merge jobs: %#v", app.mergeJobs)
+	}
+}
+
+func TestHandlePublicMergeRejectsEmptyKeysBeforeQueuing(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/public-merge", strings.NewReader(`{"keys":["  ","sk-"]}`))
+	w := httptest.NewRecorder()
+
+	app.handlePublicMerge(w, req)
+
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "No keys provided") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(app.mergeJobs) != 0 {
+		t.Fatalf("blank keys should not queue public merge jobs: %#v", app.mergeJobs)
+	}
+}
