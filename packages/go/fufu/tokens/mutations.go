@@ -10,8 +10,19 @@ import (
 	"fufu/newapi"
 )
 
+func (s *Service) configuredClient() (*newapi.Client, error) {
+	if s == nil || s.Client == nil {
+		return nil, fmt.Errorf("token service is not configured")
+	}
+	return s.Client, nil
+}
+
 func (s *Service) GetToken(ctx context.Context, id int) (Token, error) {
-	res, data, err := s.Client.Request(ctx, http.MethodGet, fmt.Sprintf("/api/token/%d", id), nil)
+	client, err := s.configuredClient()
+	if err != nil {
+		return Token{}, err
+	}
+	res, data, err := client.Request(ctx, http.MethodGet, fmt.Sprintf("/api/token/%d", id), nil)
 	if err != nil {
 		return Token{}, err
 	}
@@ -28,19 +39,35 @@ func (s *Service) GetToken(ctx context.Context, id int) (Token, error) {
 }
 
 func (s *Service) CreateToken(ctx context.Context, body map[string]any) (newapi.Response, map[string]any, error) {
-	return s.Client.Request(ctx, http.MethodPost, "/api/token/", body)
+	client, err := s.configuredClient()
+	if err != nil {
+		return newapi.Response{}, nil, err
+	}
+	return client.Request(ctx, http.MethodPost, "/api/token/", body)
 }
 
 func (s *Service) CreateTokens(ctx context.Context, count int, body map[string]any) (newapi.Response, map[string]any, error) {
-	return s.Client.Request(ctx, http.MethodPost, fmt.Sprintf("/api/token/tokens?tokenCount=%d", count), body)
+	client, err := s.configuredClient()
+	if err != nil {
+		return newapi.Response{}, nil, err
+	}
+	return client.Request(ctx, http.MethodPost, fmt.Sprintf("/api/token/tokens?tokenCount=%d", count), body)
 }
 
 func (s *Service) UpdateTokenRaw(ctx context.Context, raw map[string]any) (newapi.Response, map[string]any, error) {
-	return s.Client.Request(ctx, http.MethodPut, "/api/token/", raw)
+	client, err := s.configuredClient()
+	if err != nil {
+		return newapi.Response{}, nil, err
+	}
+	return client.Request(ctx, http.MethodPut, "/api/token/", raw)
 }
 
 func (s *Service) DeleteToken(ctx context.Context, id int) (bool, newapi.Response, error) {
-	res, _, err := s.Client.Request(ctx, http.MethodDelete, fmt.Sprintf("/api/token/%d", id), nil)
+	client, err := s.configuredClient()
+	if err != nil {
+		return false, newapi.Response{}, err
+	}
+	res, _, err := client.Request(ctx, http.MethodDelete, fmt.Sprintf("/api/token/%d", id), nil)
 	if err != nil {
 		return false, newapi.Response{}, err
 	}

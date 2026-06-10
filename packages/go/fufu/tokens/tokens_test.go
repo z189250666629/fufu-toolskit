@@ -218,6 +218,52 @@ func TestBatchSearchReturnsConfigurationErrorForNilService(t *testing.T) {
 	}
 }
 
+func TestMutationMethodsReturnConfigurationErrorForNilService(t *testing.T) {
+	var svc *Service
+	cases := []struct {
+		name string
+		call func() error
+	}{
+		{name: "GetToken", call: func() error {
+			_, err := svc.GetToken(context.Background(), 1)
+			return err
+		}},
+		{name: "CreateToken", call: func() error {
+			_, _, err := svc.CreateToken(context.Background(), map[string]any{"name": "card"})
+			return err
+		}},
+		{name: "CreateTokens", call: func() error {
+			_, _, err := svc.CreateTokens(context.Background(), 2, map[string]any{"name": "card"})
+			return err
+		}},
+		{name: "UpdateTokenRaw", call: func() error {
+			_, _, err := svc.UpdateTokenRaw(context.Background(), map[string]any{"id": 1})
+			return err
+		}},
+		{name: "DeleteToken", call: func() error {
+			ok, _, err := svc.DeleteToken(context.Background(), 1)
+			if ok {
+				t.Fatal("DeleteToken should not report success without a configured service")
+			}
+			return err
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if x := recover(); x != nil {
+					t.Fatalf("%s should return an error, not panic: %v", tc.name, x)
+				}
+			}()
+			err := tc.call()
+			if err == nil || !strings.Contains(err.Error(), "token service is not configured") {
+				t.Fatalf("err = %v", err)
+			}
+		})
+	}
+}
+
 func TestSearchTokenByKeyReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "bad token"})
