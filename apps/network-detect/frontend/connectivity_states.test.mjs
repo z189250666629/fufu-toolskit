@@ -19,6 +19,22 @@ test('flattenConnectivityTargets expands groups without mutating input', () => {
   assert.deepEqual(groups[0].urls, ['https://a.test', 'https://b.test']);
 });
 
+test('flattenConnectivityTargets trims URLs and drops empty or malformed groups', () => {
+  const groups = [
+    { id: 'api', name: 'API', urls: [' https://a.test ', '', '   '] },
+    { id: 'bad', name: 'Bad', urls: 'https://bad.test' },
+    { id: 'token', name: 'Token', urls: ['\thttps://token.test\n'] }
+  ];
+
+  const targets = flattenConnectivityTargets(groups);
+
+  assert.deepEqual(targets.map((target) => [target.group.id, target.url]), [
+    ['api', 'https://a.test'],
+    ['token', 'https://token.test']
+  ]);
+  assert.deepEqual(groups[0].urls, [' https://a.test ', '', '   ']);
+});
+
 test('connectivity base states expose stable UI copy', () => {
   assert.equal(buildRunningState().title, '测试中');
   assert.equal(buildRunningState().running, true);

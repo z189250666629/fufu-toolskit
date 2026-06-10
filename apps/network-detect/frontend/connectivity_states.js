@@ -3,7 +3,13 @@ import {
 } from './utils.js';
 
 export function flattenConnectivityTargets(groups = []) {
-  return groups.flatMap((group) => (group.urls || []).map((url) => ({ group, url })));
+  return groups.flatMap((group) => {
+    const urls = Array.isArray(group.urls) ? group.urls : [];
+    return urls
+      .map((url) => String(url ?? '').trim())
+      .filter(Boolean)
+      .map((url) => ({ group, url }));
+  });
 }
 
 export function buildNoTargetsState(testedAt) {
