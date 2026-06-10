@@ -14,6 +14,24 @@ require_env() {
   fi
 }
 
+require_port() {
+  local name="$1"
+  local value="${!name:-}"
+  if [ -z "$value" ]; then
+    printf '[deploy] %s is required and must be a number between 1 and 65535\n' "$name" >&2
+    exit 1
+  fi
+  if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+    printf '[deploy] %s must be a number between 1 and 65535\n' "$name" >&2
+    exit 1
+  fi
+  local number=$((10#$value))
+  if [ "$number" -lt 1 ] || [ "$number" -gt 65535 ]; then
+    printf '[deploy] %s must be a number between 1 and 65535\n' "$name" >&2
+    exit 1
+  fi
+}
+
 write_env_var() {
   local name="$1"
   local value="${!name:-}"
@@ -51,6 +69,7 @@ REMOTE_COMPOSE_FILE="$(basename "$COMPOSE_FILE")"
 CONTAINER_NAME="${CONTAINER_NAME:-$APP_NAME}"
 HOST_BIND="${HOST_BIND:-0.0.0.0}"
 HOST_PORT="${HOST_PORT:-}"
+require_port HOST_PORT
 
 mkdir -p "$HOME/.ssh"
 chmod 700 "$HOME/.ssh"

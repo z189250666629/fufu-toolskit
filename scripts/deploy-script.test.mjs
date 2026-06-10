@@ -38,6 +38,85 @@ test('deploy shell scripts pass bash syntax checks', { skip: bashProbe.error ? '
   }
 });
 
+async function runDeployPortValidationCase(t, { hostPort }) {
+  const tmpName = `.tmp/deploy-script-port-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
+  const fakeBinRel = `${tmpName}/bin`;
+  const composeRel = `${tmpName}/docker-compose.yml`;
+  const composeEnvRel = `${tmpName}/compose.env`;
+  const sshMarkerUrl = new URL('ssh-called.txt', tmpUrl);
+
+  t.after(() => rm(tmpUrl, { recursive: true, force: true }));
+  await mkdir(new URL('bin/', tmpUrl), { recursive: true });
+  await mkdir(new URL('home/', tmpUrl), { recursive: true });
+  await writeFile(new URL('docker-compose.yml', tmpUrl), 'services:\n  app:\n    image: ${APP_IMAGE}:${APP_TAG}\n');
+
+  for (const [name, body] of Object.entries({
+    'ssh-keygen': '#!/usr/bin/env bash\nexit 0\n',
+    'ssh-keyscan': '#!/usr/bin/env bash\nprintf "example ssh-rsa test\\n"\n',
+    scp: '#!/usr/bin/env bash\nexit 0\n',
+    ssh: [
+      '#!/usr/bin/env bash',
+      'printf "called\\n" > "$SSH_CALLED_MARKER"',
+      'exit 44',
+      ''
+    ].join('\n')
+  })) {
+    const commandUrl = new URL(`bin/${name}`, tmpUrl);
+    await writeFile(commandUrl, body);
+    await chmod(commandUrl, 0o755);
+  }
+
+  const envAssignments = {
+    APP_NAME: 'y2k-nav',
+    APP_IMAGE: 'example/y2k',
+    APP_TAG: 'test',
+    SSH_HOST: 'example.test',
+    SSH_USER: 'deploy',
+    SSH_PRIVATE_KEY: 'fake-key',
+    DEPLOY_PATH: '/srv/fufu',
+    COMPOSE_FILE: composeRel,
+    COMPOSE_SERVICE_NAME: 'app',
+    COMPOSE_ENV_FILE: composeEnvRel,
+    HOME: `${tmpName}/home`,
+    SSH_CALLED_MARKER: fileURLToPath(sshMarkerUrl)
+  };
+  if (hostPort !== undefined) {
+    envAssignments.HOST_PORT = hostPort;
+  }
+  const command = [
+    `PATH="$PWD/${fakeBinRel}:$PATH"`,
+    ...Object.entries(envAssignments).map(([name, value]) => `${name}=${shellQuote(value)}`),
+    'bash scripts/deploy-docker-app.sh'
+  ].join(' ');
+  const result = spawnSync('bash', ['-c', command], { cwd: repoRoot, encoding: 'utf8' });
+  let sshWasCalled = true;
+  try {
+    await access(sshMarkerUrl);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    sshWasCalled = false;
+  }
+  return { result, sshWasCalled };
+}
+
+test('deploy script fails before ssh when y2k-nav HOST_PORT is missing or invalid', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
+  for (const tc of [
+    { name: 'missing', hostPort: undefined },
+    { name: 'non numeric', hostPort: 'abc' },
+    { name: 'zero', hostPort: '0' },
+    { name: 'too high', hostPort: '65536' }
+  ]) {
+    await t.test(tc.name, async (t) => {
+      const { result, sshWasCalled } = await runDeployPortValidationCase(t, tc);
+
+      assert.equal(result.status, 1, `deployment should fail quickly\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+      assert.match(result.stderr, /HOST_PORT/);
+      assert.equal(sshWasCalled, false, 'invalid HOST_PORT should fail before ssh is called');
+    });
+  }
+});
+
 test('deploy script cleans compose env file when deployment fails', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
   const tmpName = `.tmp/deploy-script-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
@@ -82,6 +161,7 @@ test('deploy script cleans compose env file when deployment fails', { skip: bash
     COMPOSE_FILE: composeRel,
     COMPOSE_SERVICE_NAME: 'app',
     COMPOSE_ENV_FILE: composeEnvRel,
+    HOST_PORT: '18820',
     EXPECTED_COMPOSE_ENV_FILE: composeEnvRel,
     DEPLOY_ENV_SNAPSHOT: composeEnvSnapshotRel,
     HOME: `${tmpName}/home`,
@@ -159,6 +239,7 @@ test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error
     COMPOSE_FILE: composeRel,
     COMPOSE_SERVICE_NAME: 'app',
     COMPOSE_ENV_FILE: composeEnvRel,
+    HOST_PORT: '33148',
     HOME: `${tmpName}/home`
   };
   const command = [
@@ -237,6 +318,7 @@ test('deploy script prints diagnostics when health inspect fails', { skip: bashP
     COMPOSE_FILE: composeRel,
     COMPOSE_SERVICE_NAME: 'app',
     COMPOSE_ENV_FILE: composeEnvRel,
+    HOST_PORT: '33148',
     HOME: `${tmpName}/home`,
     HEALTH_LOG_MARKER: markerRel
   };
