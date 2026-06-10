@@ -34,10 +34,48 @@ function cleanTargetGroups(groups = []) {
       id: String(group.id || group.name || ''),
       name: String(group.name || group.id || 'URL 组'),
       urls: Array.isArray(group.urls)
-        ? group.urls.map((url) => String(url ?? '').trim()).filter(Boolean)
+        ? group.urls.map(safeTargetOrigin).filter(Boolean)
         : []
     }))
     .filter((group) => group.urls.length);
+}
+
+function safeTargetOrigin(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return '';
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+  if (!hostname || hostname === 'localhost' || hostname.endsWith('.localhost')) return '';
+  if (isUnsafeIPAddress(hostname)) return '';
+  return parsed.origin;
+}
+
+function isUnsafeIPAddress(hostname) {
+  const ipv4 = hostname.match(/^(\d{1,3})(?:\.(\d{1,3})){3}$/);
+  if (ipv4) {
+    const parts = hostname.split('.').map(Number);
+    if (parts.some((part) => part < 0 || part > 255)) return true;
+    const [a, b] = parts;
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    );
+  }
+  if (hostname.includes(':')) {
+    const compact = hostname.toLowerCase();
+    return compact === '::1' || compact === '::' || compact.startsWith('fc') || compact.startsWith('fd') || compact.startsWith('fe80:');
+  }
+  return false;
 }
 
 export function addCacheBust(url, baseHref = globalThis.location?.href || 'http://localhost/') {

@@ -494,17 +494,47 @@ func TestConnectivityTargetsDoNotExposePrivateNewAPIFallbackURLs(t *testing.T) {
 	}
 }
 
-func TestConnectivityTargetsKeepExplicitPrivateConnectivityURLs(t *testing.T) {
+func TestConnectivityTargetsRejectExplicitPrivateConnectivityURLs(t *testing.T) {
 	clearConnectivityEnv(t)
-	t.Setenv("CONNECTIVITY_API_URLS", "http://10.0.0.5:3000")
+	t.Setenv("CONNECTIVITY_API_URLS", "http://10.0.0.5:3000,http://127.0.0.1:8080,http://localhost:8080,http://0.0.0.0:8080,http://169.254.1.1,http://[::1]:8080,https://api.example.test/v1?token=sk-secret#debug")
 	req := httptest.NewRequest(http.MethodGet, "/api/connectivity/targets", nil)
 	w := httptest.NewRecorder()
 
 	handleAPI(w, req)
 
 	body := w.Body.String()
-	if w.Code != http.StatusOK || !strings.Contains(body, "10.0.0.5") {
-		t.Fatalf("explicit connectivity URL should be preserved for browser checks: code=%d body=%s", w.Code, body)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	for _, leaked := range []string{"10.0.0.5", "127.0.0.1", "localhost", "0.0.0.0", "169.254.1.1", "::1", "sk-secret", "/v1", "debug"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("connectivity targets leaked unsafe explicit URL detail %q in %s", leaked, body)
+		}
+	}
+	if !strings.Contains(body, "https://api.example.test") {
+		t.Fatalf("safe explicit URL origin should be preserved, got %s", body)
+	}
+}
+
+func TestConnectivityTargetsSanitizesInlineTargets(t *testing.T) {
+	clearConnectivityEnv(t)
+	t.Setenv("CONNECTIVITY_TARGETS", `[{"id":"api","name":"API","urls":["http://10.0.0.5:3000","C:\\secret\\config.json","https://api.example.test/path?token=sk-secret#debug"]}]`)
+	req := httptest.NewRequest(http.MethodGet, "/api/connectivity/targets", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := w.Body.String()
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	for _, leaked := range []string{"10.0.0.5", "C:\\\\secret", "config.json", "sk-secret", "/path", "debug"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("inline connectivity targets leaked unsafe detail %q in %s", leaked, body)
+		}
+	}
+	if !strings.Contains(body, "https://api.example.test") {
+		t.Fatalf("safe inline URL origin should be preserved, got %s", body)
 	}
 }
 

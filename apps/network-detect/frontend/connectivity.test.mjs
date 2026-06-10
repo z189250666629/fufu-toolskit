@@ -16,7 +16,7 @@ test('normalizes target groups and falls back to defaults', () => {
   ]);
 
   assert.deepEqual(custom, [
-    { id: 'api', name: 'API', urls: ['https://a.example', '123'] }
+    { id: 'api', name: 'API', urls: ['https://a.example'] }
   ]);
 
   const fallback = normalizeTargetGroups([]);
@@ -41,6 +41,29 @@ test('normalizeTargetGroups trims target URLs before filtering', () => {
 
   assert.deepEqual(custom, [
     { id: 'api', name: 'API', urls: ['https://a.example'] }
+  ]);
+});
+
+test('normalizeTargetGroups drops unsafe targets and strips URL details', () => {
+  const custom = normalizeTargetGroups([
+    {
+      id: 'api',
+      name: 'API',
+      urls: [
+        'http://10.0.0.5:3000',
+        'http://127.0.0.1:8080',
+        'http://localhost:8080',
+        'http://0.0.0.0:8080',
+        'http://169.254.1.1',
+        'http://[::1]:8080',
+        'C:\\secret\\config.json',
+        'https://api.example.test/path?token=sk-secret#debug'
+      ]
+    }
+  ]);
+
+  assert.deepEqual(custom, [
+    { id: 'api', name: 'API', urls: ['https://api.example.test'] }
   ]);
 });
 
