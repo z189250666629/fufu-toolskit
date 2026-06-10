@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"sync"
+	"time"
 
 	"fufu/newapi"
 	"fufu/tokens"
@@ -19,11 +20,19 @@ type App struct {
 		Hash string
 		Role Role
 	}
-	mu         sync.Mutex
-	sessions   map[string]SessionInfo
-	mergeJobs  map[string]MergeJob
-	mergeLocks map[int]struct{}
-	static     http.Handler
+	mu               sync.Mutex
+	sessions         map[string]SessionInfo
+	authFailures     map[string]authFailureRecord
+	authFailureDelay time.Duration
+	mergeJobs        map[string]MergeJob
+	mergeLocks       map[int]struct{}
+	static           http.Handler
+}
+
+type authFailureRecord struct {
+	Count        int
+	FirstAttempt time.Time
+	BlockedUntil time.Time
 }
 
 type contextKey string

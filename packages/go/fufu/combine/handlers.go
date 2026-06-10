@@ -16,18 +16,28 @@ func (a *App) handleAuth(w http.ResponseWriter, r *http.Request) {
 		writeJSONDecodeError(w, err)
 		return
 	}
+	now := time.Now()
+	if until, blocked := a.authBlockedUntil(r, now); blocked {
+		w.Header().Set("Retry-After", retryAfterSeconds(until, now))
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "登录尝试过多，请稍后重试"})
+		return
+	}
 	matched, ok := matchRoleByPassword(a.passwords, p.Password)
 	if !ok {
-		time.Sleep(time.Second)
+		a.recordAuthFailure(r, now)
+		if a.authFailureDelay > 0 {
+			time.Sleep(a.authFailureDelay)
+		}
 		writeJSON(w, 401, map[string]string{"error": "密码错误"})
 		return
 	}
+	a.clearAuthFailures(r)
 	token, err := randomHex(24)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "生成会话失败"})
 		return
 	}
-	now := time.Now()
+	now = time.Now()
 	a.mu.Lock()
 	a.cleanSessionsLocked(now)
 	a.sessions[token] = SessionInfo{Expiry: now.Add(sessionTTL), Role: matched}

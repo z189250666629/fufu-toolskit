@@ -53,7 +53,8 @@ func newApp(cfg Config, db *sql.DB) *App {
 			"admin": {"6628b315d42878243a5f3d0638389c2cf69a0efa01346dda6b3c46ae313c9fe9", RoleAdmin},
 			"user":  {"5708e5c4c00d86c91e085624253d96bdcf7b3b828243d81e72d883ca414b5d1d", RoleUser},
 		},
-		sessions: make(map[string]SessionInfo), mergeJobs: make(map[string]MergeJob), mergeLocks: make(map[int]struct{}),
+		sessions: make(map[string]SessionInfo), authFailures: make(map[string]authFailureRecord), authFailureDelay: authFailureDelay,
+		mergeJobs: make(map[string]MergeJob), mergeLocks: make(map[int]struct{}),
 		static: webutil.NewStaticHandler("public"),
 	}
 }

@@ -337,6 +337,42 @@ func TestHandleAuthRejectsOversizedJSONBody(t *testing.T) {
 	}
 }
 
+func TestHandleAuthRateLimitsRepeatedFailures(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	app.authFailureDelay = 0
+	app.passwords = map[string]struct {
+		Hash string
+		Role Role
+	}{
+		"admin": {Hash: sha256Hex("test-admin"), Role: RoleAdmin},
+	}
+	remoteAddr := "203.0.113.7:4242"
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/auth", strings.NewReader(`{"password":"bad"}`))
+		req.RemoteAddr = remoteAddr
+		w := httptest.NewRecorder()
+		app.handleAuth(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("failure %d code=%d body=%s", i+1, w.Code, w.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth", strings.NewReader(`{"password":"bad"}`))
+	req.RemoteAddr = remoteAddr
+	w := httptest.NewRecorder()
+	app.handleAuth(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("rate limited auth code=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Retry-After"); got == "" {
+		t.Fatal("rate limited auth should include Retry-After")
+	}
+	if strings.Contains(w.Body.String(), "test-admin") {
+		t.Fatalf("rate limited auth leaked password detail: %s", w.Body.String())
+	}
+}
+
 func TestHandleSearchKeysRejectsBlankOnlyKeys(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/search-keys", strings.NewReader(`{"keys":["  ","sk-"]}`))

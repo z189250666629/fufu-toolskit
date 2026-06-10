@@ -18,6 +18,10 @@ const (
 	publicSourceUnit   = 3
 	publicTargetUnit   = 8
 	maxTraceRecords    = 50
+	authFailureLimit   = 5
+	authFailureWindow  = 5 * time.Minute
+	authFailureLockout = time.Minute
+	authFailureDelay   = time.Second
 )
 
 type Role = auth.Role
