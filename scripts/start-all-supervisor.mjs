@@ -70,6 +70,17 @@ export function createStartAllSupervisor({
     }
   }
 
+  function handleError(item, child, error) {
+    exited.add(child);
+    logger.log(`[${item.name}] failed to start: ${error?.message || error}`);
+
+    if (!stopping) {
+      exitCode = 1;
+      stopAll();
+      onFatalExit(exitCode, item, null);
+    }
+  }
+
   function start() {
     for (const item of commands) {
       const child = spawn(npmCommand(item.command, platform), item.args, {
@@ -81,6 +92,7 @@ export function createStartAllSupervisor({
       child.stdout?.on('data', createPrefixWriter(stdout, item.name));
       child.stderr?.on('data', createPrefixWriter(stderr, item.name));
       child.on('exit', (code, signal) => handleExit(item, child, code, signal));
+      child.on('error', (error) => handleError(item, child, error));
     }
     return children;
   }
