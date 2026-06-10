@@ -126,6 +126,29 @@ func TestLoadPrimarySiteReportsManagedSiteConfigErrorWhenNoLegacyConfig(t *testi
 	}
 }
 
+func TestLoadPrimarySiteUsesNewAPISiteEnvMetadata(t *testing.T) {
+	clearPrimaryEnv(t)
+	t.Setenv("NEWAPI_API_SITE_URL", "https://api.example.test/")
+	t.Setenv("NEWAPI_API_SITE_TOKEN", "api-token")
+	t.Setenv("NEWAPI_API_SITE_NAME", "api-env")
+	t.Setenv("NEWAPI_API_SITE_USER_ID", "77")
+	t.Setenv("NEWAPI_API_SITE_QUOTA_UNIT", "800000")
+	t.Setenv("NEWAPI_API_SITE_CURRENCY", "¥")
+	t.Setenv("NEWAPI_API_SITE_RECHARGE_RATIO", "0.3")
+	t.Setenv("NEWAPI_API_SITE_SKIP_USER_HEADER", "true")
+
+	site, err := LoadPrimarySite(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if site.Name != "api-env" || site.URL != "https://api.example.test" || site.Token != "api-token" {
+		t.Fatalf("bad site identity: %#v", site)
+	}
+	if site.UserID != "77" || site.QuotaUnit != 800000 || site.Currency != "¥" || site.RechargeRatio != 0.3 || !site.SkipUserHeader {
+		t.Fatalf("metadata not loaded: %#v", site)
+	}
+}
+
 func TestLoadPrimarySiteReportsInvalidLegacyConfig(t *testing.T) {
 	clearPrimaryEnv(t)
 	root := t.TempDir()
@@ -153,6 +176,12 @@ func clearPrimaryEnv(t *testing.T) {
 		"FUFU_API_USER_ID",
 		"FUFU_QUOTA_UNIT",
 		"NEWAPI_API_SITE_URL",
+		"NEWAPI_API_SITE_NAME",
+		"NEWAPI_API_SITE_USER_ID",
+		"NEWAPI_API_SITE_QUOTA_UNIT",
+		"NEWAPI_API_SITE_CURRENCY",
+		"NEWAPI_API_SITE_RECHARGE_RATIO",
+		"NEWAPI_API_SITE_SKIP_USER_HEADER",
 		"NEWAPI_API_SITE_TOKEN",
 		"NEWAPI_API_SITE_ACCESS_TOKEN",
 		"NEWAPI_TOKEN_SITE_URL",

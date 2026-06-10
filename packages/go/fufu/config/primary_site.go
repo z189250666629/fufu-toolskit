@@ -11,22 +11,20 @@ import (
 )
 
 func LoadPrimarySite(rootDir string) (newapi.Site, error) {
-	url := NormalizeBaseURL(Env("FUFU_COMBINE_API_URL"))
-	if url == "" {
-		url = NormalizeBaseURL(Env("FUFU_API_BASE_URL"))
-		if url == "" {
-			url = NormalizeBaseURL(Env("NEWAPI_API_SITE_URL"))
-		}
+	if site, ok := fufuCombinePrimarySiteFromEnv(); ok {
+		return site, nil
 	}
-	token := Env("FUFU_COMBINE_API_TOKEN")
-	if token == "" {
-		token = Env("FUFU_API_TOKEN")
-		if token == "" {
-			token = Env("NEWAPI_API_SITE_TOKEN")
-		}
+	if site, ok := fufuAPIPrimarySiteFromEnv(); ok {
+		return site, nil
 	}
-	if url != "" && token != "" {
-		return newapi.Site{Name: stringOrDefault(Env("FUFU_COMBINE_NAME"), "次数fufu"), URL: url, Token: token, UserID: stringOrDefault(Env("FUFU_COMBINE_USER_ID"), stringOrDefault(Env("FUFU_API_USER_ID"), "1")), QuotaUnit: int64Value(stringOrDefault(Env("FUFU_COMBINE_QUOTA_UNIT"), Env("FUFU_QUOTA_UNIT")), newapi.DefaultQuotaUnit), Currency: "$", RechargeRatio: 1}, nil
+	if site, ok := managedSiteFromEnv(managedSiteEnvDef{
+		Prefix:                   "NEWAPI_API_SITE",
+		DefaultName:              "次数fufu",
+		DefaultRatio:             "1",
+		DefaultChannelListPath:   "/api/channel/search?keyword=&p=1&page_size=500",
+		AllowAccessTokenFallback: true,
+	}); ok {
+		return site, nil
 	}
 	sites, managedMsg := LoadManagedSites(rootDir)
 	if len(sites) > 0 {
@@ -65,4 +63,49 @@ func LoadPrimarySite(rootDir string) (newapi.Site, error) {
 		return newapi.Site{}, fmt.Errorf("%s", managedMsg)
 	}
 	return newapi.Site{}, fmt.Errorf("missing NewAPI primary site config")
+}
+
+func fufuCombinePrimarySiteFromEnv() (newapi.Site, bool) {
+	return primarySiteFromEnv(primarySiteEnvDef{
+		URL:       Env("FUFU_COMBINE_API_URL"),
+		Token:     Env("FUFU_COMBINE_API_TOKEN"),
+		Name:      Env("FUFU_COMBINE_NAME"),
+		UserID:    Env("FUFU_COMBINE_USER_ID"),
+		QuotaUnit: Env("FUFU_COMBINE_QUOTA_UNIT"),
+	})
+}
+
+func fufuAPIPrimarySiteFromEnv() (newapi.Site, bool) {
+	return primarySiteFromEnv(primarySiteEnvDef{
+		URL:       Env("FUFU_API_BASE_URL"),
+		Token:     Env("FUFU_API_TOKEN"),
+		Name:      Env("FUFU_COMBINE_NAME"),
+		UserID:    Env("FUFU_API_USER_ID"),
+		QuotaUnit: Env("FUFU_QUOTA_UNIT"),
+	})
+}
+
+type primarySiteEnvDef struct {
+	URL       string
+	Token     string
+	Name      string
+	UserID    string
+	QuotaUnit string
+}
+
+func primarySiteFromEnv(def primarySiteEnvDef) (newapi.Site, bool) {
+	url := NormalizeBaseURL(def.URL)
+	token := strings.TrimSpace(def.Token)
+	if url == "" || token == "" {
+		return newapi.Site{}, false
+	}
+	return newapi.Site{
+		Name:          stringOrDefault(def.Name, "次数fufu"),
+		URL:           url,
+		Token:         token,
+		UserID:        stringOrDefault(def.UserID, "1"),
+		QuotaUnit:     int64Value(def.QuotaUnit, newapi.DefaultQuotaUnit),
+		Currency:      "$",
+		RechargeRatio: 1,
+	}, true
 }
