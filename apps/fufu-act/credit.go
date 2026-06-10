@@ -26,7 +26,10 @@ func processCredits() {
 	if tokenSvc == nil {
 		return
 	}
-	rows, _ := db.Query(`SELECT cq.id,cq.card_key,cq.prize_dollars,cq.retries FROM credit_queue cq INNER JOIN (SELECT card_key, MIN(id) as min_id FROM credit_queue WHERE status='pending' AND retries < ? GROUP BY card_key) earliest ON cq.id=earliest.min_id ORDER BY cq.id ASC LIMIT 10`, maxCreditRetries)
+	rows, err := db.Query(`SELECT cq.id,cq.card_key,cq.prize_dollars,cq.retries FROM credit_queue cq INNER JOIN (SELECT card_key, MIN(id) as min_id FROM credit_queue WHERE status='pending' AND retries < ? GROUP BY card_key) earliest ON cq.id=earliest.min_id ORDER BY cq.id ASC LIMIT 10`, maxCreditRetries)
+	if err != nil {
+		return
+	}
 	defer rows.Close()
 	for rows.Next() {
 		var id, prize, retries int
