@@ -39,6 +39,7 @@ var modelCache = struct {
 	Inflight          map[string]*modelStatusBuildCall
 }{}
 var testCooldowns sync.Map
+var testClientCooldowns sync.Map
 var testResults sync.Map
 
 type apiResult struct {

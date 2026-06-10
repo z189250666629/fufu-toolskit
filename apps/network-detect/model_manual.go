@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, 400, "siteName 和 model 必填")
 		return
 	}
-	result, err := runModelTest(r.Context(), body.SiteName, body.Model, body.Group)
+	result, err := runModelTest(contextWithModelTestClient(r.Context(), clientIP(r)), body.SiteName, body.Model, body.Group)
 	if err != nil {
 		var e *httpError
 		if errors.As(err, &e) {
@@ -49,6 +50,24 @@ func (e *httpError) Error() string { return e.Message }
 
 var runModelTest = testModel
 
+type modelTestClientContextKey struct{}
+
+func contextWithModelTestClient(ctx context.Context, client string) context.Context {
+	client = strings.TrimSpace(client)
+	if client == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, modelTestClientContextKey{}, client)
+}
+
+func modelTestClientFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	client, _ := ctx.Value(modelTestClientContextKey{}).(string)
+	return strings.TrimSpace(client)
+}
+
 func testModel(ctx context.Context, siteName, model, group string) (map[string]any, error) {
 	sites, configMsg := config.LoadManagedSites(rootDir)
 	if configMsg != "" && len(sites) == 0 {
@@ -64,22 +83,24 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	if site == nil {
 		return nil, &httpError{Status: 404, Message: "站点不存在"}
 	}
-	key := modelManualKey(siteName, model, group)
 	now := time.Now().Unix()
 	pruneManualTestCache(now)
-	if v, ok := testCooldowns.Load(key); ok && v.(int64) > now {
-		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: v.(int64)}
-	}
 	next := now + int64(modelTestCooldown/time.Second)
-	if existing, loaded := testCooldowns.LoadOrStore(key, next); loaded {
-		if until, ok := existing.(int64); ok && until > now {
-			return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: until}
+	clientCooldownKey := ""
+	if client := modelTestClientFromContext(ctx); client != "" {
+		clientCooldownKey = modelManualClientKey(siteName, client)
+		if until, ok := reserveModelTestCooldown(&testClientCooldowns, clientCooldownKey, now, next); !ok {
+			return nil, &httpError{Status: 429, Message: "该站点模型测试仍在冷却中", NextAllowedAt: until}
 		}
-		testCooldowns.Store(key, next)
+	}
+	key := modelManualKey(siteName, model, group)
+	if until, ok := reserveModelTestCooldown(&testCooldowns, key, now, next); !ok {
+		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: until}
 	}
 	channels, errMsg := loadSiteChannels(ctx, *site)
 	if errMsg != "" {
 		clearModelTestCooldownReservation(key, next)
+		clearClientModelTestCooldownReservation(clientCooldownKey, next)
 		return nil, &httpError{Status: 502, Message: errMsg}
 	}
 	candidates := selectModelTestChannels(channels, model, group)
@@ -89,6 +110,7 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	}
 	if err := ctx.Err(); err != nil {
 		clearModelTestCooldownReservation(key, next)
+		clearClientModelTestCooldownReservation(clientCooldownKey, next)
 		return nil, err
 	}
 	stream := supportsStream(model)
@@ -101,6 +123,9 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	}
 	if err := ctx.Err(); err != nil {
 		testCooldowns.Delete(key)
+		if clientCooldownKey != "" {
+			testClientCooldowns.Delete(clientCooldownKey)
+		}
 		return nil, err
 	}
 	rec := testRecord{OK: res.OK, Status: map[bool]string{true: "operational", false: "down"}[res.OK], Group: group, Stream: stream, TestedAt: time.Now().Unix(), Message: truncate(testMessage(res), 180), NextAllowedAt: next}
@@ -109,13 +134,46 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	return map[string]any{"siteName": siteName, "model": model, "group": group, "test": rec}, nil
 }
 
+func modelManualClientKey(siteName, client string) string {
+	return strings.TrimSpace(siteName) + "\x00" + strings.TrimSpace(client)
+}
+
+func reserveModelTestCooldown(cache *sync.Map, key string, now, next int64) (int64, bool) {
+	if key == "" {
+		return next, true
+	}
+	if v, ok := cache.Load(key); ok {
+		if until, ok := v.(int64); ok && until > now {
+			return until, false
+		}
+	}
+	if existing, loaded := cache.LoadOrStore(key, next); loaded {
+		if until, ok := existing.(int64); ok && until > now {
+			return until, false
+		}
+		cache.Store(key, next)
+	}
+	return next, true
+}
+
 func clearModelTestCooldownReservation(key string, next int64) {
-	if v, ok := testCooldowns.Load(key); ok {
+	clearManualTestCooldownReservation(&testCooldowns, key, next)
+}
+
+func clearClientModelTestCooldownReservation(key string, next int64) {
+	clearManualTestCooldownReservation(&testClientCooldowns, key, next)
+}
+
+func clearManualTestCooldownReservation(cache *sync.Map, key string, next int64) {
+	if key == "" {
+		return
+	}
+	if v, ok := cache.Load(key); ok {
 		until, ok := v.(int64)
 		if !ok || until != next {
 			return
 		}
-		testCooldowns.Delete(key)
+		cache.Delete(key)
 	}
 }
 
@@ -133,6 +191,13 @@ func pruneManualTestCache(now int64) {
 		if !ok || rec.NextAllowedAt <= now {
 			testResults.Delete(key)
 			testCooldowns.Delete(key)
+		}
+		return true
+	})
+	testClientCooldowns.Range(func(key, value any) bool {
+		until, ok := value.(int64)
+		if !ok || until <= now {
+			testClientCooldowns.Delete(key)
 		}
 		return true
 	})

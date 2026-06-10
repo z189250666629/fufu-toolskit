@@ -217,6 +217,47 @@ func TestTestModelAllowsOnlyOneConcurrentProbePerCell(t *testing.T) {
 	}
 }
 
+func TestHandleModelTestRateLimitsClientAcrossDifferentModels(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	siteName := "client-scan-site"
+	t.Cleanup(func() {
+		testClientCooldowns.Delete(modelManualClientKey(siteName, "203.0.113.55"))
+	})
+
+	var searchHits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/channel/search"):
+			searchHits.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+				map[string]any{"id": 7, "status": channelStatusEnabled, "models": []any{"only-known-model"}, "groups": []any{"default"}},
+			}})
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.String())
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", managedSiteConfigJSON(siteName, server.URL))
+
+	for i, wantStatus := range []int{http.StatusBadRequest, http.StatusTooManyRequests} {
+		req := httptest.NewRequest(http.MethodPost, "/api/newapi/model-status/test", strings.NewReader(`{"siteName":"`+siteName+`","model":"unknown-model-`+string(rune('a'+i))+`"}`))
+		req.RemoteAddr = "203.0.113.55:5000"
+		rec := httptest.NewRecorder()
+
+		handleModelTest(rec, req)
+
+		if rec.Code != wantStatus {
+			t.Fatalf("request %d status=%d body=%s", i+1, rec.Code, rec.Body.String())
+		}
+	}
+	if got := searchHits.Load(); got != 1 {
+		t.Fatalf("same client should only trigger one channel search across different models, got %d", got)
+	}
+}
+
 func TestBuildModelStatusPrunesExpiredManualTestEntries(t *testing.T) {
 	oldRootDir := rootDir
 	t.Cleanup(func() { rootDir = oldRootDir })
