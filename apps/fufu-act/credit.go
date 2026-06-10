@@ -12,6 +12,15 @@ type creditQueueStore interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }
 
+var creditQuotaTimeout = 30 * time.Second
+
+func creditQuotaContext() (context.Context, context.CancelFunc) {
+	if creditQuotaTimeout <= 0 {
+		return context.WithCancel(context.Background())
+	}
+	return context.WithTimeout(context.Background(), creditQuotaTimeout)
+}
+
 func sanitizeCreditScanError(error) string {
 	return "队列数据异常，请人工检查"
 }
@@ -66,7 +75,10 @@ func processCredits() {
 			}
 			continue
 		}
-		if err := tokenSvc.AddQuota(context.Background(), key, int64(prize)); err != nil {
+		ctx, cancel := creditQuotaContext()
+		err := tokenSvc.AddQuota(ctx, key, int64(prize))
+		cancel()
+		if err != nil {
 			nr := retries + 1
 			status := "pending"
 			if nr >= maxCreditRetries {

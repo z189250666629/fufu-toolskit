@@ -7,7 +7,9 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"fufu/newapi"
 	"fufu/tokens"
@@ -144,6 +146,92 @@ func TestProcessCreditsStoresSanitizedFailureMessage(t *testing.T) {
 		if strings.Contains(msg.String, leaked) {
 			t.Fatalf("credit error should be sanitized; leaked %q in %#v", leaked, msg)
 		}
+	}
+}
+
+func TestProcessCreditsTimesOutStalledQuotaUpdate(t *testing.T) {
+	setupScratchLockTestDB(t)
+
+	key := "sk-credit-timeout-123456"
+	putStarted := make(chan struct{})
+	releasePut := make(chan struct{})
+	var startedOnce sync.Once
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releasePut) }) }
+	t.Cleanup(release)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{map[string]any{
+				"id":           7,
+				"key":          key,
+				"name":         "credit-card",
+				"remain_quota": 10,
+				"status":       1,
+			}}})
+		case r.Method == http.MethodPut && r.URL.Path == "/api/token/":
+			startedOnce.Do(func() { close(putStarted) })
+			select {
+			case <-r.Context().Done():
+			case <-releasePut:
+				_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+			}
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	oldTokenSvc := tokenSvc
+	client := newapi.NewClient(newapi.Site{URL: server.URL, Token: "token", UserID: "1"})
+	client.HTTPClient.Timeout = 0
+	tokenSvc = tokens.NewService(client)
+	t.Cleanup(func() { tokenSvc = oldTokenSvc })
+
+	oldTimeout := creditQuotaTimeout
+	creditQuotaTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { creditQuotaTimeout = oldTimeout })
+
+	res, err := db.Exec(`INSERT INTO credit_queue (card_key, prize_dollars, retries, status) VALUES (?,?,?,?)`, key, 10, 0, "pending")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		processCredits()
+		close(done)
+	}()
+
+	select {
+	case <-putStarted:
+	case <-time.After(time.Second):
+		t.Fatal("credit worker did not reach stalled upstream quota update")
+	}
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		release()
+		t.Fatal("credit worker should time out stalled quota update instead of blocking indefinitely")
+	}
+	release()
+
+	var retries int
+	var status string
+	var msg sql.NullString
+	if err := db.QueryRow(`SELECT retries,status,error FROM credit_queue WHERE id=?`, id).Scan(&retries, &status, &msg); err != nil {
+		t.Fatal(err)
+	}
+	if retries != 1 || status != "pending" {
+		t.Fatalf("stalled quota update should be retried, retries=%d status=%q error=%#v", retries, status, msg)
+	}
+	if !msg.Valid || strings.TrimSpace(msg.String) == "" {
+		t.Fatalf("expected sanitized timeout failure, got %#v", msg)
 	}
 }
 
