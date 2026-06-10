@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -404,6 +405,70 @@ func TestHandleSearchKeysRedactsLookupErrorsFromPublicAPI(t *testing.T) {
 		if strings.Contains(body, leaked) {
 			t.Fatalf("search-keys error leaked %q in %s", leaked, body)
 		}
+	}
+}
+
+func TestHandleSearchKeysRejectsConcurrentRequestFromSameClient(t *testing.T) {
+	var mu sync.Mutex
+	hits := 0
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseFirst) }) }
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits++
+		hit := hits
+		mu.Unlock()
+		if hit == 1 {
+			close(firstStarted)
+			<-releaseFirst
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
+	}))
+	defer server.Close()
+	defer release()
+
+	app := NewApp(Config{URL: server.URL, Token: "token", UserID: "1", QuotaUnit: 500000}, nil)
+	firstDone := make(chan *httptest.ResponseRecorder, 1)
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/search-keys", strings.NewReader(`{"keys":["sk-first-client-search"]}`))
+	firstReq.RemoteAddr = "203.0.113.8:5000"
+	go func() {
+		w := httptest.NewRecorder()
+		app.handleSearchKeys(w, firstReq)
+		firstDone <- w
+	}()
+
+	select {
+	case <-firstStarted:
+	case <-time.After(time.Second):
+		t.Fatal("first search-keys request did not reach upstream")
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/search-keys", strings.NewReader(`{"keys":["sk-second-client-search"]}`))
+	secondReq.RemoteAddr = firstReq.RemoteAddr
+	second := httptest.NewRecorder()
+	app.handleSearchKeys(second, secondReq)
+
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("concurrent same-client search code=%d body=%s", second.Code, second.Body.String())
+	}
+	if got := second.Header().Get("Retry-After"); got == "" {
+		t.Fatal("concurrent same-client search should include Retry-After")
+	}
+	if strings.Contains(second.Body.String(), "sk-second-client-search") {
+		t.Fatalf("concurrent search response leaked key: %s", second.Body.String())
+	}
+
+	release()
+	select {
+	case first := <-firstDone:
+		if first.Code != http.StatusOK {
+			t.Fatalf("first search code=%d body=%s", first.Code, first.Body.String())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("first search did not finish after releasing upstream")
 	}
 }
 

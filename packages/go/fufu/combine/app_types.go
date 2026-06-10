@@ -24,6 +24,7 @@ type App struct {
 	sessions         map[string]SessionInfo
 	authFailures     map[string]authFailureRecord
 	authFailureDelay time.Duration
+	activeSearches   map[string]struct{}
 	mergeJobs        map[string]MergeJob
 	mergeLocks       map[int]struct{}
 	static           http.Handler

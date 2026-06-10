@@ -67,6 +67,13 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 		writeTooManyKeysRequest(w)
 		return
 	}
+	searchKey, ok := a.tryBeginClientSearch(r)
+	if !ok {
+		w.Header().Set("Retry-After", "1")
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "查询请求过于频繁，请稍后重试"})
+		return
+	}
+	defer a.endClientSearch(searchKey)
 	keys, found, missing, err := a.resolveTokensForSearch(r.Context(), keys)
 	if err != nil {
 		log.Printf("combine search token lookup failed: %s", redactError(err))
