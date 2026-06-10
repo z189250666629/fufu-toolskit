@@ -21,6 +21,19 @@ func TestSelectModelTestChannelsFiltersAndSorts(t *testing.T) {
 	}
 }
 
+func TestSelectModelTestChannelsSortsUnknownLatencyLast(t *testing.T) {
+	channels := []Channel{
+		{ID: 1, Status: channelStatusEnabled, Models: []string{"model-a"}, Groups: []string{"vip"}, ResponseTime: 0},
+		{ID: 2, Status: channelStatusEnabled, Models: []string{"model-a"}, Groups: []string{"vip"}, ResponseTime: 80},
+		{ID: 3, Status: channelStatusEnabled, Models: []string{"model-a"}, Groups: []string{"vip"}, ResponseTime: 250},
+	}
+
+	got := selectModelTestChannels(channels, "model-a", "vip")
+	if len(got) != 3 || got[0].ID != 2 || got[1].ID != 3 || got[2].ID != 1 {
+		t.Fatalf("candidates = %#v", got)
+	}
+}
+
 func TestChannelTestEndpointEscapesModelAndStreamFlag(t *testing.T) {
 	if got := channelTestEndpoint(7, "gpt model", true); got != "/api/channel/test/7?model=gpt+model&stream=true" {
 		t.Fatalf("stream endpoint = %q", got)

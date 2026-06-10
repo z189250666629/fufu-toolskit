@@ -14,9 +14,21 @@ func selectModelTestChannels(channels []Channel, model, group string) []Channel 
 		}
 	}
 	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].ResponseTime < candidates[j].ResponseTime
+		left := channelResponseTimeRank(candidates[i].ResponseTime)
+		right := channelResponseTimeRank(candidates[j].ResponseTime)
+		if left != right {
+			return left < right
+		}
+		return candidates[i].ID < candidates[j].ID
 	})
 	return candidates
+}
+
+func channelResponseTimeRank(responseTime int64) int64 {
+	if responseTime <= 0 {
+		return 1<<62 - 1
+	}
+	return responseTime
 }
 
 func channelTestEndpoint(channelID int, model string, stream bool) string {
