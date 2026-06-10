@@ -123,6 +123,14 @@ case "$APP_NAME" in
   y2k-nav)
     ;;
   network-detect)
+    if [ -n "${NEWAPI_MANAGED_API_CONFIG:-}" ]; then
+      if [ ! -f "$NEWAPI_MANAGED_API_CONFIG" ]; then
+        printf '[deploy] NEWAPI_MANAGED_API_CONFIG must point to a local JSON file for upload: %s\n' "$NEWAPI_MANAGED_API_CONFIG" >&2
+        exit 1
+      fi
+      CONFIG_JSON_FILE="$NEWAPI_MANAGED_API_CONFIG"
+      NEWAPI_MANAGED_API_CONFIG="config.json"
+    fi
     for name in \
       NEWAPI_MANAGED_API_SITES NEWAPI_MANAGED_API_CONFIG \
       NEWAPI_API_SITE_TOKEN NEWAPI_TOKEN_SITE_TOKEN NEWAPI_API_SITE_URL NEWAPI_TOKEN_SITE_URL \

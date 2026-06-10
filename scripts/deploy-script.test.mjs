@@ -187,6 +187,78 @@ test('deploy script cleans compose env file when deployment fails', { skip: bash
   );
 });
 
+test('deploy script uploads managed-site config file for network-detect', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
+  const tmpName = `.tmp/deploy-script-managed-config-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
+  const fakeBinRel = `${tmpName}/bin`;
+  const composeRel = `${tmpName}/docker-compose.yml`;
+  const composeEnvRel = `${tmpName}/compose.env`;
+  const composeEnvSnapshotRel = `${tmpName}/snapshot.env`;
+  const managedConfigRel = `${tmpName}/managed-sites.json`;
+  const scpLogRel = `${tmpName}/scp.log`;
+
+  t.after(() => rm(tmpUrl, { recursive: true, force: true }));
+  await mkdir(new URL('bin/', tmpUrl), { recursive: true });
+  await mkdir(new URL('home/', tmpUrl), { recursive: true });
+  await writeFile(new URL('docker-compose.yml', tmpUrl), 'services:\n  network-detect:\n    image: ${APP_IMAGE}:${APP_TAG}\n');
+  await writeFile(new URL('managed-sites.json', tmpUrl), '[{"name":"api","url":"https://api.example.test","tokenEnv":"NEWAPI_API_SITE_TOKEN"}]\n');
+
+  for (const [name, body] of Object.entries({
+    'ssh-keygen': '#!/usr/bin/env bash\nexit 0\n',
+    'ssh-keyscan': '#!/usr/bin/env bash\nprintf "example ssh-rsa test\\n"\n',
+    ssh: '#!/usr/bin/env bash\nexit 0\n',
+    scp: [
+      '#!/usr/bin/env bash',
+      'printf "%s\\n" "$*" >> "$SCP_LOG"',
+      'for arg in "$@"; do',
+      '  if [ "$arg" = "$EXPECTED_COMPOSE_ENV_FILE" ]; then',
+      '    cp "$arg" "$DEPLOY_ENV_SNAPSHOT"',
+      '  fi',
+      'done',
+      'exit 0',
+      ''
+    ].join('\n')
+  })) {
+    const commandUrl = new URL(`bin/${name}`, tmpUrl);
+    await writeFile(commandUrl, body);
+    await chmod(commandUrl, 0o755);
+  }
+
+  const envAssignments = {
+    APP_NAME: 'network-detect',
+    APP_IMAGE: 'example/network',
+    APP_TAG: 'test',
+    SSH_HOST: 'example.test',
+    SSH_USER: 'deploy',
+    SSH_PRIVATE_KEY: 'fake-key',
+    DEPLOY_PATH: '/srv/fufu/network-detect',
+    COMPOSE_FILE: composeRel,
+    COMPOSE_SERVICE_NAME: 'network-detect',
+    COMPOSE_ENV_FILE: composeEnvRel,
+    HOST_PORT: '38473',
+    HOME: `${tmpName}/home`,
+    NEWAPI_MANAGED_API_CONFIG: managedConfigRel,
+    NEWAPI_API_SITE_TOKEN: 'secret-api-token',
+    EXPECTED_COMPOSE_ENV_FILE: composeEnvRel,
+    DEPLOY_ENV_SNAPSHOT: composeEnvSnapshotRel,
+    SCP_LOG: scpLogRel
+  };
+  const command = [
+    `PATH="$PWD/${fakeBinRel}:$PATH"`,
+    ...Object.entries(envAssignments).map(([name, value]) => `${name}=${shellQuote(value)}`),
+    'bash scripts/deploy-docker-app.sh'
+  ].join(' ');
+  const result = spawnSync('bash', ['-c', command], { cwd: repoRoot, encoding: 'utf8' });
+
+  assert.equal(result.status, 0, `deployment should complete with fake ssh/scp\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  const envSnapshot = await readFile(new URL('snapshot.env', tmpUrl), 'utf8');
+  assert.match(envSnapshot, /^NEWAPI_MANAGED_API_CONFIG=config\.json$/m, 'container env should use the uploaded config path');
+  assert.doesNotMatch(envSnapshot, new RegExp(managedConfigRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'container env must not keep the runner-local config path');
+
+  const scpLog = await readFile(new URL('scp.log', tmpUrl), 'utf8');
+  assert.match(scpLog, new RegExp(`${managedConfigRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} .*:/srv/fufu/network-detect/config\\.json`), 'managed-site config JSON should be uploaded beside compose .env');
+});
+
 test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
   const tmpName = `.tmp/deploy-script-spaces-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
