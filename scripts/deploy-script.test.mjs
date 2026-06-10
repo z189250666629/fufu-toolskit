@@ -325,6 +325,66 @@ test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error
   assert.equal(result.status, 0, `ssh/scp should receive SSH_KEY_PATH as one argument\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
 });
 
+test('deploy script quotes deploy path inside remote ssh commands', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
+  const tmpName = `.tmp/deploy-script-remote-quote-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
+  const fakeBinRel = `${tmpName}/bin`;
+  const composeRel = `${tmpName}/docker-compose.yml`;
+  const composeEnvRel = `${tmpName}/compose.env`;
+  const injectionMarkerRel = `${tmpName}/injected.txt`;
+
+  t.after(() => rm(tmpUrl, { recursive: true, force: true }));
+  await mkdir(new URL('bin/', tmpUrl), { recursive: true });
+  await mkdir(new URL('home/', tmpUrl), { recursive: true });
+  await writeFile(new URL('docker-compose.yml', tmpUrl), 'services:\n  app:\n    image: ${APP_IMAGE}:${APP_TAG}\n');
+
+  for (const [name, body] of Object.entries({
+    'ssh-keygen': '#!/usr/bin/env bash\nexit 0\n',
+    'ssh-keyscan': '#!/usr/bin/env bash\nprintf "example ssh-rsa test\\n"\n',
+    scp: '#!/usr/bin/env bash\nexit 0\n',
+    ssh: [
+      '#!/usr/bin/env bash',
+      'command="${@: -1}"',
+      'export FAKE_REPO_ROOT="$PWD"',
+      'bash -c "$command"',
+      'exit 42',
+      ''
+    ].join('\n')
+  })) {
+    const commandUrl = new URL(`bin/${name}`, tmpUrl);
+    await writeFile(commandUrl, body);
+    await chmod(commandUrl, 0o755);
+  }
+
+  const envAssignments = {
+    APP_NAME: 'y2k-nav',
+    APP_IMAGE: 'example/y2k',
+    APP_TAG: 'test',
+    SSH_HOST: 'example.test',
+    SSH_USER: 'deploy',
+    SSH_PRIVATE_KEY: 'fake-key',
+    DEPLOY_PATH: `${tmpName}/remote'; printf pwned > ${injectionMarkerRel}; #`,
+    COMPOSE_FILE: composeRel,
+    COMPOSE_SERVICE_NAME: 'app',
+    COMPOSE_ENV_FILE: composeEnvRel,
+    HOST_PORT: '33148',
+    HOME: `${tmpName}/home`
+  };
+  const command = [
+    `PATH="$PWD/${fakeBinRel}:$PATH"`,
+    ...Object.entries(envAssignments).map(([name, value]) => `${name}=${shellQuote(value)}`),
+    'bash scripts/deploy-docker-app.sh'
+  ].join(' ');
+  const result = spawnSync('bash', ['-c', command], { cwd: repoRoot, encoding: 'utf8' });
+
+  assert.equal(result.status, 42, `fake ssh should stop after evaluating first remote command\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  await assert.rejects(
+    () => access(new URL('injected.txt', tmpUrl)),
+    { code: 'ENOENT' },
+    'DEPLOY_PATH must not be executable as remote shell code'
+  );
+});
+
 test('deploy script prints diagnostics when health inspect fails', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
   const tmpName = `.tmp/deploy-script-health-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);

@@ -41,6 +41,12 @@ write_env_var() {
   printf '%s=%s\n' "$name" "$value" >> "$COMPOSE_ENV_FILE"
 }
 
+remote_quote() {
+  printf "'"
+  printf '%s' "$1" | sed "s/'/'\\\\''/g"
+  printf "'"
+}
+
 cleanup_compose_env_file() {
   rm -f -- "$COMPOSE_ENV_FILE"
 }
@@ -145,8 +151,13 @@ case "$APP_NAME" in
     ;;
 esac
 
+Q_DEPLOY_PATH="$(remote_quote "$DEPLOY_PATH")"
+Q_DEPLOY_DATA_PATH="$(remote_quote "$DEPLOY_PATH/data")"
+Q_REMOTE_COMPOSE_FILE="$(remote_quote "$REMOTE_COMPOSE_FILE")"
+Q_COMPOSE_SERVICE_NAME="$(remote_quote "$COMPOSE_SERVICE_NAME")"
+
 log "preparing remote directory $SSH_TARGET:$DEPLOY_PATH"
-ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" "set -eu; mkdir -p '$DEPLOY_PATH' '$DEPLOY_PATH/data'"
+ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" "set -eu; mkdir -p $Q_DEPLOY_PATH $Q_DEPLOY_DATA_PATH"
 
 log "uploading compose and env files"
 scp "${SSH_OPTS[@]}" -P "$SSH_PORT" "$COMPOSE_FILE" "$SSH_TARGET:$DEPLOY_PATH/$REMOTE_COMPOSE_FILE"
@@ -158,21 +169,23 @@ fi
 REGISTRY_USER_VALUE="${REGISTRY_USER:-${GHCR_USERNAME:-}}"
 REGISTRY_PASSWORD_VALUE="${REGISTRY_PASSWORD:-${GHCR_TOKEN:-}}"
 if [ -n "$REGISTRY_USER_VALUE" ] && [ -n "$REGISTRY_PASSWORD_VALUE" ]; then
+  Q_REGISTRY="$(remote_quote "$REGISTRY")"
+  Q_REGISTRY_USER_VALUE="$(remote_quote "$REGISTRY_USER_VALUE")"
   log "logging remote docker into $REGISTRY"
   printf '%s' "$REGISTRY_PASSWORD_VALUE" | ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" \
-    "docker login '$REGISTRY' -u '$REGISTRY_USER_VALUE' --password-stdin"
+    "docker login $Q_REGISTRY -u $Q_REGISTRY_USER_VALUE --password-stdin"
 fi
 
 log "deploying $APP_IMAGE:$APP_TAG"
 ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" "
   set -eu
-  cd '$DEPLOY_PATH'
-  docker compose --env-file .env -f '$REMOTE_COMPOSE_FILE' config --quiet
-  docker compose --env-file .env -f '$REMOTE_COMPOSE_FILE' pull
-  docker compose --env-file .env -f '$REMOTE_COMPOSE_FILE' up -d
-  docker compose --env-file .env -f '$REMOTE_COMPOSE_FILE' ps
+  cd $Q_DEPLOY_PATH
+  docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE config --quiet
+  docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE pull
+  docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE up -d
+  docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE ps
 
-  CID=\$(docker compose --env-file .env -f '$REMOTE_COMPOSE_FILE' ps -q '$COMPOSE_SERVICE_NAME')
+  CID=\$(docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE ps -q $Q_COMPOSE_SERVICE_NAME)
   [ -n \"\$CID\" ]
 
   i=0
@@ -193,7 +206,7 @@ ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" "
   done
 
   if [ \"\$READY\" != '1' ]; then
-    docker compose --env-file .env -f '$REMOTE_COMPOSE_FILE' logs --tail=200
+    docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE logs --tail=200
     docker inspect \"\$CID\"
     exit 1
   fi
