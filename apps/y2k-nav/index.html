@@ -322,28 +322,13 @@ body::before {
 
 <script type="module">
 import { initTheme } from './theme.mjs';
+import { initLatencyProbes } from './latency.mjs';
 
 initTheme();
+initLatencyProbes();
 </script>
 <script>
 (function() {
-  document.querySelectorAll('a[data-ping]').forEach(function(a) {
-    var url = a.getAttribute('data-ping');
-    var el = a.querySelector('.latency');
-    var t0 = performance.now();
-    fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' })
-      .then(function() {
-        var ms = Math.round(performance.now() - t0);
-        el.textContent = ms + 'ms';
-        if (ms < 200) el.className = 'latency good';
-        else if (ms < 500) el.className = 'latency slow';
-        else el.className = 'latency bad';
-      })
-      .catch(function() {
-        el.textContent = '超时';
-        el.className = 'latency bad';
-      });
-  });
   document.querySelectorAll('.nav-card[data-href]').forEach(function(card) {
     card.addEventListener('click', function(e) {
       if (e.target.closest('a')) return;

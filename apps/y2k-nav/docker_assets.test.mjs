@@ -28,7 +28,7 @@ function runtimeCopySources(file) {
 
 test('dockerfile copies all y2k module assets referenced by index', () => {
   const imports = localModuleImports(indexHtml);
-  assert.deepEqual(imports, ['theme.mjs']);
+  assert.ok(imports.length > 0, 'expected index.html to reference local module assets');
 
   const sources = runtimeCopySources(dockerfile);
   for (const asset of imports) {

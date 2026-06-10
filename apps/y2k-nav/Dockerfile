@@ -15,6 +15,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates wget
 COPY --from=build /out/y2k-nav /app/y2k-nav
 COPY apps/y2k-nav/index.html ./index.html
+COPY apps/y2k-nav/latency.mjs ./latency.mjs
 COPY apps/y2k-nav/theme.mjs ./theme.mjs
 EXPOSE 80
 ENV PORT=80
