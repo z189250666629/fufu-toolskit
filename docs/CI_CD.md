@@ -8,8 +8,8 @@ GitHub Actions 部署环境固定使用 `toolskit`。不要新增或切换到 `d
 
 | Workflow | 目录 | 镜像 | 远端路径 | 对外端口 | Directive |
 | --- | --- | --- | --- | ---: | --- |
-| `deploy-y2k-nav` | `apps/y2k-nav` | `ghcr.io/<owner>/<repo>-y2k-nav` | `DEPLOY_PATH/y2k-nav`，为空时 `/data/docker/y2k-nav` | `33148` | `[deploy y2k]` / `[deploy y2k-nav]` / `[deploy nav]` |
-| `deploy-network` | `apps/network-detect` | `ghcr.io/<owner>/<repo>-network-detect` | `DEPLOY_PATH/network-detect`，为空时 `/data/docker/network-detect` | `38473` | `[deploy network]` / `[deploy network-detect]` / `[deploy combine]` |
+| `deploy-y2k-nav` | `apps/y2k-nav` | `ghcr.io/<owner>/<repo>-y2k-nav` | `DEPLOY_PATH/y2k-nav`，为空时 `/data/docker/y2k-nav` | `33148` | `[deploy y2k]` / `[deploy y2k-nav]` / `[deploy nav]` / `[deploy navigation]` |
+| `deploy-network` | `apps/network-detect` | `ghcr.io/<owner>/<repo>-network-detect` | `DEPLOY_PATH/network-detect`，为空时 `/data/docker/network-detect` | `38473` | `[deploy network]` / `[deploy network-detect]` / `[deploy network_detect]` / `[deploy combine]` |
 | `deploy-act` | `apps/fufu-act` | `ghcr.io/<owner>/<repo>-fufu-act` | `DEPLOY_PATH/fufu-act`，为空时 `/data/docker/fufu-act` | `18820` | `[deploy act]` / `[deploy activity]` / `[deploy fufu-act]` |
 
 `[deploy all]` 会同时触发三个部署。`fufu-combine` 已并入 `network-detect`，不再独立部署；合卡页面由 network 服务的 `/combine` 承载。`[deploy combine]` 只是兼容旧指令的别名，实际触发 `deploy-network`。

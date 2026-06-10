@@ -59,6 +59,16 @@ async function deployWorkflowPaths() {
   return (await listRepoFiles('.github/workflows', (path) => /\/deploy-.*\.ya?ml$/i.test(path))).sort();
 }
 
+function deployDirectivesFromWorkflow(source, path) {
+  const gateLine = source
+    .split(/\r?\n/)
+    .find((line) => line.includes('grep -qiE') && line.includes('deploy'));
+  assert.ok(gateLine, `${path} should contain a deploy directive gate`);
+  const group = gateLine.match(/\(([^)]+)\)/)?.[1];
+  assert.ok(group, `${path} should keep deploy directives in a regex group`);
+  return group.split('|').map((directive) => `[${directive.trim()}]`);
+}
+
 test('deploy docs and workflows do not reintroduce dashboard-key auth', async () => {
   const forbidden = [
     /NEWAPI[_-]?DASHBOARD[\w-]*KEY/i,
@@ -110,6 +120,16 @@ test('deploy workflow gates cover every deploy workflow', async () => {
     '.github/workflows/deploy-network.yml',
     '.github/workflows/deploy-y2k-nav.yml'
   ]);
+});
+
+test('deploy directive aliases match the CI/CD runbook', async () => {
+  const ciDocs = await readRepoFile('docs/CI_CD.md');
+  for (const path of await deployWorkflowPaths()) {
+    const source = await readRepoFile(path);
+    for (const directive of deployDirectivesFromWorkflow(source, path)) {
+      assert.match(ciDocs, new RegExp(directive.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${path} accepts ${directive}, so docs/CI_CD.md should document it`);
+    }
+  }
 });
 
 test('deploy workflows use the canonical toolskit GitHub environment', async () => {
