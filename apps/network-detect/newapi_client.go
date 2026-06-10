@@ -41,22 +41,7 @@ func str(v any) string {
 }
 
 func items(data map[string]any) []map[string]any {
-	candidates := []any{data["data"], data["items"], data["logs"], data["channels"]}
-	if nested, ok := data["data"].(map[string]any); ok {
-		candidates = append(candidates, nested["data"], nested["items"], nested["logs"], nested["channels"])
-	}
-	for _, c := range candidates {
-		if arr, ok := c.([]any); ok {
-			out := []map[string]any{}
-			for _, it := range arr {
-				if obj, ok := it.(map[string]any); ok {
-					out = append(out, obj)
-				}
-			}
-			return out
-		}
-	}
-	return nil
+	return newapi.PayloadItems(data, "data", "items", "logs", "channels")
 }
 
 func toInt64(v any) int64 {

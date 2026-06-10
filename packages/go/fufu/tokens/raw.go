@@ -3,6 +3,7 @@ package tokens
 import (
 	"encoding/json"
 	"fmt"
+	"fufu/newapi"
 	"strconv"
 	"strings"
 )
@@ -12,22 +13,7 @@ func FromRaw(raw map[string]any) Token {
 }
 
 func DataList(data map[string]any) []map[string]any {
-	candidates := []any{data["data"], data["items"], data["tokens"]}
-	if nested, ok := data["data"].(map[string]any); ok {
-		candidates = append(candidates, nested["data"], nested["items"], nested["tokens"])
-	}
-	for _, c := range candidates {
-		if arr, ok := c.([]any); ok {
-			out := []map[string]any{}
-			for _, item := range arr {
-				if obj, ok := item.(map[string]any); ok {
-					out = append(out, obj)
-				}
-			}
-			return out
-		}
-	}
-	return nil
+	return newapi.PayloadItems(data, "data", "items", "tokens")
 }
 
 func getString(obj map[string]any, key string) string {
