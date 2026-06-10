@@ -168,6 +168,28 @@ func TestRequireMethodUsesNetworkMethodMessage(t *testing.T) {
 	}
 }
 
+func TestReadJSONRejectsTrailingJSONValue(t *testing.T) {
+	var body struct {
+		SiteName string `json:"siteName"`
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/newapi/model-status/test", strings.NewReader(`{"siteName":"a"} {}`))
+
+	if err := readJSON(req, &body); err == nil {
+		t.Fatal("expected trailing JSON value to be rejected")
+	}
+}
+
+func TestReadJSONAllowsTrailingWhitespace(t *testing.T) {
+	var body struct {
+		SiteName string `json:"siteName"`
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/newapi/model-status/test", strings.NewReader("{\"siteName\":\"a\"}\n\t "))
+
+	if err := readJSON(req, &body); err != nil {
+		t.Fatalf("readJSON: %v", err)
+	}
+}
+
 func TestParseListCleansSortsAndDedupes(t *testing.T) {
 	got := parseList(`["beta","alpha","beta",""]`)
 	if strings.Join(got, ",") != "alpha,beta" {
