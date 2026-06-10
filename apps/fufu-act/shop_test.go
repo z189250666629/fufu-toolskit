@@ -42,6 +42,46 @@ func TestExtractPurchaseTimeTrimsAndDropsBlankValues(t *testing.T) {
 	}
 }
 
+func TestFindShopPurchaseRefreshesExpiredCookie(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = "mcy_session=expired"
+
+	postAttempts := 0
+	loginAttempts := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/admin/login":
+			loginAttempts++
+			http.SetCookie(w, &http.Cookie{Name: "mcy_session", Value: "fresh"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodPost && r.URL.Path == "/plugin/virtual-card-ship/card/get":
+			postAttempts++
+			if r.Header.Get("Cookie") != "mcy_session=fresh" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": "expired"})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"list": []any{map[string]any{"purchase_time": "2026-06-10 12:00:00"}}}})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "p")
+
+	got := findShopPurchase("card-1")
+
+	if got != "2026-06-10 12:00:00" {
+		t.Fatalf("purchase time = %q", got)
+	}
+	if postAttempts != 2 || loginAttempts != 1 {
+		t.Fatalf("postAttempts=%d loginAttempts=%d", postAttempts, loginAttempts)
+	}
+}
+
 func TestMCYPostReturnsErrorForInvalidRequestURL(t *testing.T) {
 	oldCookie := mcyCookie
 	t.Cleanup(func() { mcyCookie = oldCookie })

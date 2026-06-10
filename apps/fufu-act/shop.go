@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"fufu/config"
 	"net/http"
@@ -24,7 +25,17 @@ func findShopPurchase(cardKey string) string {
 	}
 	data, err := mcyPost("/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
 	if err != nil {
-		return ""
+		if !isMCYAuthError(err) {
+			return ""
+		}
+		mcyCookie = ""
+		if err := mcyLogin(); err != nil || mcyCookie == "" {
+			return ""
+		}
+		data, err = mcyPost("/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
+		if err != nil {
+			return ""
+		}
 	}
 	if d, ok := data["data"].(map[string]any); ok {
 		return extractPurchaseTime(d)
@@ -52,6 +63,19 @@ func mcyConfig() (string, string, string, string) {
 	return strings.TrimRight(firstNonEmpty(config.Env("MCY_BASE_URL"), config.Env("SHOP_BASE_URL")), "/"), firstNonEmpty(config.Env("MCY_USERNAME"), config.Env("SHOP_USERNAME")), firstNonEmpty(config.Env("MCY_PASSWORD"), config.Env("SHOP_PASSWORD")), firstNonEmpty(config.Env("MCY_LOGIN_ENDPOINT"), "/admin/login")
 }
 
+type mcyHTTPError struct {
+	status int
+}
+
+func (e mcyHTTPError) Error() string {
+	return fmt.Sprintf("MCY HTTP %d", e.status)
+}
+
+func isMCYAuthError(err error) bool {
+	var httpErr mcyHTTPError
+	return errors.As(err, &httpErr) && (httpErr.status == http.StatusUnauthorized || httpErr.status == http.StatusForbidden)
+}
+
 func mcyLogin() error {
 	base, user, pass, login := mcyConfig()
 	if base == "" || user == "" || pass == "" {
@@ -69,7 +93,7 @@ func mcyLogin() error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("MCY login HTTP %d", resp.StatusCode)
+		return mcyHTTPError{status: resp.StatusCode}
 	}
 	cookies := resp.Cookies()
 	if len(cookies) > 0 {
@@ -109,7 +133,7 @@ func mcyPost(endpoint string, payload any) (map[string]any, error) {
 		return nil, fmt.Errorf("MCY JSON decode failed: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return data, fmt.Errorf("MCY HTTP %d", resp.StatusCode)
+		return data, mcyHTTPError{status: resp.StatusCode}
 	}
 	return data, nil
 }
