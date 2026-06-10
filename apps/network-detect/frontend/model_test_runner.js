@@ -10,9 +10,16 @@ function findModelCell(modelStatus, siteName, model, group = '') {
   return cell;
 }
 
-export function updateModelCell(modelStatus, siteName, model, cell) {
+export function updateModelCell(modelStatus, siteName, model, cell, group = '') {
   const row = modelStatus?.models?.find((item) => item.model === model);
   if (!row?.perSite || !cell) return;
+  if (group) {
+    const siteCell = row.perSite[siteName];
+    if (!siteCell) return;
+    siteCell.groupStats ||= {};
+    siteCell.groupStats[group] = cell;
+    return;
+  }
   row.perSite[siteName] = cell;
 }
 
@@ -29,7 +36,7 @@ export function applyModelTestResultToState(modelStatus, siteName, model, result
   const targetModel = result?.model || model;
   const targetGroup = result?.group || group || '';
   if (result?.cell) {
-    updateModelCell(modelStatus, targetSite, targetModel, result.cell);
+    updateModelCell(modelStatus, targetSite, targetModel, result.cell, result?.group || '');
     return true;
   }
   const cell = findModelCell(modelStatus, targetSite, targetModel, targetGroup);

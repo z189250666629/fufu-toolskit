@@ -47,6 +47,33 @@ test('applyModelTestResultToState records returned test when API omits cell', ()
   assert.equal(modelStatus.models[0].perSite.site.status, 'unknown');
 });
 
+test('applyModelTestResultToState updates returned group cell without replacing site cell', () => {
+  const siteCell = {
+    status: 'degraded',
+    pricing: { input: 0.1, output: 0.2 },
+    groupStats: {
+      vip: { status: 'unknown', requestCount: 0 },
+      default: { status: 'operational', requestCount: 2 }
+    }
+  };
+  const modelStatus = {
+    models: [{ model: 'model-a', perSite: { site: siteCell } }]
+  };
+  const nextGroupCell = { status: 'operational', requestCount: 1 };
+
+  assert.equal(applyModelTestResultToState(modelStatus, 'site', 'model-a', {
+    siteName: 'site',
+    model: 'model-a',
+    group: 'vip',
+    cell: nextGroupCell
+  }), true);
+
+  assert.equal(modelStatus.models[0].perSite.site, siteCell);
+  assert.equal(modelStatus.models[0].perSite.site.groupStats.vip, nextGroupCell);
+  assert.deepEqual(modelStatus.models[0].perSite.site.groupStats.default, { status: 'operational', requestCount: 2 });
+  assert.deepEqual(modelStatus.models[0].perSite.site.pricing, { input: 0.1, output: 0.2 });
+});
+
 test('runModelCellTest toggles testing state and writes success message', async () => {
   const state = {
     testingCells: new Set(),
