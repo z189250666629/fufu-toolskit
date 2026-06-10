@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -44,5 +45,21 @@ func TestMCYPostReturnsErrorForInvalidRequestURL(t *testing.T) {
 	}()
 	if _, err := mcyPost("/check", map[string]any{"ok": true}); err == nil {
 		t.Fatal("mcyPost should reject invalid request URLs")
+	}
+}
+
+func TestMCYPostReturnsErrorForInvalidJSONResponse(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = "session=ok"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`not-json`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	data, err := mcyPost("/check", map[string]any{"ok": true})
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "json") {
+		t.Fatalf("data=%#v err=%v", data, err)
 	}
 }

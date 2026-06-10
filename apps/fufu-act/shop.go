@@ -94,7 +94,9 @@ func mcyPost(endpoint string, payload any) (map[string]any, error) {
 	}
 	defer resp.Body.Close()
 	var data map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&data)
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("MCY JSON decode failed: %w", err)
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return data, fmt.Errorf("MCY HTTP %d", resp.StatusCode)
 	}
