@@ -11,6 +11,7 @@ type MergeJob struct {
 	Error     string `json:"error,omitempty"`
 	Role      Role   `json:"role,omitempty"`
 	MergeID   int64  `json:"mergeId,omitempty"`
+	Client    string `json:"-"`
 }
 
 type MergeJobPatch struct {

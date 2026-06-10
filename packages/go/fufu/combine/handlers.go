@@ -143,7 +143,8 @@ func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role := RoleGuest
-	if !a.tryQueueMergeJob(jobID, buildQueuedMergeJobPatch(len(keys), role, "准备普通合卡...")) {
+	if !a.tryQueuePublicMergeJob(jobID, buildQueuedMergeJobPatch(len(keys), role, "准备普通合卡..."), authClientKey(r)) {
+		w.Header().Set("Retry-After", "1")
 		writeMergeBusy(w)
 		return
 	}

@@ -586,3 +586,28 @@ func TestHandlePublicMergeRejectsWhenActiveJobsAtLimit(t *testing.T) {
 		t.Fatalf("active job limit should not queue another job: %#v", app.mergeJobs)
 	}
 }
+
+func TestHandlePublicMergeRejectsWhenSameClientHasActiveGuestJobs(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	now := time.Now().UnixMilli()
+	client := "203.0.113.90"
+	for i := 0; i < maxActivePublicMergeJobsPerClient; i++ {
+		app.mergeJobs["client-active-"+strconv.Itoa(i)] = MergeJob{Status: "queued", CreatedAt: now, UpdatedAt: now, Role: RoleGuest, Client: client}
+	}
+	app.mergeJobs["other-client-active"] = MergeJob{Status: "queued", CreatedAt: now, UpdatedAt: now, Role: RoleGuest, Client: "198.51.100.9"}
+	req := httptest.NewRequest(http.MethodPost, "/api/public-merge", strings.NewReader(`{"keys":["sk-client-limit-a","sk-client-limit-b"]}`))
+	req.RemoteAddr = client + ":5000"
+	w := httptest.NewRecorder()
+
+	app.handlePublicMerge(w, req)
+
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "任务繁忙") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("Retry-After"); got == "" {
+		t.Fatal("same-client public merge limit should include Retry-After")
+	}
+	if len(app.mergeJobs) != maxActivePublicMergeJobsPerClient+1 {
+		t.Fatalf("same-client limit should not queue another guest job: %#v", app.mergeJobs)
+	}
+}

@@ -56,6 +56,16 @@ func activeMergeJobCountLocked(jobs map[string]MergeJob) int {
 	return count
 }
 
+func activePublicMergeJobCountForClientLocked(jobs map[string]MergeJob, client string) int {
+	count := 0
+	for _, job := range jobs {
+		if job.Role == RoleGuest && job.Client == client && !isTerminalMergeJobStatus(job.Status) {
+			count++
+		}
+	}
+	return count
+}
+
 func (a *App) tryQueueMergeJob(jobID string, p MergeJobPatch) bool {
 	nowMs := time.Now().UnixMilli()
 	a.mu.Lock()
@@ -64,6 +74,22 @@ func (a *App) tryQueueMergeJob(jobID string, p MergeJobPatch) bool {
 		return false
 	}
 	job := MergeJob{CreatedAt: nowMs, Status: "queued"}
+	applyMergeJobPatch(&job, p, nowMs)
+	a.mergeJobs[jobID] = job
+	return true
+}
+
+func (a *App) tryQueuePublicMergeJob(jobID string, p MergeJobPatch, client string) bool {
+	nowMs := time.Now().UnixMilli()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if activeMergeJobCountLocked(a.mergeJobs) >= maxActiveMergeJobs {
+		return false
+	}
+	if activePublicMergeJobCountForClientLocked(a.mergeJobs, client) >= maxActivePublicMergeJobsPerClient {
+		return false
+	}
+	job := MergeJob{CreatedAt: nowMs, Status: "queued", Client: client}
 	applyMergeJobPatch(&job, p, nowMs)
 	a.mergeJobs[jobID] = job
 	return true
