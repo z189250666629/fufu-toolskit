@@ -33,7 +33,10 @@ func newAPIGet(ctx context.Context, site newapi.Site, endpoint string, timeout t
 }
 
 func upstreamError(data map[string]any, status int) string {
-	return newapi.ErrorMessage(data, status, "NewAPI 请求失败")
+	if status > 0 && (status < 200 || status >= 300) {
+		return fmt.Sprintf("NewAPI 请求失败（上游状态 %d）", status)
+	}
+	return "NewAPI 请求失败"
 }
 
 func str(v any) string {

@@ -51,6 +51,33 @@ func TestNewAPIGetMasksTransportErrors(t *testing.T) {
 	}
 }
 
+func TestNewAPIGetMasksUpstreamPayloadMessages(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"message": `sql failed token=sk-secret internal=http://10.0.0.5/config`,
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	result := newAPIGet(context.Background(), newapi.Site{URL: server.URL, Token: "token", UserID: "1"}, "/api/log/self", time.Second)
+
+	if result.OK {
+		t.Fatalf("result should fail: %#v", result)
+	}
+	if result.Status != http.StatusOK {
+		t.Fatalf("status = %d", result.Status)
+	}
+	if result.Error != "NewAPI 请求失败" {
+		t.Fatalf("upstream payload message should be masked, got %q", result.Error)
+	}
+	for _, leaked := range []string{"sk-secret", "token=", "10.0.0.5", "sql", "internal="} {
+		if strings.Contains(result.Error, leaked) {
+			t.Fatalf("upstream payload error leaked %q in %q", leaked, result.Error)
+		}
+	}
+}
+
 func TestToInt64ParsesDecimalJSONNumber(t *testing.T) {
 	if got := toInt64(json.Number("42.0")); got != 42 {
 		t.Fatalf("decimal json.Number = %d", got)
