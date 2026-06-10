@@ -14,6 +14,7 @@ export function renderSegmentedTabs({
   dataAttribute
 }) {
   const activeIndex = Math.max(0, options.findIndex((option) => option.value === activeValue));
+  const resolvedActiveValue = options[activeIndex]?.value;
   const tabCount = Math.max(1, options.length);
 
   return `
@@ -28,7 +29,7 @@ export function renderSegmentedTabs({
     >
       <span class="tab-indicator tabs__indicator" data-slot="tab-indicator" aria-hidden="true"></span>
       ${options.map((option) => {
-        const active = activeValue === option.value;
+        const active = resolvedActiveValue === option.value;
         return `
         <button
           class="${escapeHtml(buttonClassName)} ${active ? 'active' : ''}"

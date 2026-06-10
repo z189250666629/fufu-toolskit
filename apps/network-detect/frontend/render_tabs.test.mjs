@@ -30,3 +30,24 @@ test('renderSegmentedTabs renders escaped tablist markup with active metadata', 
   assert.match(html, /URL &lt;检测&gt;/);
   assert.doesNotMatch(html, /URL <检测>/);
 });
+
+test('renderSegmentedTabs falls back to first option when active value is missing', () => {
+  const html = renderSegmentedTabs({
+    className: 'panel-toggle',
+    ariaLabel: '状态视图',
+    motionKey: 'panel',
+    activeValue: 'missing',
+    options: [
+      { value: 'url', label: 'URL 检测' },
+      { value: 'models', label: '模型状态' }
+    ],
+    buttonClassName: 'toggle-button',
+    getControls: (value) => `${value}Panel`,
+    getId: (value) => `${value}Tab`,
+    dataAttribute: 'panel'
+  });
+
+  assert.match(html, /style="--tab-count: 2; --active-tab-index: 0;"/);
+  assert.match(html, /aria-selected="true"[\s\S]*?tabindex="0"[\s\S]*?data-panel="url"/);
+  assert.match(html, /aria-selected="false"[\s\S]*?data-panel="models"/);
+});
