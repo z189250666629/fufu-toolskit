@@ -15,12 +15,14 @@ test('activity render escapes history timestamp and coerces prize rows', async (
   const symbols = { 1000: '<b>JP</b>', 5: '🍀' };
 
   const prizeHtml = render.buildPrizeTableHtml([
-    { dollars: '1000' },
+    { dollars: '1000', pct: '0.40<script>' },
     { dollars: 'not-a-number' }
   ], symbols);
 
   assert.match(prizeHtml, /class="prize-row jackpot"/);
   assert.match(prizeHtml, /\$1000 JP/);
+  assert.match(prizeHtml, /0\.40&lt;script&gt;%/);
+  assert.doesNotMatch(prizeHtml, /0\.40<script>%/);
   assert.match(prizeHtml, /&lt;b&gt;JP&lt;\/b&gt;/);
   assert.doesNotMatch(prizeHtml, /<b>JP<\/b>/);
 

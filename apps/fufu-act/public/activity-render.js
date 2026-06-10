@@ -28,7 +28,10 @@
       return `
         <div class="prize-row ${jackpot ? 'jackpot' : ''}">
           <div class="symbol">${prizeSymbol(symbols, dollars)}</div>
-          <div class="amount">$${escapeHtml(dollars)}${jackpot ? ' JP' : ''}</div>
+          <div class="prize-main">
+            <div class="amount">$${escapeHtml(dollars)}${jackpot ? ' JP' : ''}</div>
+            <div class="odds">${escapeHtml(row?.pct)}%</div>
+          </div>
         </div>
       `;
     }).join('');
