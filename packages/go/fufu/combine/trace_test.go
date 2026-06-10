@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newTraceTestApp(t *testing.T) *App {
@@ -197,6 +198,61 @@ func TestTraceDiagnosticFieldsRedactSecretsBeforePersisting(t *testing.T) {
 			t.Fatalf("%s should keep masked key context, got %q", name, value)
 		}
 	}
+}
+
+func TestCreateMergeTracePrunesExpiredTraceRows(t *testing.T) {
+	ctx := context.Background()
+	app := newTraceTestApp(t)
+	oldMergeID, err := app.createMergeTrace(ctx, "job-old-trace", RoleUser, 60)
+	if err != nil {
+		t.Fatalf("create old trace: %v", err)
+	}
+	recentMergeID, err := app.createMergeTrace(ctx, "job-recent-trace", RoleUser, 60)
+	if err != nil {
+		t.Fatalf("create recent trace: %v", err)
+	}
+	oldToken := ResolvedToken{ID: 301, Key: "sk-old-trace-key-1234567890", Name: "old", Status: 1}
+	recentToken := ResolvedToken{ID: 302, Key: "sk-recent-trace-key-1234567890", Name: "recent", Status: 1}
+	if err := app.upsertTraceToken(ctx, oldMergeID, "source", oldToken); err != nil {
+		t.Fatalf("upsert old token: %v", err)
+	}
+	if err := app.upsertTraceToken(ctx, recentMergeID, "source", recentToken); err != nil {
+		t.Fatalf("upsert recent token: %v", err)
+	}
+	oldMs := time.Now().Add(-31 * 24 * time.Hour).UnixMilli()
+	recentMs := time.Now().Add(-time.Hour).UnixMilli()
+	if _, err := app.db.ExecContext(ctx, `UPDATE merge_records SET status = 'done', created_at = ?, updated_at = ?, completed_at = ? WHERE id = ?`, oldMs, oldMs, oldMs, oldMergeID); err != nil {
+		t.Fatalf("age old trace: %v", err)
+	}
+	if _, err := app.db.ExecContext(ctx, `UPDATE merge_records SET status = 'done', created_at = ?, updated_at = ?, completed_at = ? WHERE id = ?`, recentMs, recentMs, recentMs, recentMergeID); err != nil {
+		t.Fatalf("age recent trace: %v", err)
+	}
+
+	if _, err := app.createMergeTrace(ctx, "job-new-trace", RoleUser, 60); err != nil {
+		t.Fatalf("create new trace: %v", err)
+	}
+
+	if got := countTraceRows(t, app, `SELECT COUNT(*) FROM merge_records WHERE id = ?`, oldMergeID); got != 0 {
+		t.Fatalf("expired merge record count = %d, want 0", got)
+	}
+	if got := countTraceRows(t, app, `SELECT COUNT(*) FROM merge_tokens WHERE merge_id = ?`, oldMergeID); got != 0 {
+		t.Fatalf("expired trace token count = %d, want 0", got)
+	}
+	if got := countTraceRows(t, app, `SELECT COUNT(*) FROM merge_records WHERE id = ?`, recentMergeID); got != 1 {
+		t.Fatalf("recent merge record count = %d, want 1", got)
+	}
+	if got := countTraceRows(t, app, `SELECT COUNT(*) FROM merge_tokens WHERE merge_id = ?`, recentMergeID); got != 1 {
+		t.Fatalf("recent trace token count = %d, want 1", got)
+	}
+}
+
+func countTraceRows(t *testing.T, app *App, query string, args ...any) int {
+	t.Helper()
+	var count int
+	if err := app.db.QueryRow(query, args...).Scan(&count); err != nil {
+		t.Fatalf("count trace rows: %v", err)
+	}
+	return count
 }
 
 func TestGeneratedTokenCacheIgnoresUnserializableRawSnapshot(t *testing.T) {

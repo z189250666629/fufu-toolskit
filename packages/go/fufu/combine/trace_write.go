@@ -10,15 +10,42 @@ func (a *App) createMergeTrace(ctx context.Context, jobID string, role Role, int
 	if a.db == nil {
 		return 0, nil
 	}
-	now := time.Now().UnixMilli()
+	now := time.Now()
+	if err := a.pruneExpiredTraceRows(ctx, now); err != nil {
+		log.Printf("trace retention cleanup failed: %v", err)
+	}
+	nowMs := now.UnixMilli()
 	res, err := a.db.ExecContext(ctx, `
 		INSERT INTO merge_records (job_id, role, status, requested_interval_unit, created_at, updated_at)
 		VALUES (?, ?, 'started', ?, ?, ?)
-	`, jobID, string(role), intervalUnit, now, now)
+	`, jobID, string(role), intervalUnit, nowMs, nowMs)
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
+}
+
+func (a *App) pruneExpiredTraceRows(ctx context.Context, now time.Time) error {
+	if a.db == nil {
+		return nil
+	}
+	cutoff := now.Add(-traceRetention).UnixMilli()
+	if _, err := a.db.ExecContext(ctx, `
+		DELETE FROM merge_tokens
+		WHERE merge_id IN (
+			SELECT id FROM merge_records
+			WHERE completed_at IS NOT NULL AND completed_at < ?
+		)
+	`, cutoff); err != nil {
+		return err
+	}
+	if _, err := a.db.ExecContext(ctx, `
+		DELETE FROM merge_records
+		WHERE completed_at IS NOT NULL AND completed_at < ?
+	`, cutoff); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *App) setTraceStatus(ctx context.Context, mergeID int64, status string) {

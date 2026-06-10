@@ -11,6 +11,7 @@ const (
 	searchConcurrency = 6
 	sessionTTL        = 4 * time.Hour
 	mergeJobTTL       = 30 * time.Minute
+	traceRetention    = 30 * 24 * time.Hour
 	publicSourceUnit  = 3
 	publicTargetUnit  = 8
 	maxTraceRecords   = 50
