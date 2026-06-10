@@ -10,6 +10,7 @@ import (
 )
 
 const DefaultQuotaUnit int64 = 500000
+const maxResponseBodyBytes int64 = 16 << 20
 
 type Site struct {
 	Name                string  `json:"name"`
@@ -94,7 +95,7 @@ func (c *Client) Request(ctx context.Context, method, endpoint string, body any)
 		return Response{}, nil, err
 	}
 	defer resp.Body.Close()
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := readResponseBody(resp.Body)
 	if err != nil {
 		return Response{StatusCode: resp.StatusCode}, nil, err
 	}
@@ -117,6 +118,18 @@ func (c *Client) Put(ctx context.Context, endpoint string, body any) (Response, 
 }
 func (c *Client) Delete(ctx context.Context, endpoint string) (Response, map[string]any, error) {
 	return c.Request(ctx, http.MethodDelete, endpoint, nil)
+}
+
+func readResponseBody(r io.Reader) ([]byte, error) {
+	limited := &io.LimitedReader{R: r, N: maxResponseBodyBytes + 1}
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxResponseBodyBytes {
+		return nil, fmt.Errorf("response body too large")
+	}
+	return body, nil
 }
 
 func IsSuccess(data map[string]any) bool {

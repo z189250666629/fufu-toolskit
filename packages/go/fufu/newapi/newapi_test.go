@@ -91,6 +91,35 @@ func TestRequestDoesNotTreatInvalidJSONAsSuccess(t *testing.T) {
 	}
 }
 
+func TestRequestRejectsOversizedResponseBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":"`))
+		_, _ = w.Write([]byte(strings.Repeat("x", (16<<20)+1)))
+		_, _ = w.Write([]byte(`"}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(Site{URL: server.URL, Token: "secret", UserID: "1"})
+	res, data, err := client.Get(context.Background(), "/api/test")
+
+	if err == nil {
+		t.Fatalf("expected oversized response error, got status=%d bodyBytes=%d data=%#v", res.StatusCode, len(res.Body), data)
+	}
+	if !strings.Contains(err.Error(), "response body too large") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status code = %d", res.StatusCode)
+	}
+	if res.Body != "" {
+		t.Fatalf("oversized body should not be retained, got %d bytes", len(res.Body))
+	}
+	if data != nil {
+		t.Fatalf("oversized response should not return payload: %#v", data)
+	}
+}
+
 func TestSuccessFalseErrorMessage(t *testing.T) {
 	data := map[string]any{"success": false, "message": "bad token"}
 	if IsSuccess(data) {
