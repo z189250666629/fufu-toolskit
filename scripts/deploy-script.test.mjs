@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readdir, readFile } from 'node:fs/promises';
+import { access, chmod, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const scriptsDirUrl = new URL('./', import.meta.url);
 const scriptsDir = fileURLToPath(scriptsDirUrl);
+const repoRootUrl = new URL('../', scriptsDirUrl);
+const repoRoot = fileURLToPath(repoRootUrl);
 
 async function shellScripts() {
   return (await readdir(scriptsDirUrl))
@@ -33,4 +35,73 @@ test('deploy shell scripts pass bash syntax checks', { skip: bashProbe.error ? '
       `${script.path} should pass bash -n`
     );
   }
+});
+
+test('deploy script cleans compose env file when deployment fails', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
+  const tmpName = `.tmp/deploy-script-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
+  const fakeBinRel = `${tmpName}/bin`;
+  const composeRel = `${tmpName}/docker-compose.yml`;
+  const composeEnvRel = `${tmpName}/leaky.env`;
+  const composeEnvSnapshotRel = `${tmpName}/snapshot.env`;
+
+  t.after(() => rm(tmpUrl, { recursive: true, force: true }));
+  await mkdir(new URL('bin/', tmpUrl), { recursive: true });
+  await mkdir(new URL('home/', tmpUrl), { recursive: true });
+  await writeFile(new URL('docker-compose.yml', tmpUrl), 'services:\n  app:\n    image: ${APP_IMAGE}:${APP_TAG}\n');
+
+  for (const [name, body] of Object.entries({
+    'ssh-keygen': '#!/usr/bin/env bash\nexit 0\n',
+    'ssh-keyscan': '#!/usr/bin/env bash\nprintf "example ssh-rsa test\\n"\n',
+    scp: '#!/usr/bin/env bash\nexit 0\n',
+    ssh: [
+      '#!/usr/bin/env bash',
+      'if [ ! -f "$EXPECTED_COMPOSE_ENV_FILE" ]; then',
+      '  printf "compose env was not written before ssh\\n" >&2',
+      '  exit 43',
+      'fi',
+      'cp "$EXPECTED_COMPOSE_ENV_FILE" "$DEPLOY_ENV_SNAPSHOT"',
+      'exit 42',
+      ''
+    ].join('\n')
+  })) {
+    const commandUrl = new URL(`bin/${name}`, tmpUrl);
+    await writeFile(commandUrl, body);
+    await chmod(commandUrl, 0o755);
+  }
+
+  const shellQuote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
+  const envAssignments = {
+    APP_NAME: 'fufu-act',
+    APP_IMAGE: 'example/app',
+    APP_TAG: 'test',
+    SSH_HOST: 'example.test',
+    SSH_USER: 'deploy',
+    SSH_PRIVATE_KEY: 'fake-key',
+    DEPLOY_PATH: '/srv/fufu',
+    COMPOSE_FILE: composeRel,
+    COMPOSE_SERVICE_NAME: 'app',
+    COMPOSE_ENV_FILE: composeEnvRel,
+    EXPECTED_COMPOSE_ENV_FILE: composeEnvRel,
+    DEPLOY_ENV_SNAPSHOT: composeEnvSnapshotRel,
+    HOME: `${tmpName}/home`,
+    ADMIN_TOKEN: 'secret-admin-token',
+    MCY_PASSWORD: 'secret-password'
+  };
+  const command = [
+    `PATH="$PWD/${fakeBinRel}:$PATH"`,
+    ...Object.entries(envAssignments).map(([name, value]) => `${name}=${shellQuote(value)}`),
+    'bash scripts/deploy-docker-app.sh'
+  ].join(' ');
+  const result = spawnSync('bash', ['-c', command], { cwd: repoRoot, encoding: 'utf8' });
+
+  assert.equal(result.status, 42, `fake ssh should force deployment failure after env creation\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  const snapshot = await readFile(new URL('snapshot.env', tmpUrl), 'utf8');
+  assert.match(snapshot, /ADMIN_TOKEN=secret-admin-token/);
+  assert.match(snapshot, /MCY_PASSWORD=secret-password/);
+  await assert.rejects(
+    () => access(new URL('leaky.env', tmpUrl)),
+    { code: 'ENOENT' },
+    'compose env file should be removed after failed deployment'
+  );
 });

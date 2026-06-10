@@ -23,6 +23,10 @@ write_env_var() {
   printf '%s=%s\n' "$name" "$value" >> "$COMPOSE_ENV_FILE"
 }
 
+cleanup_compose_env_file() {
+  rm -f -- "$COMPOSE_ENV_FILE"
+}
+
 require_env APP_NAME
 require_env APP_IMAGE
 require_env APP_TAG
@@ -79,6 +83,7 @@ fi
 chmod 644 "$HOME/.ssh/known_hosts"
 
 : > "$COMPOSE_ENV_FILE"
+trap cleanup_compose_env_file EXIT
 write_env_var APP_IMAGE
 write_env_var APP_TAG
 write_env_var CONTAINER_NAME
