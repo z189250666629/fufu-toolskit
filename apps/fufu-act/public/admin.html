@@ -314,6 +314,7 @@
     <div id="content"></div>
   </div>
 
+  <script src="activity-api.js"></script>
   <script src="admin-render.js"></script>
   <script>
     /* ---- starfield ---- */
@@ -370,12 +371,15 @@
       errEl.textContent = '';
       try {
         const r = await fetch('/api/admin/stats?token=' + encodeURIComponent(tok));
-        if (!r.ok) { const j = await r.json(); throw new Error(j.error || r.status); }
-        render(await r.json());
+        const data = await activityApi.readApiJson(r, {
+          serverErrorMessage: '统计加载失败，请稍后重试',
+          clientErrorMessage: '统计加载失败，请稍后重试',
+        });
+        render(data);
         const prefix = timer ? '自动刷新中（每 10 秒）— ' : '';
         document.getElementById('info').textContent = prefix + '最后更新：' + new Date().toLocaleTimeString('zh-CN');
       } catch(e) {
-        errEl.textContent = 'ERROR: ' + e.message;
+        errEl.textContent = activityApi.safeErrorMessage(e, '统计加载失败，请稍后重试');
       }
     }
 
