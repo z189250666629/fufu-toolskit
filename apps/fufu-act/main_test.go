@@ -266,6 +266,9 @@ func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "public api marker") {
 		t.Fatalf("normal asset should still be served: code=%d body=%s", w.Code, w.Body.String())
 	}
+	if got := w.Header().Get("Cache-Control"); got != "public, max-age=300" {
+		t.Fatalf("normal asset Cache-Control = %q", got)
+	}
 }
 
 func TestInitAllResetsTokenConfigStateOnPrimarySiteError(t *testing.T) {

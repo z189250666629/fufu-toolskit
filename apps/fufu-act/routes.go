@@ -85,7 +85,7 @@ func staticRoute(w http.ResponseWriter, r *http.Request) {
 		webutil.WriteStaticNotFound(w, r)
 		return
 	}
-	webutil.ServeFile(w, r, file, true)
+	webutil.ServeFile(w, r, file, strings.HasSuffix(file, ".html"))
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
