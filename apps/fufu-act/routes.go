@@ -12,9 +12,13 @@ import (
 	"unicode"
 )
 
-const maxCardKeyLength = 256
+const (
+	maxCardKeyLength       = 256
+	maxJSONBodyBytes int64 = 1 << 20
+)
 
 var errInvalidCardKey = errors.New("invalid card key")
+var errRequestBodyTooLarge = errors.New("request body too large")
 
 func apiRoute(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
@@ -84,7 +88,17 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 }
 
 func readBody(r *http.Request, out any) error {
-	return webutil.DecodeJSON(io.LimitReader(r.Body, 1<<20), out)
+	limited := &io.LimitedReader{R: r.Body, N: maxJSONBodyBytes + 1}
+	if err := webutil.DecodeJSON(limited, out); err != nil {
+		if limited.N <= 0 {
+			return errRequestBodyTooLarge
+		}
+		return err
+	}
+	if limited.N <= 0 {
+		return errRequestBodyTooLarge
+	}
+	return nil
 }
 
 func readCardKeyRequest(r *http.Request, out any, cardKey func() string) (string, bool, error) {
@@ -111,6 +125,10 @@ func isValidCardKey(key string) bool {
 }
 
 func writeCardKeyRequestError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errRequestBodyTooLarge) {
+		writeJSONError(w, http.StatusRequestEntityTooLarge, "请求体过大")
+		return
+	}
 	if errors.Is(err, errInvalidCardKey) {
 		writeJSONError(w, http.StatusBadRequest, "卡密格式错误")
 		return

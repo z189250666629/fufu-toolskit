@@ -249,6 +249,30 @@ func TestReadCardKeyRequestRejectsTrailingJSON(t *testing.T) {
 	}
 }
 
+func TestReadCardKeyRequestRejectsOversizedTrailingBody(t *testing.T) {
+	var body struct {
+		CardKey string `json:"cardKey"`
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"sk-card"}`+strings.Repeat(" ", 1<<20)))
+	key, ok, err := readCardKeyRequest(req, &body, func() string { return body.CardKey })
+
+	if err == nil || ok || key != "" {
+		t.Fatalf("oversized trailing body card key = %q/%v err=%v", key, ok, err)
+	}
+}
+
+func TestCardKeyHandlersReportOversizedBody(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"sk-card"}`+strings.Repeat(" ", 1<<20)))
+	w := httptest.NewRecorder()
+
+	handleSpin(w, req)
+
+	if w.Code != http.StatusRequestEntityTooLarge || !strings.Contains(w.Body.String(), "请求体过大") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestCardKeyWhitespaceRejectedAcrossHandlers(t *testing.T) {
 	cases := []struct {
 		name    string
