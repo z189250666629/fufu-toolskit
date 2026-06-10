@@ -8,8 +8,9 @@ import (
 
 func getModelStatus(force bool) *ModelStatus {
 	now := time.Now()
+	cacheKey := modelStatusCacheKey(rootDir)
 	modelCache.Lock()
-	if !force && modelCache.Value != nil && now.Before(modelCache.Expires) {
+	if !force && modelCache.Value != nil && modelCache.Key == cacheKey && now.Before(modelCache.Expires) {
 		v := modelCache.Value
 		modelCache.Unlock()
 		return v
@@ -19,6 +20,7 @@ func getModelStatus(force bool) *ModelStatus {
 	modelCache.Lock()
 	modelCache.Value = status
 	modelCache.Expires = now.Add(modelStatusCacheTTL)
+	modelCache.Key = cacheKey
 	modelCache.Unlock()
 	return status
 }

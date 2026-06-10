@@ -33,6 +33,7 @@ var modelCache = struct {
 	sync.Mutex
 	Value   *ModelStatus
 	Expires time.Time
+	Key     string
 }{}
 var testCooldowns sync.Map
 var testResults sync.Map
