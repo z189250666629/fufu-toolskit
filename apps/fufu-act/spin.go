@@ -28,7 +28,9 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 			return nil, httpErr{403, "抽奖次数已用完"}
 		}
 		maxWon := 0
-		_ = db.QueryRow(`SELECT COALESCE(MAX(prize_dollars),0) FROM spin_log WHERE card_key=? AND is_retry=0`, key).Scan(&maxWon)
+		if err := db.QueryRow(`SELECT COALESCE(MAX(prize_dollars),0) FROM spin_log WHERE card_key=? AND is_retry=0`, key).Scan(&maxWon); err != nil {
+			return nil, err
+		}
 		force := 0
 		if card.Rigged.Valid {
 			var m map[string]int
@@ -38,23 +40,48 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 		}
 		sr := spin(card.Dollars, card.WonJackpot != 0, card.UsedSpins, card.TotalSpins, maxWon, force)
 		if sr.Type == "retry" {
-			_, _ = db.Exec(`INSERT INTO spin_log (card_key,prize_dollars,is_retry) VALUES (?,0,1)`, key)
+			if _, err := db.Exec(`INSERT INTO spin_log (card_key,prize_dollars,is_retry) VALUES (?,0,1)`, key); err != nil {
+				return nil, err
+			}
 			return map[string]any{"isRetry": true, "isMiss": false, "message": "再来一次！", "remainingSpins": remaining}, nil
 		}
-		tx, _ := db.Begin()
+		tx, err := db.Begin()
+		if err != nil {
+			return nil, err
+		}
+		committed := false
+		defer func() {
+			if !committed {
+				_ = tx.Rollback()
+			}
+		}()
 		if sr.Type == "miss" {
-			_, _ = tx.Exec(`UPDATE cards SET used_spins=used_spins+1,last_spin_at=datetime('now') WHERE card_key=?`, key)
-			_, _ = tx.Exec(`INSERT INTO spin_log (card_key,prize_dollars,is_retry) VALUES (?,0,0)`, key)
+			if _, err := tx.Exec(`UPDATE cards SET used_spins=used_spins+1,last_spin_at=datetime('now') WHERE card_key=?`, key); err != nil {
+				return nil, err
+			}
+			if _, err := tx.Exec(`INSERT INTO spin_log (card_key,prize_dollars,is_retry) VALUES (?,0,0)`, key); err != nil {
+				return nil, err
+			}
 		} else {
 			jack := 0
 			if sr.Dollars == 1000 {
 				jack = 1
 			}
-			_, _ = tx.Exec(`UPDATE cards SET used_spins=used_spins+1, won_jackpot=won_jackpot+?, total_won=total_won+?, last_spin_at=datetime('now') WHERE card_key=?`, jack, sr.Dollars, key)
-			_, _ = tx.Exec(`INSERT INTO spin_log (card_key,prize_dollars,is_retry) VALUES (?,?,0)`, key, sr.Dollars)
+			if _, err := tx.Exec(`UPDATE cards SET used_spins=used_spins+1, won_jackpot=won_jackpot+?, total_won=total_won+?, last_spin_at=datetime('now') WHERE card_key=?`, jack, sr.Dollars, key); err != nil {
+				return nil, err
+			}
+			if _, err := tx.Exec(`INSERT INTO spin_log (card_key,prize_dollars,is_retry) VALUES (?,?,0)`, key, sr.Dollars); err != nil {
+				return nil, err
+			}
 		}
-		_ = tx.Commit()
-		updated, _ := getCard(key)
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		committed = true
+		updated, ok := getCard(key)
+		if !ok {
+			return nil, httpErr{500, "服务器错误"}
+		}
 		newRem := updated.TotalSpins - updated.UsedSpins
 		if newRem <= 0 && updated.TotalWon > 0 {
 			enqueueCredit(key, updated.TotalWon)
