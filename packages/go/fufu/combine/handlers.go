@@ -138,6 +138,9 @@ func (a *App) handleMergeStatus(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "未授权"})
 		return
 	}
+	if job.Role == RoleGuest {
+		job = publicMergeJobStatus(job)
+	}
 	writeJSON(w, 200, job)
 }
 

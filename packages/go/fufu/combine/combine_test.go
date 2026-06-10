@@ -153,6 +153,42 @@ func TestMergeStatusRequiresSessionForNonGuestJobs(t *testing.T) {
 	}
 }
 
+func TestGuestMergeStatusRedactsSourceKeysAndRawErrors(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	guestRole := RoleGuest
+	app.setMergeJob("job-guest-secret", MergeJobPatch{
+		Status: strp("error"),
+		Role:   &guestRole,
+		Result: MergeResult{
+			Success: false,
+			NewCard: NewCardResult{
+				Key: "sk-new-card-secret-1234567890",
+			},
+			DeleteResults: []DeleteResult{{ID: 1, Key: "sk-source-secret-1234567890", OK: false}},
+		},
+		HasResult: true,
+		Error:     strp("upstream panic: sk-source-secret-1234567890"),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/merge-status/job-guest-secret", nil)
+	rec := httptest.NewRecorder()
+	app.handleAPI(rec, req)
+
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status code=%d body=%s", rec.Code, body)
+	}
+	if strings.Contains(body, "sk-source-secret-1234567890") || strings.Contains(body, "upstream panic") {
+		t.Fatalf("guest status leaked source key or raw error: %s", body)
+	}
+	if !strings.Contains(body, "sk-sour…7890") || !strings.Contains(body, "合并失败，请稍后重试") {
+		t.Fatalf("guest status should keep safe diagnostics: %s", body)
+	}
+	if !strings.Contains(body, "sk-new-card-secret-1234567890") {
+		t.Fatalf("guest status should still return the generated card key: %s", body)
+	}
+}
+
 func TestHandleAPIRejectsWrongMethodWithMethodNotAllowed(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/auth", nil)

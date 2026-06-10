@@ -23,6 +23,42 @@ func buildMergeAcceptedResponse(jobID string) map[string]any {
 	return map[string]any{"ok": true, "jobId": jobID}
 }
 
+func publicMergeJobStatus(job MergeJob) MergeJob {
+	out := job
+	if out.Error != "" {
+		out.Error = "合并失败，请稍后重试"
+	}
+	out.Result = publicMergeJobResult(out.Result)
+	return out
+}
+
+func publicMergeJobResult(result any) any {
+	switch v := result.(type) {
+	case MergeResult:
+		return publicMergeResult(v)
+	case *MergeResult:
+		if v == nil {
+			return v
+		}
+		out := publicMergeResult(*v)
+		return &out
+	default:
+		return result
+	}
+}
+
+func publicMergeResult(result MergeResult) MergeResult {
+	out := result
+	if len(result.DeleteResults) > 0 {
+		out.DeleteResults = make([]DeleteResult, len(result.DeleteResults))
+		for i, deleteResult := range result.DeleteResults {
+			out.DeleteResults[i] = deleteResult
+			out.DeleteResults[i].Key = keyMask(deleteResult.Key)
+		}
+	}
+	return out
+}
+
 func buildSearchKeysResponse(keys []string, found []ResolvedToken, missing []string, quotaUnit int64, elapsedMs int64, traceResults []TraceResult) map[string]any {
 	elig := evaluatePublicMergeEligibility(found)
 	publicTraces := publicTraceResults(traceResults)
