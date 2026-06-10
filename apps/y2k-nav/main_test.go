@@ -67,6 +67,16 @@ func TestServeReturnsListenerErrors(t *testing.T) {
 	}
 }
 
+func TestHTTPServerHasTimeouts(t *testing.T) {
+	server := newHTTPServer("33148", http.NewServeMux())
+	if server.Addr != "0.0.0.0:33148" {
+		t.Fatalf("Addr = %q", server.Addr)
+	}
+	if server.ReadHeaderTimeout <= 0 || server.ReadTimeout <= 0 || server.WriteTimeout <= 0 || server.IdleTimeout <= 0 {
+		t.Fatalf("server timeouts should be set: %#v", server)
+	}
+}
+
 func TestStaticHandlerServesRootIndex(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "index.html"), []byte("y2k home"), 0644); err != nil {

@@ -96,6 +96,16 @@ func TestServeReturnsListenerErrors(t *testing.T) {
 	}
 }
 
+func TestHTTPServerHasTimeouts(t *testing.T) {
+	server := newHTTPServer("18820", http.NewServeMux())
+	if server.Addr != "0.0.0.0:18820" {
+		t.Fatalf("Addr = %q", server.Addr)
+	}
+	if server.ReadHeaderTimeout <= 0 || server.ReadTimeout <= 0 || server.WriteTimeout <= 0 || server.IdleTimeout <= 0 {
+		t.Fatalf("server timeouts should be set: %#v", server)
+	}
+}
+
 func TestStaticRouteServesPublicIndex(t *testing.T) {
 	oldRoot := rootDir
 	defer func() { rootDir = oldRoot }()

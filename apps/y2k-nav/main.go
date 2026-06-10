@@ -29,7 +29,11 @@ func serve(root, port string) error {
 	mux := http.NewServeMux()
 	mux.Handle("/", newStaticHandler(root))
 	fmt.Printf("y2k-nav Go static server listening on :%s\n", port)
-	return http.ListenAndServe("0.0.0.0:"+port, mux)
+	return newHTTPServer(port, mux).ListenAndServe()
+}
+
+func newHTTPServer(port string, handler http.Handler) *http.Server {
+	return webutil.NewHTTPServer("0.0.0.0:"+port, handler)
 }
 
 func resolvePort(value string) (string, error) {

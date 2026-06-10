@@ -44,6 +44,16 @@ func TestServeReturnsListenerErrors(t *testing.T) {
 	}
 }
 
+func TestHTTPServerHasTimeouts(t *testing.T) {
+	server := newHTTPServer("8080", http.NewServeMux())
+	if server.Addr != "0.0.0.0:8080" {
+		t.Fatalf("Addr = %q", server.Addr)
+	}
+	if server.ReadHeaderTimeout <= 0 || server.ReadTimeout <= 0 || server.WriteTimeout <= 0 || server.IdleTimeout <= 0 {
+		t.Fatalf("server timeouts should be set: %#v", server)
+	}
+}
+
 func TestCombinePageServed(t *testing.T) {
 	tmp := t.TempDir()
 	rootDir = tmp

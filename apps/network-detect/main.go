@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"fufu/newapi"
+	"fufu/webutil"
 )
 
 const (
@@ -157,7 +158,11 @@ func main() {
 }
 
 func serve(port string, handler http.Handler) error {
-	return http.ListenAndServe("0.0.0.0:"+port, handler)
+	return newHTTPServer(port, handler).ListenAndServe()
+}
+
+func newHTTPServer(port string, handler http.Handler) *http.Server {
+	return webutil.NewHTTPServer("0.0.0.0:"+port, handler)
 }
 
 type httpError struct {
