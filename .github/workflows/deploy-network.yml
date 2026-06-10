@@ -45,6 +45,7 @@ jobs:
         with:
           node-version: 22
       - run: go test -count=1 ./...
+      - run: npm run test:scripts
       - run: npm --prefix apps/network-detect run test:frontend
   docker:
     needs: verify

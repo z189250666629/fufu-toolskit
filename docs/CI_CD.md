@@ -17,7 +17,7 @@ GitHub Actions 部署环境固定使用 `toolskit`。不要新增或切换到 `d
 ## 阶段
 
 1. `check`：过滤 tag 与 directive。
-2. `verify`：运行 Go 测试。
+2. `verify`：运行 `go test -count=1 ./...`、根目录脚本守护测试和对应 app 的前端测试。
 3. `docker`：构建并推送 GHCR 镜像。
 4. `deploy`：SSH 上传 compose/env，执行 `docker compose pull && docker compose up -d`。
 

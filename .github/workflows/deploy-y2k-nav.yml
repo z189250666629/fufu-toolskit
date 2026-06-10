@@ -42,6 +42,7 @@ jobs:
         with:
           node-version: 22
       - run: go test -count=1 ./...
+      - run: npm run test:scripts
       - run: npm --prefix apps/y2k-nav run test:frontend
   docker:
     needs: verify

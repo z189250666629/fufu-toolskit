@@ -144,6 +144,17 @@ test('deploy workflow verify jobs run frontend tests before packaging images', a
   }
 });
 
+test('deploy workflow verify jobs run root script discipline tests', async () => {
+  for (const path of await deployWorkflowPaths()) {
+    const source = await readRepoFile(path);
+    assert.match(
+      source,
+      /^\s*-\s*run:\s*npm run test:scripts\s*$/m,
+      `${path} should run root script discipline tests before packaging images`
+    );
+  }
+});
+
 test('repo docs and agent instructions do not recommend cache-prone Go tests', async () => {
   for (const path of [
     'README.md',
