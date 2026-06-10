@@ -1206,6 +1206,7 @@
   </div>
 
   <script src="activity-render.js"></script>
+  <script src="scratch-card.js"></script>
   <script>
     /* ============================================================
        Constants
@@ -1698,7 +1699,7 @@
       scratchPosMap = [0,1,2,3,4,5,6,7,8];
       scratchRevealed = [];
       scratchMines = [];
-      scratchIsTest = (data.cardName || '').toLowerCase().includes('test');
+      scratchIsTest = scratchCard.isTestCardName(data.cardName);
 
       if (data.scratchGame) {
         renderScratchState(data.scratchGame);
