@@ -13,9 +13,6 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleAPI(w, r)
 		return
 	}
-	if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") {
-		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
-	}
 	a.static.ServeHTTP(w, r)
 }
 

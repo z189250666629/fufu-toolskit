@@ -276,6 +276,17 @@ func TestStaticHandlerRejectsDirectoryListingsTestArtifactsAndDotfiles(t *testin
 	}
 }
 
+func TestServeHTTPDelegatesStaticCachePolicy(t *testing.T) {
+	raw, err := os.ReadFile("server.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(raw)
+	if strings.Contains(source, `Header().Set("Cache-Control"`) {
+		t.Fatal("combine ServeHTTP should delegate static Cache-Control policy to webutil.NewStaticHandler")
+	}
+}
+
 func TestHandleAuthCreatesSession(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	app.passwords = map[string]struct {
