@@ -26,6 +26,10 @@ func writeBadJSONRequest(w http.ResponseWriter) {
 	writeJSONError(w, http.StatusBadRequest, "请求格式错误")
 }
 
+func writeTooManyKeysRequest(w http.ResponseWriter) {
+	writeJSONError(w, http.StatusBadRequest, "Too many keys")
+}
+
 func writeJSONDecodeError(w http.ResponseWriter, err error) {
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {

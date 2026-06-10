@@ -13,6 +13,7 @@ const (
 	mergeJobTTL       = 30 * time.Minute
 	traceRetention    = 30 * 24 * time.Hour
 	maxJSONBodyBytes  = int64(1 << 20)
+	maxKeysPerRequest = 200
 	publicSourceUnit  = 3
 	publicTargetUnit  = 8
 	maxTraceRecords   = 50

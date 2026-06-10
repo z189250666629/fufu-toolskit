@@ -3,6 +3,7 @@ package combine
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -383,5 +384,25 @@ func TestHandlePublicMergeRejectsEmptyKeysBeforeQueuing(t *testing.T) {
 	}
 	if len(app.mergeJobs) != 0 {
 		t.Fatalf("blank keys should not queue public merge jobs: %#v", app.mergeJobs)
+	}
+}
+
+func TestHandlePublicMergeRejectsTooManyKeysBeforeQueuing(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	keys := make([]string, 201)
+	for i := range keys {
+		keys[i] = "sk-over-limit-key-" + strconv.Itoa(i)
+	}
+	body := `{"keys":["` + strings.Join(keys, `","`) + `"]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/public-merge", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	app.handlePublicMerge(w, req)
+
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "Too many keys") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(app.mergeJobs) != 0 {
+		t.Fatalf("too many keys should not queue public merge jobs: %#v", app.mergeJobs)
 	}
 }

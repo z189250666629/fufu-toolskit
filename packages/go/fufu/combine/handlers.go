@@ -53,6 +53,10 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "No keys provided"})
 		return
 	}
+	if len(keys) > maxKeysPerRequest {
+		writeTooManyKeysRequest(w)
+		return
+	}
 	keys, found, missing, err := a.resolveTokensForSearch(r.Context(), keys)
 	if err != nil {
 		log.Printf("combine search token lookup failed: %s", redactError(err))
@@ -80,6 +84,10 @@ func (a *App) handleMerge(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "No keys provided"})
 		return
 	}
+	if len(p.Keys) > maxKeysPerRequest {
+		writeTooManyKeysRequest(w)
+		return
+	}
 	role := roleFromContext(r.Context())
 	jobID, err := randomHex(16)
 	if err != nil {
@@ -103,6 +111,10 @@ func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
 	keys := normalizeKeys(p.Keys)
 	if len(keys) == 0 {
 		writeJSON(w, 400, map[string]string{"error": "No keys provided"})
+		return
+	}
+	if len(keys) > maxKeysPerRequest {
+		writeTooManyKeysRequest(w)
 		return
 	}
 	jobID, err := randomHex(16)
