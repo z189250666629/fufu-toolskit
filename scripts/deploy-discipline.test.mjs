@@ -3,39 +3,90 @@ import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 
 const repoRoot = new URL('../', import.meta.url);
-const deployScope = [
-  '.env.example',
-  'README.md',
-  'docs/CI_CD.md',
-  '.github/workflows/deploy-act.yml',
-  '.github/workflows/deploy-network.yml',
-  '.github/workflows/deploy-y2k-nav.yml',
-  'infra/deploy/fufu-act/docker-compose.yml',
-  'infra/deploy/network-detect/docker-compose.yml',
-  'apps/network-detect/docker-compose.yml',
-  'scripts/deploy-docker-app.sh'
-];
 
 async function readRepoFile(path) {
   return readFile(new URL(path, repoRoot), 'utf8');
 }
 
+async function listRepoFiles(dir, accept) {
+  const root = new URL(`${dir.replace(/\/$/, '')}/`, repoRoot);
+  const out = [];
+  async function walk(url, prefix) {
+    let entries;
+    try {
+      entries = await readdir(url, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === 'ENOENT') return;
+      throw error;
+    }
+    for (const entry of entries) {
+      const rel = `${prefix}${entry.name}`;
+      if (entry.isDirectory()) {
+        await walk(new URL(`${entry.name}/`, url), `${rel}/`);
+        continue;
+      }
+      if (entry.isFile() && accept(rel)) {
+        out.push(rel);
+      }
+    }
+  }
+  await walk(root, `${dir.replace(/\/$/, '')}/`);
+  return out;
+}
+
+async function deployDisciplinePaths() {
+  const paths = new Set([
+    '.env.example',
+    'README.md',
+    'scripts/deploy-docker-app.sh'
+  ]);
+  for (const path of await listRepoFiles('docs', (path) => path.endsWith('.md'))) {
+    paths.add(path);
+  }
+  for (const path of await listRepoFiles('apps', (path) => /\/(?:README|AGENTS|CLAUDE)\.md$/i.test(path) || path.endsWith('/docker-compose.yml'))) {
+    paths.add(path);
+  }
+  for (const path of await listRepoFiles('.github/workflows', (path) => /\/deploy-.*\.ya?ml$/i.test(path))) {
+    paths.add(path);
+  }
+  for (const path of await listRepoFiles('infra/deploy', (path) => path.endsWith('/docker-compose.yml'))) {
+    paths.add(path);
+  }
+  return [...paths].sort();
+}
+
 test('deploy docs and workflows do not reintroduce dashboard-key auth', async () => {
   const forbidden = [
-    'NEWAPI_DASHBOARD_VIEW_KEY',
-    'NEWAPI_LOG_VIEW_KEY',
-    'api-dashboard-key',
-    'X-Dashboard-Key',
-    'x-dashboard-key',
-    'requiresKey',
-    'dashboard-key'
+    /NEWAPI[_-]?DASHBOARD[\w-]*KEY/i,
+    /NEWAPI[_-]?LOG[\w-]*KEY/i,
+    /api-dashboard-key/i,
+    /x-dashboard-key/i,
+    /requiresKey/i,
+    /dashboard-key/i
   ];
 
-  for (const path of deployScope) {
+  for (const path of await deployDisciplinePaths()) {
     const source = await readRepoFile(path);
-    for (const token of forbidden) {
-      assert.equal(source.includes(token), false, `${path} must not contain ${token}`);
+    for (const pattern of forbidden) {
+      assert.doesNotMatch(source, pattern, `${path} must not match forbidden dashboard-key auth pattern ${pattern}`);
     }
+  }
+});
+
+test('dashboard-key discipline scans deploy docs env and agent files', async () => {
+  const paths = await deployDisciplinePaths();
+  for (const expected of [
+    '.env.example',
+    'README.md',
+    'docs/CI_CD.md',
+    'docs/merge-notes.md',
+    'apps/fufu-act/AGENTS.md',
+    'apps/network-detect/README.md',
+    '.github/workflows/deploy-y2k-nav.yml',
+    'infra/deploy/y2k-nav/docker-compose.yml',
+    'scripts/deploy-docker-app.sh'
+  ]) {
+    assert.equal(paths.includes(expected), true, `${expected} should be covered by deploy discipline scans`);
   }
 });
 
