@@ -12,7 +12,7 @@ func (a *App) createMergeTrace(ctx context.Context, jobID string, role Role, int
 	}
 	now := time.Now()
 	if err := a.pruneExpiredTraceRows(ctx, now); err != nil {
-		log.Printf("trace retention cleanup failed: %v", err)
+		log.Printf("trace retention cleanup failed: %s", redactError(err))
 	}
 	nowMs := now.UnixMilli()
 	res, err := a.db.ExecContext(ctx, `
@@ -53,7 +53,7 @@ func (a *App) setTraceStatus(ctx context.Context, mergeID int64, status string) 
 		return
 	}
 	if _, err := a.db.ExecContext(ctx, `UPDATE merge_records SET status = ?, updated_at = ? WHERE id = ?`, status, time.Now().UnixMilli(), mergeID); err != nil {
-		log.Printf("trace status update failed: %v", err)
+		log.Printf("trace status update failed: %s", redactError(err))
 	}
 }
 
@@ -66,7 +66,7 @@ func (a *App) setTraceFinal(ctx context.Context, mergeID int64, quota int64, nam
 		SET final_quota = ?, final_name = ?, final_group = ?, updated_at = ?
 		WHERE id = ?
 	`, quota, name, group, time.Now().UnixMilli(), mergeID); err != nil {
-		log.Printf("trace final update failed: %v", err)
+		log.Printf("trace final update failed: %s", redactError(err))
 	}
 }
 
@@ -77,7 +77,7 @@ func (a *App) setTraceCreatedCard(ctx context.Context, mergeID int64, cardID int
 	if _, err := a.db.ExecContext(ctx, `
 		UPDATE merge_records SET created_card_id = ?, updated_at = ? WHERE id = ?
 	`, cardID, time.Now().UnixMilli(), mergeID); err != nil {
-		log.Printf("trace created card update failed: %v", err)
+		log.Printf("trace created card update failed: %s", redactError(err))
 	}
 }
 
@@ -90,7 +90,7 @@ func (a *App) setTraceRollback(ctx context.Context, mergeID int64, succeeded boo
 		SET rollback_attempted = 1, rollback_succeeded = ?, rollback_note = ?, updated_at = ?
 		WHERE id = ?
 	`, boolInt(succeeded), redactTraceDiagnostic(note), time.Now().UnixMilli(), mergeID); err != nil {
-		log.Printf("trace rollback update failed: %v", err)
+		log.Printf("trace rollback update failed: %s", redactError(err))
 	}
 }
 
@@ -101,7 +101,7 @@ func (a *App) setTraceDeleteStarted(ctx context.Context, mergeID int64) {
 	if _, err := a.db.ExecContext(ctx, `
 		UPDATE merge_records SET delete_started = 1, updated_at = ? WHERE id = ?
 	`, time.Now().UnixMilli(), mergeID); err != nil {
-		log.Printf("trace delete start update failed: %v", err)
+		log.Printf("trace delete start update failed: %s", redactError(err))
 	}
 }
 
@@ -112,7 +112,7 @@ func (a *App) setTraceDeletedCount(ctx context.Context, mergeID int64, count int
 	if _, err := a.db.ExecContext(ctx, `
 		UPDATE merge_records SET old_cards_deleted_count = ?, updated_at = ? WHERE id = ?
 	`, count, time.Now().UnixMilli(), mergeID); err != nil {
-		log.Printf("trace deleted count update failed: %v", err)
+		log.Printf("trace deleted count update failed: %s", redactError(err))
 	}
 }
 
@@ -126,7 +126,7 @@ func (a *App) finishTrace(ctx context.Context, mergeID int64, status, errText st
 		SET status = ?, error = ?, updated_at = ?, completed_at = ?
 		WHERE id = ?
 	`, status, redactTraceDiagnostic(errText), now, now, mergeID); err != nil {
-		log.Printf("trace finish update failed: %v", err)
+		log.Printf("trace finish update failed: %s", redactError(err))
 	}
 }
 
@@ -167,6 +167,6 @@ func (a *App) setTraceTokenDeleteResult(ctx context.Context, mergeID int64, toke
 		SET delete_ok = ?, delete_error = ?, updated_at = ?
 		WHERE merge_id = ? AND kind = 'source' AND key_hash = ?
 	`, boolInt(ok), redactTraceDiagnostic(errText), time.Now().UnixMilli(), mergeID, key.hash); err != nil {
-		log.Printf("trace token delete update failed: %v", err)
+		log.Printf("trace token delete update failed: %s", redactError(err))
 	}
 }

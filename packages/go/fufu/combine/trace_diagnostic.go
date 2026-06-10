@@ -14,6 +14,7 @@ var (
 	traceAuthorizationPattern = regexp.MustCompile(`(?i)\bAuthorization\s*:\s*[^\s]+(?:\s+[^\s]+)?`)
 	traceTokenParamPattern    = regexp.MustCompile(`(?i)\b(token=)[^&\s;]+`)
 	traceURLPattern           = regexp.MustCompile(`https?://[^\s"'<>]+`)
+	traceInvalidEscapePattern = regexp.MustCompile(`(?i)invalid URL escape\s+"[^"]+"`)
 )
 
 func redactTraceDiagnostic(message string) string {
@@ -26,7 +27,15 @@ func redactTraceDiagnostic(message string) string {
 	message = traceAuthorizationPattern.ReplaceAllString(message, "Authorization: [REDACTED]")
 	message = traceTokenParamPattern.ReplaceAllString(message, "${1}[REDACTED]")
 	message = traceURLPattern.ReplaceAllStringFunc(message, redactTraceDiagnosticURL)
+	message = traceInvalidEscapePattern.ReplaceAllString(message, `invalid URL escape "[REDACTED]"`)
 	return truncateTraceDiagnostic(message)
+}
+
+func redactError(err error) string {
+	if err == nil {
+		return ""
+	}
+	return redactTraceDiagnostic(err.Error())
 }
 
 func redactTraceDiagnosticURL(raw string) string {

@@ -57,6 +57,6 @@ func (a *App) deleteGeneratedTokenCacheByID(ctx context.Context, tokenID int) {
 		return
 	}
 	if _, err := a.db.ExecContext(ctx, `DELETE FROM generated_tokens WHERE token_id = ?`, tokenID); err != nil {
-		log.Printf("generated token cache delete failed: %v", err)
+		log.Printf("generated token cache delete failed: %s", redactError(err))
 	}
 }

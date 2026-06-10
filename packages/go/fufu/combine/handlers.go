@@ -55,13 +55,13 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	keys, found, missing, err := a.resolveTokensForSearch(r.Context(), keys)
 	if err != nil {
-		log.Printf("combine search token lookup failed: %v", err)
+		log.Printf("combine search token lookup failed: %s", redactError(err))
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "查询失败，请稍后重试"})
 		return
 	}
 	traceResults, err := a.traceResultsForKeys(r.Context(), keys)
 	if err != nil {
-		log.Printf("combine search trace lookup failed: %v", err)
+		log.Printf("combine search trace lookup failed: %s", redactError(err))
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "查询失败，请稍后重试"})
 		return
 	}
@@ -119,12 +119,12 @@ func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
 func (a *App) runMergeJob(jobID string, p MergePayload, role Role) {
 	defer func() {
 		if x := recover(); x != nil {
-			a.setMergeJob(jobID, MergeJobPatch{Status: strp("error"), StepText: strp("合并失败"), Error: strp(fmt.Sprint(x))})
+			a.setMergeJob(jobID, MergeJobPatch{Status: strp("error"), StepText: strp("合并失败"), Error: strp(redactTraceDiagnostic(fmt.Sprint(x)))})
 		}
 	}()
 	_, err := a.executeMerge(context.Background(), buildRunMergeJobParams(jobID, p, role))
 	if err != nil {
-		a.setMergeJob(jobID, MergeJobPatch{Status: strp("error"), StepText: strp("合并失败"), Error: strp(err.Error())})
+		a.setMergeJob(jobID, MergeJobPatch{Status: strp("error"), StepText: strp("合并失败"), Error: strp(redactError(err))})
 	}
 }
 
@@ -217,7 +217,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if err := a.upsertGeneratedToken(r.Context(), verifiedToken); err != nil {
-			log.Printf("generated token cache insert failed: %v", err)
+			log.Printf("generated token cache insert failed: %s", redactError(err))
 		}
 		keys = append(keys, verifiedToken.Key)
 	}
@@ -225,7 +225,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 }
 
 func appendGenerateError(errs []string, index int, message string, err error) []string {
-	log.Printf("combine generate token #%d failed: %v", index+1, err)
+	log.Printf("combine generate token #%d failed: %s", index+1, redactError(err))
 	return append(errs, fmt.Sprintf("#%d: %s", index+1, message))
 }
 
@@ -242,7 +242,7 @@ func (a *App) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	}
 	ok, res, err := a.deleteToken(r.Context(), id)
 	if err != nil {
-		log.Printf("combine delete token failed: %v", err)
+		log.Printf("combine delete token failed: %s", redactError(err))
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "删除失败，请稍后重试"})
 		return
 	}

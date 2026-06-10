@@ -151,7 +151,7 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 	}
 	resultTraceToken := tokenFromRaw(newCard)
 	if e := a.upsertTraceToken(ctx, mergeID, "result", resultTraceToken); e != nil {
-		log.Printf("trace result token insert failed: %v", e)
+		log.Printf("trace result token insert failed: %s", redactError(e))
 	}
 	update(MergeJobPatch{Current: intp(1)})
 
