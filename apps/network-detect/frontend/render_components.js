@@ -64,7 +64,12 @@ export function renderStatusPill(status, configured = true) {
 }
 
 export function renderPriceCell(pricing) {
-  if (!pricing?.available) return '<span class="price-empty">-</span>';
+  if (!pricing || pricing.available === false) return '<span class="price-empty">-</span>';
+  const hasStandardPricing = Number.isFinite(Number(pricing.input)) || Number.isFinite(Number(pricing.output));
+  const hasRequestPricing = Number.isFinite(Number(pricing.request));
+  if (pricing.available !== true && !pricing.type && !hasStandardPricing && !hasRequestPricing) {
+    return '<span class="price-empty">-</span>';
+  }
   if (pricing.type === 'dynamic') {
     return `
       <div class="price-cell">
@@ -73,7 +78,7 @@ export function renderPriceCell(pricing) {
       </div>
     `;
   }
-  if (pricing.type === 'request') {
+  if (pricing.type === 'request' || (hasRequestPricing && !hasStandardPricing)) {
     return `
       <div class="price-cell">
         <b>${escapeHtml(formatPriceValue(pricing.request, pricing.currency))}</b>

@@ -35,3 +35,12 @@ test('renderPriceCell handles empty and request pricing', () => {
   assert.match(renderPriceCell(null), /price-empty/);
   assert.match(renderPriceCell({ available: true, type: 'request', request: 0.2, currency: '¥' }), /每次请求/);
 });
+
+test('renderPriceCell displays backend pricing shape without available flag', () => {
+  const html = renderPriceCell({ input: 0.1, output: 0.2, currency: 'CNY' });
+
+  assert.doesNotMatch(html, /price-empty/);
+  assert.match(html, /入/);
+  assert.match(html, /出/);
+  assert.match(html, /CNY/);
+});
