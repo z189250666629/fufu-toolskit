@@ -126,7 +126,7 @@ func (a *App) upsertTraceToken(ctx context.Context, mergeID int64, kind string, 
 			group_name = excluded.group_name,
 			status = excluded.status,
 			updated_at = excluded.updated_at
-	`, mergeID, kind, token.ID, key.full, key.hash, key.mask, token.Name, token.RemainQuota, token.UsedQuota, token.IntervalUnit, token.Group, token.Status, now, now)
+	`, mergeID, kind, token.ID, key.mask, key.hash, key.mask, token.Name, token.RemainQuota, token.UsedQuota, token.IntervalUnit, token.Group, token.Status, now, now)
 	return err
 }
 
