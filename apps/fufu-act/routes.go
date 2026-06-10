@@ -84,8 +84,7 @@ func staticRoute(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Cache-Control", "no-store")
-	http.ServeFile(w, r, file)
+	webutil.ServeFile(w, r, file, true)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

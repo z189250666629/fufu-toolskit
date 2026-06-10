@@ -81,6 +81,39 @@ func TestSharedPackagesDoNotUseInternalRawconv(t *testing.T) {
 	}
 }
 
+func TestBusinessAppsUseSharedStaticFileServing(t *testing.T) {
+	err := filepath.WalkDir(filepath.FromSlash("apps"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case "node_modules", "data":
+				return filepath.SkipDir
+			default:
+				return nil
+			}
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		source := string(raw)
+		for _, forbidden := range []string{"http.ServeFile", "http.FileServer"} {
+			if strings.Contains(source, forbidden) {
+				t.Fatalf("%s should use shared fufu/webutil static serving instead of %s", path, forbidden)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func fingerprintModule(t *testing.T, dir string) {
 	t.Helper()
 	err := filepath.WalkDir(filepath.FromSlash(dir), func(path string, d fs.DirEntry, err error) error {
