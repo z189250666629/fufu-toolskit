@@ -7,6 +7,11 @@ import (
 )
 
 func validateExecuteMergeRequest(p ExecuteMergeParams, tokens []ResolvedToken) error {
+	for _, token := range tokens {
+		if token.ID <= 0 {
+			return fmt.Errorf("Token ID 无效：%s", keyMask(token.Key))
+		}
+	}
 	if p.Role == RoleGuest {
 		if p.CustomQuota || p.TotalQuota != nil || strings.TrimSpace(p.Name) != "" {
 			return errors.New("普通免登录合卡不支持指定额度或自定义命名")
