@@ -22,11 +22,11 @@ type SpinResult struct {
 	Dollars int
 }
 
-var SpinMap = map[float64]int{0.1: 100, 100: 1, 150: 1, 300: 3, 500: 4, 1000: 10}
+var defaultSpinMap = map[float64]int{0.1: 100, 100: 1, 150: 1, 300: 3, 500: 4, 1000: 10}
 
-var PrizePool = []Prize{{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 1500}, {"win", 5, 3000}, {"win", 10, 2000}, {"win", 20, 1200}, {"win", 50, 580}, {"win", 100, 380}, {"win", 200, 200}, {"win", 500, 100}, {"win", 1000, 40}}
+var defaultPrizePool = []Prize{{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 1500}, {"win", 5, 3000}, {"win", 10, 2000}, {"win", 20, 1200}, {"win", 50, 580}, {"win", 100, 380}, {"win", 200, 200}, {"win", 500, 100}, {"win", 1000, 40}}
 
-var TierPools = map[int][]Prize{
+var defaultTierPools = map[int][]Prize{
 	100:  {{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 1800}, {"win", 5, 3500}, {"win", 10, 2300}, {"win", 20, 1000}, {"win", 50, 250}, {"win", 100, 100}, {"win", 200, 30}, {"win", 500, 15}, {"win", 1000, 5}},
 	150:  {{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 1200}, {"win", 5, 3000}, {"win", 10, 2500}, {"win", 20, 1500}, {"win", 50, 500}, {"win", 100, 180}, {"win", 200, 70}, {"win", 500, 35}, {"win", 1000, 15}},
 	300:  {{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 2200}, {"win", 5, 3300}, {"win", 10, 2000}, {"win", 20, 1000}, {"win", 50, 300}, {"win", 100, 120}, {"win", 200, 50}, {"win", 500, 20}, {"win", 1000, 10}},
@@ -34,8 +34,40 @@ var TierPools = map[int][]Prize{
 	1000: {{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 1500}, {"win", 5, 3000}, {"win", 10, 2000}, {"win", 20, 1200}, {"win", 50, 580}, {"win", 100, 380}, {"win", 200, 200}, {"win", 500, 120}, {"win", 1000, 20}},
 }
 
-var PostJackpotPool = []Prize{{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 3000}, {"win", 5, 3500}, {"win", 10, 1700}, {"win", 20, 800}}
-var ScratchRewards = []int{2, 4, 6, 8, 12, 15}
+var defaultPostJackpotPool = []Prize{{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 3000}, {"win", 5, 3500}, {"win", 10, 1700}, {"win", 20, 800}}
+var defaultScratchRewards = []int{2, 4, 6, 8, 12, 15}
+
+func DefaultSpinMap() map[float64]int {
+	out := make(map[float64]int, len(defaultSpinMap))
+	for dollars, spins := range defaultSpinMap {
+		out[dollars] = spins
+	}
+	return out
+}
+
+func DefaultPrizePool() []Prize {
+	return clonePrizePool(defaultPrizePool)
+}
+
+func DefaultTierPools() map[int][]Prize {
+	out := make(map[int][]Prize, len(defaultTierPools))
+	for dollars, pool := range defaultTierPools {
+		out[dollars] = clonePrizePool(pool)
+	}
+	return out
+}
+
+func DefaultPostJackpotPool() []Prize {
+	return clonePrizePool(defaultPostJackpotPool)
+}
+
+func DefaultScratchRewards() []int {
+	return append([]int(nil), defaultScratchRewards...)
+}
+
+func clonePrizePool(pool []Prize) []Prize {
+	return append([]Prize(nil), pool...)
+}
 
 func DollarsTier(quota, quotaUnit int64) float64 {
 	if quotaUnit <= 0 {
@@ -55,10 +87,10 @@ func Spin(dollars float64, hasJackpot bool, used, total, maxWon, force int, rand
 	if int(dollars) == 500 && remaining == 1 && maxWon < 50 {
 		return SpinResult{"win", 20}
 	}
-	pool := PrizePool
+	pool := defaultPrizePool
 	if hasJackpot || (dollars >= 100 && float64(maxWon) >= dollars*0.5) {
-		pool = PostJackpotPool
-	} else if p, ok := TierPools[int(dollars)]; ok {
+		pool = defaultPostJackpotPool
+	} else if p, ok := defaultTierPools[int(dollars)]; ok {
 		pool = p
 	}
 	p := Roll(pool, randomInt)

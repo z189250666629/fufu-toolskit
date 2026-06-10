@@ -30,9 +30,9 @@ var tokenConfigErr error
 var cardLocks = &cardLockRegistry{}
 var mcyCookie string
 
-var spinMap = activity.SpinMap
-var prizePool = activity.PrizePool
-var scratchRewards = activity.ScratchRewards
+var spinMap = activity.DefaultSpinMap()
+var prizePool = activity.DefaultPrizePool()
+var scratchRewards = activity.DefaultScratchRewards()
 
 const scratchMines = activity.ScratchMines
 const scratchMaxReveals = activity.ScratchMaxReveals

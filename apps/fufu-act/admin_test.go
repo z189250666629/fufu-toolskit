@@ -73,16 +73,19 @@ func TestHandlePrizesReturnsActivityPoolWeights(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defaultPrizePool := activity.DefaultPrizePool()
 	defaultDollar := findPrizeRow(t, body.Prizes, 1)
-	if defaultDollar.Weight != activity.PrizePool[2].Weight || defaultDollar.TotalWeight != sumPrizeWeights(activity.PrizePool) {
+	if defaultDollar.Weight != defaultPrizePool[2].Weight || defaultDollar.TotalWeight != sumPrizeWeights(defaultPrizePool) {
 		t.Fatalf("default $1 row=%+v", defaultDollar)
 	}
+	defaultTierPools := activity.DefaultTierPools()
 	tierDollar := findPrizeRow(t, body.TierPools["100"], 1)
-	if tierDollar.Weight != activity.TierPools[100][2].Weight || tierDollar.TotalWeight != sumPrizeWeights(activity.TierPools[100]) {
+	if tierDollar.Weight != defaultTierPools[100][2].Weight || tierDollar.TotalWeight != sumPrizeWeights(defaultTierPools[100]) {
 		t.Fatalf("tier $100 $1 row=%+v", tierDollar)
 	}
+	defaultPostJackpotPool := activity.DefaultPostJackpotPool()
 	postJackpotDollar := findPrizeRow(t, body.PostJackpotPrizes, 20)
-	if postJackpotDollar.Weight != activity.PostJackpotPool[5].Weight || postJackpotDollar.TotalWeight != sumPrizeWeights(activity.PostJackpotPool) {
+	if postJackpotDollar.Weight != defaultPostJackpotPool[5].Weight || postJackpotDollar.TotalWeight != sumPrizeWeights(defaultPostJackpotPool) {
 		t.Fatalf("post-jackpot $20 row=%+v", postJackpotDollar)
 	}
 }

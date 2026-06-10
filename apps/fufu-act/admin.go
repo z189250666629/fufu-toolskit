@@ -37,7 +37,7 @@ func adminBearerToken(r *http.Request) string {
 
 func handlePrizes(w http.ResponseWriter, r *http.Request) {
 	tierPoolsOut := map[string][]prizeWeightResponse{}
-	for dollars, pool := range activity.TierPools {
+	for dollars, pool := range activity.DefaultTierPools() {
 		tierPoolsOut[strconv.Itoa(dollars)] = buildPrizeWeightRows(pool)
 	}
 	spinMapOut := map[string]int{}
@@ -47,7 +47,7 @@ func handlePrizes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"prizes":            buildPrizeWeightRows(prizePool),
 		"tierPools":         tierPoolsOut,
-		"postJackpotPrizes": buildPrizeWeightRows(activity.PostJackpotPool),
+		"postJackpotPrizes": buildPrizeWeightRows(activity.DefaultPostJackpotPool()),
 		"spinMap":           spinMapOut,
 	})
 }

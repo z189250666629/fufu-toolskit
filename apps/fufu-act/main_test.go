@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fufu/activity"
 	"fufu/tokens"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,35 @@ func TestSpinGuaranteeForThousandCard(t *testing.T) {
 	got := spin(1000, false, 9, 10, 0, 0)
 	if got.Type != "win" || got.Dollars != 100 {
 		t.Fatalf("unexpected guarantee result: %#v", got)
+	}
+}
+
+func TestActivityRuntimeConfigUsesIndependentDefaults(t *testing.T) {
+	oldSpinMap := spinMap
+	oldPrizePool := prizePool
+	oldScratchRewards := scratchRewards
+	t.Cleanup(func() {
+		spinMap = oldSpinMap
+		prizePool = oldPrizePool
+		scratchRewards = oldScratchRewards
+	})
+
+	spinMap = activity.DefaultSpinMap()
+	prizePool = activity.DefaultPrizePool()
+	scratchRewards = activity.DefaultScratchRewards()
+
+	spinMap[100] = 999
+	prizePool[2].Weight = 1
+	scratchRewards[0] = 999
+
+	if activity.DefaultSpinMap()[100] == 999 {
+		t.Fatalf("spinMap runtime changes should not mutate shared activity defaults")
+	}
+	if activity.DefaultPrizePool()[2].Weight == 1 {
+		t.Fatalf("prizePool runtime changes should not mutate shared activity defaults")
+	}
+	if activity.DefaultScratchRewards()[0] == 999 {
+		t.Fatalf("scratchRewards runtime changes should not mutate shared activity defaults")
 	}
 }
 
