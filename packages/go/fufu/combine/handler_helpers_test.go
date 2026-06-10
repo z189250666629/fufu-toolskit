@@ -79,3 +79,29 @@ func TestBuildSearchKeysResponseIncludesEligibilityAndTrace(t *testing.T) {
 		t.Fatalf("trace results = %#v", resp["traceResults"])
 	}
 }
+
+func TestBuildSearchKeysResponseRedactsTraceTokenFullKeys(t *testing.T) {
+	traces := []TraceResult{{
+		MergeID: 8,
+		SourceKeys: []TraceToken{
+			{Key: "sk-source-secret-1234567890", KeyMask: "sk-sour…7890", KeyHash: "source-hash"},
+			{Key: "sk-related-secret-1234567890", KeyMask: "sk-rela…7890", KeyHash: "related-hash"},
+		},
+		ResultKey: &TraceToken{Key: "sk-result-secret-1234567890", KeyMask: "sk-resu…7890", KeyHash: "result-hash"},
+	}}
+
+	resp := buildSearchKeysResponse([]string{"sk-source-secret-1234567890"}, nil, nil, 500000, 1, traces)
+	got := resp["traceResults"].([]TraceResult)
+
+	for _, token := range got[0].SourceKeys {
+		if token.Key != token.KeyMask || token.KeyHash != "" {
+			t.Fatalf("source token should be public-safe: %#v", token)
+		}
+	}
+	if got[0].ResultKey == nil || got[0].ResultKey.Key != got[0].ResultKey.KeyMask || got[0].ResultKey.KeyHash != "" {
+		t.Fatalf("result token should be public-safe: %#v", got[0].ResultKey)
+	}
+	if traces[0].SourceKeys[0].Key != "sk-source-secret-1234567890" || traces[0].SourceKeys[0].KeyHash != "source-hash" {
+		t.Fatalf("redaction should not mutate stored traces: %#v", traces[0].SourceKeys[0])
+	}
+}

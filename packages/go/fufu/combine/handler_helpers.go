@@ -25,12 +25,51 @@ func buildMergeAcceptedResponse(jobID string) map[string]any {
 
 func buildSearchKeysResponse(keys []string, found []ResolvedToken, missing []string, quotaUnit int64, elapsedMs int64, traceResults []TraceResult) map[string]any {
 	elig := evaluatePublicMergeEligibility(found)
+	publicTraces := publicTraceResults(traceResults)
 	return map[string]any{
 		"found": found, "missing": missing, "quotaUnit": quotaUnit, "searched": len(keys),
 		"concurrency": min(searchConcurrency, len(keys)), "elapsedMs": elapsedMs,
 		"publicMergeEligibility": map[string]any{"eligible": elig.Eligible, "reasons": elig.Reasons, "targetUnit": publicTargetUnit},
-		"traceResults":           traceResults,
+		"traceResults":           publicTraces,
 	}
+}
+
+func publicTraceResults(results []TraceResult) []TraceResult {
+	if len(results) == 0 {
+		return results
+	}
+	out := make([]TraceResult, len(results))
+	for i, result := range results {
+		out[i] = result
+		out[i].SourceKeys = publicTraceTokens(result.SourceKeys)
+		if result.ResultKey != nil {
+			token := publicTraceToken(*result.ResultKey)
+			out[i].ResultKey = &token
+		}
+	}
+	return out
+}
+
+func publicTraceTokens(tokens []TraceToken) []TraceToken {
+	if len(tokens) == 0 {
+		return tokens
+	}
+	out := make([]TraceToken, len(tokens))
+	for i, token := range tokens {
+		out[i] = publicTraceToken(token)
+	}
+	return out
+}
+
+func publicTraceToken(token TraceToken) TraceToken {
+	if token.KeyMask != "" {
+		token.Key = token.KeyMask
+	} else {
+		token.Key = keyMask(token.Key)
+		token.KeyMask = token.Key
+	}
+	token.KeyHash = ""
+	return token
 }
 
 func canDeleteTokenRole(role Role) bool {
