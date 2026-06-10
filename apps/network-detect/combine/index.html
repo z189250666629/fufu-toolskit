@@ -601,9 +601,11 @@
   </div>
 </div>
 
+<script src="/combine_card_units.js"></script>
 <script>
 const UNIT_NAMES = { 3: '天卡', 8: '周不刷新卡', 9: '月不刷新卡' };
 const tokenSectionsModule = import('/combine_token_sections.js');
+const { getAllowedUnitsForUser } = window.combineCardUnits;
 const API_URL = '';  // Empty means same origin
 let foundTokens = [];
 let traceResults = [];
@@ -692,26 +694,6 @@ function syncSessionBar() {
     button.textContent = '退出';
     button.onclick = function() { logout(); };
   }
-}
-
-// For user role: compute which target types are allowed based on source cards
-function getAllowedUnitsForUser(tokens) {
-  if (!tokens.length) return [3, 8, 9];
-  const units = new Set(tokens.map(t => t.interval_unit));
-  if (tokens.length === 1) {
-    // Single card renewal: must keep same type
-    return [tokens[0].interval_unit];
-  }
-  // Multiple cards: determine by source types
-  // Day cards (3) → weekly (8) only
-  // Weekly cards (8) → weekly (8) only
-  // Monthly cards (9) → monthly (9) only
-  // Mixed: union of what each type allows
-  const allowed = new Set();
-  if (units.has(3)) allowed.add(8);   // day → weekly
-  if (units.has(8)) allowed.add(8);   // weekly → weekly
-  if (units.has(9)) allowed.add(9);   // monthly → monthly
-  return Array.from(allowed);
 }
 
 function syncMergeTypeButtons() {
