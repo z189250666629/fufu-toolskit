@@ -243,3 +243,31 @@ func TestSearchTokenByNameReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
 		t.Fatalf("found=%#v err=%v", found, err)
 	}
 }
+
+func TestAddQuotaUsesDefaultQuotaUnitWhenServiceQuotaUnitUnset(t *testing.T) {
+	var updated map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{map[string]any{"id": 7, "key": "quota-key-123", "name": "quota-card", "remain_quota": 10, "status": 1}}})
+		case r.Method == http.MethodPut && r.URL.Path == "/api/token/":
+			if err := json.NewDecoder(r.Body).Decode(&updated); err != nil {
+				t.Fatal(err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer server.Close()
+	svc := &Service{Client: newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"})}
+
+	if err := svc.AddQuota(context.Background(), "sk-quota-key-123", 1); err != nil {
+		t.Fatal(err)
+	}
+	got := int64(updated["remain_quota"].(float64))
+	want := int64(10 + newapi.DefaultQuotaUnit)
+	if got != want {
+		t.Fatalf("remain_quota=%d, want %d; body=%#v", got, want, updated)
+	}
+}

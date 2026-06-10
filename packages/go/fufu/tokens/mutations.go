@@ -52,7 +52,7 @@ func (s *Service) AddQuota(ctx context.Context, key string, dollars int64) error
 	if t == nil {
 		return fmt.Errorf("token not found on fufu")
 	}
-	add := dollars * s.QuotaUnit
+	add := s.DollarsToQuota(float64(dollars))
 	raw := map[string]any{}
 	for k, v := range t.Raw {
 		raw[k] = v
