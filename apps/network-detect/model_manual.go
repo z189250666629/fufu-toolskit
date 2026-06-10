@@ -62,6 +62,7 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	}
 	key := modelManualKey(siteName, model, group)
 	now := time.Now().Unix()
+	pruneManualTestCache(now)
 	if v, ok := testCooldowns.Load(key); ok && v.(int64) > now {
 		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: v.(int64)}
 	}
@@ -94,6 +95,25 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	testResults.Store(key, rec)
 	applyManualToCachedStatus(siteName, model, group, rec, next)
 	return map[string]any{"siteName": siteName, "model": model, "group": group, "test": rec}, nil
+}
+
+func pruneManualTestCache(now int64) {
+	testCooldowns.Range(func(key, value any) bool {
+		until, ok := value.(int64)
+		if !ok || until <= now {
+			testCooldowns.Delete(key)
+			testResults.Delete(key)
+		}
+		return true
+	})
+	testResults.Range(func(key, value any) bool {
+		rec, ok := value.(testRecord)
+		if !ok || rec.NextAllowedAt <= now {
+			testResults.Delete(key)
+			testCooldowns.Delete(key)
+		}
+		return true
+	})
 }
 
 func supportsStream(model string) bool {

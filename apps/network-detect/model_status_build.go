@@ -62,6 +62,7 @@ func buildModelStatus(ctx context.Context) *ModelStatus {
 	sites, msg := config.LoadManagedSites(rootDir)
 	publicMsg := publicManagedSiteConfigError(msg)
 	now := time.Now().Unix()
+	pruneManualTestCache(now)
 	status := &ModelStatus{Configured: len(sites) > 0, ConfigError: publicMsg, GeneratedAt: now, ExpiresAt: now + modelStatusWindowSeconds, WindowSeconds: modelStatusWindowSeconds, RefreshEverySeconds: modelStatusWindowSeconds, Totals: map[string]int{"siteCount": len(sites), "modelCount": 0, "requestCount": 0, "successCount": 0, "failureCount": 0, "operational": 0, "degraded": 0, "down": 0, "unknown": 0}}
 	modelRows := map[string]*ModelRow{}
 	start := now - modelStatusWindowSeconds

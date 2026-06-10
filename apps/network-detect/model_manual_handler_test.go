@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHandleModelTestMasksUnexpectedErrors(t *testing.T) {
@@ -107,5 +108,58 @@ func TestTestModelDoesNotStoreCooldownOrResultWhenCanceledDuringProbe(t *testing
 	}
 	if value, ok := testResults.Load(key); ok {
 		t.Fatalf("canceled probe should not leave manual test result: %#v", value)
+	}
+}
+
+func TestBuildModelStatusPrunesExpiredManualTestEntries(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `[]`)
+	key := modelManualKey("old-site", "old-model", "")
+	expired := time.Now().Add(-time.Second).Unix()
+	testCooldowns.Store(key, expired)
+	testResults.Store(key, testRecord{OK: true, Status: "operational", TestedAt: expired, NextAllowedAt: expired})
+	t.Cleanup(func() {
+		testCooldowns.Delete(key)
+		testResults.Delete(key)
+	})
+
+	_ = buildModelStatus(context.Background())
+
+	if _, ok := testCooldowns.Load(key); ok {
+		t.Fatal("expired manual-test cooldown should be pruned")
+	}
+	if _, ok := testResults.Load(key); ok {
+		t.Fatal("expired manual-test result should be pruned")
+	}
+}
+
+func TestPruneManualTestCacheDropsExpiredOrMalformedResults(t *testing.T) {
+	now := time.Now().Unix()
+	expiredKey := modelManualKey("site", "expired", "")
+	futureKey := modelManualKey("site", "future", "")
+	malformedKey := modelManualKey("site", "malformed", "")
+	testResults.Store(expiredKey, testRecord{NextAllowedAt: now - 1})
+	testResults.Store(futureKey, testRecord{NextAllowedAt: now + 60})
+	testResults.Store(malformedKey, "bad")
+	t.Cleanup(func() {
+		for _, key := range []string{expiredKey, futureKey, malformedKey} {
+			testCooldowns.Delete(key)
+			testResults.Delete(key)
+		}
+	})
+
+	pruneManualTestCache(now)
+
+	if _, ok := testResults.Load(expiredKey); ok {
+		t.Fatal("expired manual-test result should be pruned")
+	}
+	if _, ok := testResults.Load(malformedKey); ok {
+		t.Fatal("malformed manual-test result should be pruned")
+	}
+	if _, ok := testResults.Load(futureKey); !ok {
+		t.Fatal("future manual-test result should remain")
 	}
 }
