@@ -38,6 +38,46 @@ test('fetchJson throws API error with status and data', async () => {
   );
 });
 
+test('fetchJson throws when successful API response is not valid JSON', async () => {
+  await assert.rejects(
+    () => fetchJson('/api/test', {
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new SyntaxError('Unexpected token <');
+        }
+      })
+    }),
+    (error) => {
+      assert.equal(error.message, '响应不是有效 JSON');
+      assert.equal(error.status, 200);
+      assert.deepEqual(error.data, {});
+      return true;
+    }
+  );
+});
+
+test('fetchJson preserves HTTP error status when error body is not JSON', async () => {
+  await assert.rejects(
+    () => fetchJson('/api/test', {
+      fetchImpl: async () => ({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new SyntaxError('Unexpected token <');
+        }
+      })
+    }),
+    (error) => {
+      assert.equal(error.message, 'HTTP 502');
+      assert.equal(error.status, 502);
+      assert.deepEqual(error.data, {});
+      return true;
+    }
+  );
+});
+
 test('postJson sends JSON body and content type', async () => {
   const calls = [];
   await postJson('/api/test', { hello: 'world' }, {

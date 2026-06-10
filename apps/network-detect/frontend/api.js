@@ -4,7 +4,17 @@ export async function fetchJson(path, options = {}) {
     ...(fetchOptions.headers || {})
   };
   const response = await fetchImpl(path, { ...fetchOptions, headers, cache: 'no-store' });
-  const data = await response.json().catch(() => ({}));
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    if (response.ok) {
+      const error = new Error('响应不是有效 JSON');
+      error.status = response.status;
+      error.data = {};
+      throw error;
+    }
+  }
   if (!response.ok) {
     const error = new Error(data.error || data.configError || `HTTP ${response.status}`);
     error.status = response.status;
