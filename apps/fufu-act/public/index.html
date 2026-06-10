@@ -1206,6 +1206,7 @@
   </div>
 
   <script src="activity-render.js"></script>
+  <script src="activity-api.js"></script>
   <script src="scratch-card.js"></script>
   <script>
     /* ============================================================
@@ -1539,15 +1540,17 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardKey: currentCardKey }),
         });
-        data = await res.json();
-        if (!res.ok) throw new Error(data.error || '抽奖失败');
+        data = await activityApi.readApiJson(res, {
+          serverErrorMessage: '抽奖失败，请稍后重试',
+          clientErrorMessage: '抽奖失败',
+        });
       } catch (err) {
         await new Promise(r => setTimeout(r, 200));
         for (const reel of reels) {
           await reel.stopOn(ALL_SYMBOLS[Math.floor(Math.random() * ALL_SYMBOLS.length)], 500);
         }
         $('result').className = 'result muted';
-        $('result').textContent = err.message || '网络错误';
+        $('result').textContent = activityApi.safeErrorMessage(err, '抽奖失败，请稍后重试');
         spinning = false;
         updateLeverState(parseInt($('info-remaining').textContent) || 0);
         return;
