@@ -20,8 +20,11 @@ func BareKey(key string) string { return strings.TrimPrefix(EnsureFullKey(key), 
 
 func DisplayKey(key string) string {
 	value := EnsureFullKey(key)
+	if value == "" {
+		return ""
+	}
 	if len(value) <= 14 {
-		return value
+		return "sk-..."
 	}
 	return value[:7] + "..." + value[len(value)-5:]
 }

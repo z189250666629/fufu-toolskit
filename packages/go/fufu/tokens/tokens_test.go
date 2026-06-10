@@ -337,6 +337,24 @@ func TestSearchTokenByKeyReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
 	}
 }
 
+func TestSearchTokenByKeyMasksKeyInErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": false})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	secretKey := "sk-shortkey"
+	found, err := svc.SearchTokenByKey(context.Background(), secretKey)
+
+	if found != nil || err == nil {
+		t.Fatalf("found=%#v err=%v", found, err)
+	}
+	if strings.Contains(err.Error(), secretKey) || strings.Contains(err.Error(), "shortkey") {
+		t.Fatalf("error should mask key %q, got %q", secretKey, err.Error())
+	}
+}
+
 func TestSearchTokenByNameReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "name rejected"})
