@@ -31,6 +31,9 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 		if remaining <= 0 {
 			return nil, httpErr{403, "抽奖次数已用完"}
 		}
+		if !isSpinDollarTier(card.Dollars) {
+			return nil, httpErr{403, "此卡密额度不参与活动"}
+		}
 		maxWon := 0
 		if err := db.QueryRow(`SELECT COALESCE(MAX(prize_dollars),0) FROM spin_log WHERE card_key=? AND is_retry=0`, key).Scan(&maxWon); err != nil {
 			return nil, err
@@ -105,6 +108,10 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 func spin(dollars float64, hasJackpot bool, used, total, maxWon, force int) spinResult {
 	got := activity.Spin(dollars, hasJackpot, used, total, maxWon, force, secureRandomInt)
 	return spinResult{got.Type, got.Dollars}
+}
+
+func isSpinDollarTier(dollars float64) bool {
+	return spinMap[dollars] > 0
 }
 
 func secureRandomInt(max int) int {
