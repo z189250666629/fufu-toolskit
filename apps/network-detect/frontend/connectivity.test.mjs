@@ -24,6 +24,26 @@ test('normalizes target groups and falls back to defaults', () => {
   assert.equal(fallback[0].id, 'api');
 });
 
+test('normalizes target groups falls back to defaults after dropping groups without usable URLs', () => {
+  const fallback = normalizeTargetGroups([
+    { id: 'empty', name: 'Empty', urls: [] },
+    { id: 'blank', name: 'Blank', urls: [' ', '\n\t'] }
+  ]);
+
+  assert.equal(fallback.length, DEFAULT_TARGET_GROUPS.length);
+  assert.deepEqual(fallback.map((group) => group.id), DEFAULT_TARGET_GROUPS.map((group) => group.id));
+});
+
+test('normalizeTargetGroups trims target URLs before filtering', () => {
+  const custom = normalizeTargetGroups([
+    { id: 'api', name: 'API', urls: [' https://a.example ', '  '] }
+  ]);
+
+  assert.deepEqual(custom, [
+    { id: 'api', name: 'API', urls: ['https://a.example'] }
+  ]);
+});
+
 test('adds cache bust query without dropping existing URL parts', () => {
   const got = new URL(addCacheBust('https://api.example.test/v1?x=1', 'https://panel.example.test/'));
   assert.equal(got.origin, 'https://api.example.test');

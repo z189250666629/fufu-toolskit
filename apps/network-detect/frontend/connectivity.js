@@ -23,12 +23,19 @@ export const DEFAULT_TARGET_GROUPS = [
 ];
 
 export function normalizeTargetGroups(targets, fallback = DEFAULT_TARGET_GROUPS) {
-  const groups = targets?.length ? targets : fallback;
+  const normalized = cleanTargetGroups(targets);
+  if (normalized.length) return normalized;
+  return cleanTargetGroups(fallback);
+}
+
+function cleanTargetGroups(groups = []) {
   return groups
     .map((group) => ({
       id: String(group.id || group.name || ''),
       name: String(group.name || group.id || 'URL 组'),
-      urls: Array.isArray(group.urls) ? group.urls.map(String).filter(Boolean) : []
+      urls: Array.isArray(group.urls)
+        ? group.urls.map((url) => String(url ?? '').trim()).filter(Boolean)
+        : []
     }))
     .filter((group) => group.urls.length);
 }
