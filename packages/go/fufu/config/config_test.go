@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"fufu/newapi"
 )
 
 func TestNormalizeManagedSitesFiltersAndDefaults(t *testing.T) {
@@ -78,42 +76,49 @@ func TestDeploymentSitesFromEnv(t *testing.T) {
 	}
 }
 
-func TestLoadPrimarySitePrefersEnvThenConfigFile(t *testing.T) {
-	t.Run("env", func(t *testing.T) {
+func TestLoadPrimarySiteUsesCurrentEnvOnly(t *testing.T) {
+	t.Run("fufu api env", func(t *testing.T) {
 		clearPrimaryEnv(t)
 		t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(t.TempDir(), "missing-managed-sites.json"))
-		t.Setenv("FUFU_COMBINE_API_URL", "https://combine.example.test/")
-		t.Setenv("FUFU_COMBINE_API_TOKEN", "combine-token")
-		t.Setenv("FUFU_COMBINE_USER_ID", "9")
-		t.Setenv("FUFU_COMBINE_QUOTA_UNIT", "700000")
+		t.Setenv("FUFU_API_BASE_URL", "https://activity.example.test/")
+		t.Setenv("FUFU_API_TOKEN", "activity-token")
+		t.Setenv("FUFU_API_USER_ID", "9")
+		t.Setenv("FUFU_QUOTA_UNIT", "700000")
 
 		site, err := LoadPrimarySite(t.TempDir())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if site.URL != "https://combine.example.test" || site.Token != "combine-token" || site.UserID != "9" || site.QuotaUnit != 700000 {
+		if site.URL != "https://activity.example.test" || site.Token != "activity-token" || site.UserID != "9" || site.QuotaUnit != 700000 {
 			t.Fatalf("bad env primary site: %#v", site)
 		}
 	})
+}
 
-	t.Run("config file", func(t *testing.T) {
+func TestLoadPrimarySiteRejectsLegacyCombineEnvAndRootConfigFile(t *testing.T) {
+	t.Run("legacy combine env", func(t *testing.T) {
+		clearPrimaryEnv(t)
+		t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(t.TempDir(), "missing-managed-sites.json"))
+		t.Setenv("FUFU_COMBINE_API_URL", "https://legacy-combine.example.test/")
+		t.Setenv("FUFU_COMBINE_API_TOKEN", "legacy-combine-token")
+
+		_, err := LoadPrimarySite(t.TempDir())
+		if err == nil {
+			t.Fatalf("expected legacy combine env to be ignored, got %v", err)
+		}
+	})
+
+	t.Run("legacy root config file", func(t *testing.T) {
 		clearPrimaryEnv(t)
 		root := t.TempDir()
 		t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(root, "missing-managed-sites.json"))
-		path := filepath.Join(root, "config.json")
-		if err := os.WriteFile(path, []byte(`{"name":"file-site","url":"https://file.example.test/","token":"file-token"}`), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(root, "config.json"), []byte(`{"name":"file-site","url":"https://file.example.test/","token":"file-token"}`), 0644); err != nil {
 			t.Fatal(err)
 		}
 
-		site, err := LoadPrimarySite(root)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if site.Name != "file-site" || site.URL != "https://file.example.test" || site.Token != "file-token" {
-			t.Fatalf("bad file primary site: %#v", site)
-		}
-		if site.UserID != "1" || site.QuotaUnit != newapi.DefaultQuotaUnit {
-			t.Fatalf("file defaults not applied: %#v", site)
+		_, err := LoadPrimarySite(root)
+		if err == nil {
+			t.Fatalf("expected root config.json to be ignored, got %v", err)
 		}
 	})
 }
@@ -190,7 +195,7 @@ func TestLoadPrimarySiteUsesSameNewAPISiteDefaultsAsDeploymentSites(t *testing.T
 	}
 }
 
-func TestLoadPrimarySiteReportsInvalidLegacyConfig(t *testing.T) {
+func TestLoadPrimarySiteIgnoresInvalidLegacyConfig(t *testing.T) {
 	clearPrimaryEnv(t)
 	root := t.TempDir()
 	t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(root, "missing-managed-sites.json"))
@@ -199,8 +204,8 @@ func TestLoadPrimarySiteReportsInvalidLegacyConfig(t *testing.T) {
 	}
 
 	_, err := LoadPrimarySite(root)
-	if err == nil || !strings.Contains(err.Error(), "config.json") || !strings.Contains(err.Error(), "不是有效 JSON") {
-		t.Fatalf("expected invalid legacy config error, got %v", err)
+	if err == nil || strings.Contains(err.Error(), "config.json") {
+		t.Fatalf("expected invalid legacy config to be ignored, got %v", err)
 	}
 }
 
