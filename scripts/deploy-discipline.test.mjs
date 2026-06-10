@@ -12,6 +12,7 @@ const deployScope = [
   '.github/workflows/deploy-y2k-nav.yml',
   'infra/deploy/fufu-act/docker-compose.yml',
   'infra/deploy/network-detect/docker-compose.yml',
+  'apps/network-detect/docker-compose.yml',
   'scripts/deploy-docker-app.sh'
 ];
 
@@ -57,5 +58,19 @@ test('deploy workflows use the canonical toolskit GitHub environment', async () 
     const source = await readRepoFile(path);
     assert.match(source, /^\s*environment:\s*toolskit\s*$/m, `${path} should deploy through the toolskit environment`);
     assert.doesNotMatch(source, /^\s*environment:\s*docker\s*$/m, `${path} must not deploy through a docker environment`);
+  }
+});
+
+test('network-detect compose files use the canonical deployed host port', async () => {
+  for (const path of [
+    'infra/deploy/network-detect/docker-compose.yml',
+    'apps/network-detect/docker-compose.yml'
+  ]) {
+    const source = await readRepoFile(path);
+    assert.match(
+      source,
+      /\$\{HOST_PORT:-38473\}:8080/,
+      `${path} should default the network-detect external host port to 38473`
+    );
   }
 });
