@@ -28,7 +28,7 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, 400, "siteName 和 model 必填")
 		return
 	}
-	result, err := runModelTest(body.SiteName, body.Model, body.Group)
+	result, err := runModelTest(r.Context(), body.SiteName, body.Model, body.Group)
 	if err != nil {
 		var e *httpError
 		if errors.As(err, &e) {
@@ -45,7 +45,7 @@ func (e *httpError) Error() string { return e.Message }
 
 var runModelTest = testModel
 
-func testModel(siteName, model, group string) (map[string]any, error) {
+func testModel(ctx context.Context, siteName, model, group string) (map[string]any, error) {
 	sites, configMsg := config.LoadManagedSites(rootDir)
 	if configMsg != "" && len(sites) == 0 {
 		return nil, &httpError{Status: 500, Message: publicManagedSiteConfigError(configMsg)}
@@ -78,7 +78,7 @@ func testModel(siteName, model, group string) (map[string]any, error) {
 	stream := supportsStream(model)
 	var res apiResult
 	for _, ch := range candidates {
-		res = newAPIGet(context.Background(), *site, channelTestEndpoint(ch.ID, model, stream), 45*time.Second)
+		res = newAPIGet(ctx, *site, channelTestEndpoint(ch.ID, model, stream), 45*time.Second)
 		if res.OK {
 			break
 		}

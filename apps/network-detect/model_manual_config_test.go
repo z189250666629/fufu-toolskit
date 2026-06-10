@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -13,7 +14,7 @@ func TestTestModelSurfacesManagedSiteConfigErrors(t *testing.T) {
 	clearManagedSiteEnv(t)
 	t.Setenv("NEWAPI_MANAGED_API_SITES", `not-json`)
 
-	_, err := testModel("missing-site", "gpt-test", "")
+	_, err := testModel(context.Background(), "missing-site", "gpt-test", "")
 	var httpErr *httpError
 	if !errors.As(err, &httpErr) {
 		t.Fatalf("expected httpError, got %T %v", err, err)
