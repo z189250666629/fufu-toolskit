@@ -12,6 +12,14 @@ type creditQueueStore interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }
 
+func sanitizeCreditScanError(error) string {
+	return "队列数据异常，请人工检查"
+}
+
+func sanitizeCreditFailureError(error) string {
+	return "派奖失败，请人工处理"
+}
+
 func enqueueCredit(key string, prize int) error {
 	return enqueueCreditWith(db, key, prize)
 }
@@ -54,7 +62,7 @@ func processCredits() {
 		var key string
 		if err := rows.Scan(&id, &key, &prize, &retries); err != nil {
 			if id > 0 {
-				_, _ = db.Exec(`UPDATE credit_queue SET status='failed', error=? WHERE id=?`, err.Error(), id)
+				_, _ = db.Exec(`UPDATE credit_queue SET status='failed', error=? WHERE id=?`, sanitizeCreditScanError(err), id)
 			}
 			continue
 		}
@@ -64,7 +72,7 @@ func processCredits() {
 			if nr >= maxCreditRetries {
 				status = "failed"
 			}
-			_, _ = db.Exec(`UPDATE credit_queue SET retries=?, status=?, error=? WHERE id=?`, nr, status, err.Error(), id)
+			_, _ = db.Exec(`UPDATE credit_queue SET retries=?, status=?, error=? WHERE id=?`, nr, status, sanitizeCreditFailureError(err), id)
 		} else {
 			_, _ = db.Exec(`UPDATE credit_queue SET status='done', error=NULL, processed_at=datetime('now') WHERE id=?`, id)
 		}

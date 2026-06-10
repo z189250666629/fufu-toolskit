@@ -81,8 +81,69 @@ func TestProcessCreditsMarksMalformedQueueRowFailedOnScanError(t *testing.T) {
 	if status != "failed" {
 		t.Fatalf("status=%q error=%#v", status, msg)
 	}
-	if !msg.Valid || !strings.Contains(strings.ToLower(msg.String), "scan") {
-		t.Fatalf("expected scan error message, got %#v", msg)
+	if !msg.Valid || strings.TrimSpace(msg.String) == "" {
+		t.Fatalf("expected safe scan error message, got %#v", msg)
+	}
+	for _, leaked := range []string{"scan", "converting", "bad-credit-card"} {
+		if strings.Contains(strings.ToLower(msg.String), leaked) {
+			t.Fatalf("scan error should be sanitized, got %#v", msg)
+		}
+	}
+}
+
+func TestProcessCreditsStoresSanitizedFailureMessage(t *testing.T) {
+	setupScratchLockTestDB(t)
+
+	key := "sk-credit-fail-123456"
+	rawDetail := "internal https://newapi.example.local/api/token/7 secret=abc"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{map[string]any{
+				"id":           7,
+				"key":          key,
+				"name":         "credit-card",
+				"remain_quota": 10,
+				"status":       1,
+			}}})
+		case r.Method == http.MethodPut && r.URL.Path == "/api/token/":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": rawDetail})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	oldTokenSvc := tokenSvc
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "token", UserID: "1"}))
+	t.Cleanup(func() { tokenSvc = oldTokenSvc })
+
+	res, err := db.Exec(`INSERT INTO credit_queue (card_key, prize_dollars, retries, status) VALUES (?,?,?,?)`, key, 10, maxCreditRetries-1, "pending")
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	processCredits()
+
+	var status string
+	var msg sql.NullString
+	if err := db.QueryRow(`SELECT status,error FROM credit_queue WHERE id=?`, id).Scan(&status, &msg); err != nil {
+		t.Fatal(err)
+	}
+	if status != "failed" {
+		t.Fatalf("status=%q error=%#v", status, msg)
+	}
+	if !msg.Valid || strings.TrimSpace(msg.String) == "" {
+		t.Fatalf("expected sanitized error message, got %#v", msg)
+	}
+	for _, leaked := range []string{"https://", "newapi.example.local", "secret", "api/token/7", rawDetail} {
+		if strings.Contains(msg.String, leaked) {
+			t.Fatalf("credit error should be sanitized; leaked %q in %#v", leaked, msg)
+		}
 	}
 }
 
