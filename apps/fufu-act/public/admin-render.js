@@ -1,6 +1,10 @@
 (function(root) {
   const PRIZE_SYMBOLS = {1:'🍋',5:'🍒',10:'🍊',20:'🍇',50:'💎',100:'⭐',200:'👑',500:'🔥',1000:'🏆'};
-  const ALLOWED_STATUS_CLASSES = new Set(['pending', 'paid', 'failed', 'active', 'completed', 'cashed_out', 'bust', 'reset']);
+  const ALLOWED_STATUS_CLASSES = new Set([
+    'pending', 'done', 'paid', 'failed',
+    'playing', 'won', 'lost', 'cashout',
+    'active', 'completed', 'cashed_out', 'bust', 'reset'
+  ]);
 
   function escapeHtml(value) {
     return String(value ?? '')

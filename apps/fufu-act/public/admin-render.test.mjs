@@ -29,3 +29,23 @@ test('admin render escapes badge statuses and tolerates missing rows', async () 
   assert.doesNotMatch(html, /onclick=/);
   assert.doesNotMatch(html, /<script>/);
 });
+
+test('admin render preserves backend status badge classes', async () => {
+  const render = await loadAdminRender();
+  const html = render.buildStatsGridHtml({
+    queueRows: [
+      { status: 'pending', count: 1, total: 2 },
+      { status: 'done', count: 1, total: 2 }
+    ],
+    scratchRows: [
+      { status: 'playing', count: 1, total: 0 },
+      { status: 'won', count: 1, total: 8 },
+      { status: 'lost', count: 1, total: 0 },
+      { status: 'cashout', count: 1, total: 4 }
+    ]
+  });
+
+  for (const status of ['pending', 'done', 'playing', 'won', 'lost', 'cashout']) {
+    assert.match(html, new RegExp(`badge-${status}`));
+  }
+});
