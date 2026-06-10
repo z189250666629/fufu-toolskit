@@ -88,7 +88,9 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		revealed = append(revealed, b.CellIndex)
 		if intContains(mines, b.CellIndex) {
 			rb, _ := json.Marshal(revealed)
-			_, _ = db.Exec(`UPDATE scratch_games SET revealed=?, prize_dollars=0, status='lost' WHERE card_key=?`, string(rb), key)
+			if _, err := db.Exec(`UPDATE scratch_games SET revealed=?, prize_dollars=0, status='lost' WHERE card_key=?`, string(rb), key); err != nil {
+				return nil, err
+			}
 			return map[string]any{"hit": true, "mines": mines, "prize": 0, "status": "lost", "revealed": revealed}, nil
 		}
 		safe := 0
@@ -103,7 +105,9 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 			status = "won"
 		}
 		rb, _ := json.Marshal(revealed)
-		_, _ = db.Exec(`UPDATE scratch_games SET revealed=?, prize_dollars=?, status=? WHERE card_key=?`, string(rb), prize, status, key)
+		if _, err := db.Exec(`UPDATE scratch_games SET revealed=?, prize_dollars=?, status=? WHERE card_key=?`, string(rb), prize, status, key); err != nil {
+			return nil, err
+		}
 		if status == "won" && prize > 0 {
 			enqueueCredit(key, prize)
 		}
@@ -145,7 +149,9 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 			return nil, httpErr{400, "至少刮开一个安全格才能结算"}
 		}
 		prize := scratchRewards[safe-1]
-		_, _ = db.Exec(`UPDATE scratch_games SET prize_dollars=?, status='cashout' WHERE card_key=?`, prize, key)
+		if _, err := db.Exec(`UPDATE scratch_games SET prize_dollars=?, status='cashout' WHERE card_key=?`, prize, key); err != nil {
+			return nil, err
+		}
 		if prize > 0 {
 			enqueueCredit(key, prize)
 		}
