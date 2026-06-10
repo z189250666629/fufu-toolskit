@@ -25,11 +25,16 @@ func buildMergeAcceptedResponse(jobID string) map[string]any {
 
 func publicMergeJobStatus(job MergeJob) MergeJob {
 	out := job
-	if out.Error != "" {
-		out.Error = "合并失败，请稍后重试"
-	}
+	out.Error = safeMergeJobError(out.Error)
 	out.Result = publicMergeJobResult(out.Result)
 	return out
+}
+
+func safeMergeJobError(message string) string {
+	if strings.TrimSpace(message) == "" {
+		return ""
+	}
+	return "合并失败，请稍后重试"
 }
 
 func publicMergeJobResult(result any) any {

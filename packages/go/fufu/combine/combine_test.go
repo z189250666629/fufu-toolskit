@@ -189,6 +189,35 @@ func TestGuestMergeStatusRedactsSourceKeysAndRawErrors(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedMergeStatusRedactsRawJobErrors(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	userRole := RoleUser
+	app.setMergeJob("job-user-error", MergeJobPatch{
+		Status: strp("error"),
+		Role:   &userRole,
+		Error:  strp("upstream panic: sk-source-secret-1234567890 internal.example"),
+	})
+	app.sessions["user-session"] = SessionInfo{Expiry: time.Now().Add(time.Hour), Role: RoleUser}
+	req := httptest.NewRequest(http.MethodGet, "/api/merge-status/job-user-error", nil)
+	req.Header.Set("X-Session-Token", "user-session")
+	rec := httptest.NewRecorder()
+
+	app.handleAPI(rec, req)
+
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status code=%d body=%s", rec.Code, body)
+	}
+	if !strings.Contains(body, "合并失败，请稍后重试") {
+		t.Fatalf("authenticated status should keep safe error, body=%s", body)
+	}
+	for _, leaked := range []string{"sk-source-secret-1234567890", "upstream panic", "internal.example"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("authenticated status leaked %q in %s", leaked, body)
+		}
+	}
+}
+
 func TestHandleAPIRejectsWrongMethodWithMethodNotAllowed(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/auth", nil)
