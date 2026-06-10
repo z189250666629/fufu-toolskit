@@ -57,6 +57,9 @@ func TestStaticRouteServesPublicIndex(t *testing.T) {
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "activity home") {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
 }
 
 func TestWriteHTTPErrorMapsKnownError(t *testing.T) {
