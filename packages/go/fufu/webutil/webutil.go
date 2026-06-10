@@ -65,6 +65,35 @@ func NewHTTPServer(addr string, handler http.Handler) *http.Server {
 	}
 }
 
+func NewStaticHandler(root string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		path := r.URL.Path
+		if path == "/" {
+			path = "/index.html"
+		}
+		if !IsPublicStaticPath(path) {
+			http.NotFound(w, r)
+			return
+		}
+		file, ok := SafePath(root, path)
+		if !ok {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		info, err := os.Stat(file)
+		if err != nil || info.IsDir() {
+			http.NotFound(w, r)
+			return
+		}
+		ServeFile(w, r, file, strings.HasSuffix(file, ".html"))
+	})
+}
+
 func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	body, err := json.Marshal(payload)
 	if err != nil {

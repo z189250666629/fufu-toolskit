@@ -6,11 +6,12 @@ import (
 	"errors"
 	"fufu/newapi"
 	"fufu/tokens"
-	_ "modernc.org/sqlite"
-	"net/http"
+	"fufu/webutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	_ "modernc.org/sqlite"
 )
 
 func LoadConfig(path string) (Config, error) { return loadConfig(path) }
@@ -53,7 +54,7 @@ func newApp(cfg Config, db *sql.DB) *App {
 			"user":  {"5708e5c4c00d86c91e085624253d96bdcf7b3b828243d81e72d883ca414b5d1d", RoleUser},
 		},
 		sessions: make(map[string]SessionInfo), mergeJobs: make(map[string]MergeJob), mergeLocks: make(map[int]struct{}),
-		static: http.FileServer(http.Dir("public")),
+		static: webutil.NewStaticHandler("public"),
 	}
 }
 

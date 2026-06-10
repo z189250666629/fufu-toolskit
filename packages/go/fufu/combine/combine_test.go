@@ -3,6 +3,8 @@ package combine
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -228,6 +230,46 @@ func TestHandleAPIRejectsWrongMethodWithMethodNotAllowed(t *testing.T) {
 
 	if w.Code != http.StatusMethodNotAllowed || strings.TrimSpace(w.Body.String()) != `{"error":"Only POST"}` {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestStaticHandlerRejectsDirectoryListingsTestArtifactsAndDotfiles(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	publicDir := filepath.Join(root, "public")
+	for name, body := range map[string]string{
+		"app.js":           "public app marker",
+		"app.test.mjs":     "secret test marker",
+		".env.local":       "secret env marker",
+		"assets/secret.js": "secret directory marker",
+	} {
+		file := filepath.Join(publicDir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	app := NewApp(Config{}, nil)
+
+	for _, path := range []string{"/app.test.mjs", "/.env.local", "/assets/"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		app.ServeHTTP(w, req)
+		if w.Code == http.StatusOK {
+			t.Fatalf("%s should not be served: body=%s", path, w.Body.String())
+		}
+		if strings.Contains(w.Body.String(), "secret") {
+			t.Fatalf("%s leaked blocked content: %s", path, w.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	w := httptest.NewRecorder()
+	app.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "public app marker") {
+		t.Fatalf("normal asset should still be served: code=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
