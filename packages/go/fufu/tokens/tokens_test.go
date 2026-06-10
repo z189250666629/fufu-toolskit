@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"fufu/newapi"
@@ -188,5 +189,57 @@ func TestSearchCreateUpdateDelete(t *testing.T) {
 	}
 	if ok, res, err := svc.DeleteToken(context.Background(), 2); err != nil || !ok || !res.OK() {
 		t.Fatalf("DeleteToken ok=%v res=%+v err=%v", ok, res, err)
+	}
+}
+
+func TestSearchTokenByKeySkipsBlankKeyWithoutRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("blank key should not issue request: %s", r.URL.String())
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	found, err := svc.SearchTokenByKey(context.Background(), "  sk-  ")
+	if err != nil || found != nil {
+		t.Fatalf("found=%#v err=%v", found, err)
+	}
+}
+
+func TestBatchSearchReturnsConfigurationErrorForNilService(t *testing.T) {
+	var svc *Service
+	defer func() {
+		if x := recover(); x != nil {
+			t.Fatalf("BatchSearch should return an error, not panic: %v", x)
+		}
+	}()
+	_, _, _, err := svc.BatchSearch(context.Background(), []string{"sk-valid-key-123"})
+	if err == nil {
+		t.Fatal("BatchSearch should report missing token service")
+	}
+}
+
+func TestSearchTokenByKeyReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "bad token"})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	found, err := svc.SearchTokenByKey(context.Background(), "sk-failed-token")
+	if found != nil || err == nil || !strings.Contains(err.Error(), "bad token") {
+		t.Fatalf("found=%#v err=%v", found, err)
+	}
+}
+
+func TestSearchTokenByNameReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "name rejected"})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	found, err := svc.SearchTokenByName(context.Background(), "bad-name")
+	if found != nil || err == nil || !strings.Contains(err.Error(), "name rejected") {
+		t.Fatalf("found=%#v err=%v", found, err)
 	}
 }

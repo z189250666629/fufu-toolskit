@@ -2,10 +2,13 @@ package tokens
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"fufu/newapi"
 	"sync"
 )
 
@@ -14,6 +17,9 @@ func (s *Service) SearchTokenByKey(ctx context.Context, key string) (*Token, err
 		return nil, fmt.Errorf("token service is not configured")
 	}
 	bare := BareKey(key)
+	if bare == "" {
+		return nil, nil
+	}
 	endpoint := "/api/token/search?keyword=&token=" + url.QueryEscape(bare) + "&p=0&size=10"
 	res, data, err := s.Client.Request(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -21,6 +27,9 @@ func (s *Service) SearchTokenByKey(ctx context.Context, key string) (*Token, err
 	}
 	if !res.OK() {
 		return nil, fmt.Errorf("查询 %s 失败", DisplayKey(key))
+	}
+	if !newapi.IsSuccess(data) {
+		return nil, errors.New(newapi.ErrorMessage(data, res.StatusCode, "查询 "+DisplayKey(key)+" 失败"))
 	}
 	for _, item := range DataList(data) {
 		if BareKey(getString(item, "key")) == bare {
@@ -47,6 +56,9 @@ func (s *Service) SearchTokenByName(ctx context.Context, name string) (*Token, e
 	if !res.OK() {
 		return nil, fmt.Errorf("查询 token 名称 %q 失败", name)
 	}
+	if !newapi.IsSuccess(data) {
+		return nil, errors.New(newapi.ErrorMessage(data, res.StatusCode, fmt.Sprintf("查询 token 名称 %q 失败", name)))
+	}
 	for _, item := range DataList(data) {
 		if getString(item, "name") == name {
 			t := FromRaw(item)
@@ -62,6 +74,9 @@ type SearchResult struct {
 }
 
 func (s *Service) BatchSearch(ctx context.Context, raw []string) ([]string, []Token, []string, error) {
+	if s == nil || s.Client == nil {
+		return nil, nil, nil, fmt.Errorf("token service is not configured")
+	}
 	keys := NormalizeKeys(raw)
 	if len(keys) == 0 {
 		return keys, nil, nil, nil
