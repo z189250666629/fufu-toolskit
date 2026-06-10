@@ -54,10 +54,14 @@ func WriteJSONError(w http.ResponseWriter, status int, message string) {
 }
 
 func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	return RequireMethodMessage(w, r, method, "Only "+method)
+}
+
+func RequireMethodMessage(w http.ResponseWriter, r *http.Request, method, message string) bool {
 	if r.Method == method {
 		return true
 	}
-	WriteJSONError(w, http.StatusMethodNotAllowed, "Only "+method)
+	WriteJSONError(w, http.StatusMethodNotAllowed, message)
 	return false
 }
 

@@ -101,11 +101,7 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
-	if r.Method != method {
-		writeJSONError(w, 405, "Only "+method+" is supported")
-		return false
-	}
-	return true
+	return webutil.RequireMethodMessage(w, r, method, "Only "+method+" is supported")
 }
 
 func errString(err error) string {
@@ -120,7 +116,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func writeJSONError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]string{"error": message})
+	webutil.WriteJSONError(w, status, message)
 }
 
 func readJSON(r *http.Request, out any) error {

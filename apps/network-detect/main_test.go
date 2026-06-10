@@ -67,6 +67,18 @@ func TestWriteJSONErrorUsesStablePayload(t *testing.T) {
 	}
 }
 
+func TestRequireMethodUsesNetworkMethodMessage(t *testing.T) {
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/newapi/model-status/test", nil)
+
+	if requireMethod(w, req, http.MethodPost) {
+		t.Fatal("GET should be rejected when POST is required")
+	}
+	if w.Code != http.StatusMethodNotAllowed || strings.TrimSpace(w.Body.String()) != `{"error":"Only POST is supported"}` {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestParseListCleansSortsAndDedupes(t *testing.T) {
 	got := parseList(`["beta","alpha","beta",""]`)
 	if strings.Join(got, ",") != "alpha,beta" {

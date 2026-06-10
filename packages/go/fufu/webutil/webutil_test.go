@@ -85,6 +85,21 @@ func TestRequireMethodRejectsUnexpectedVerb(t *testing.T) {
 	}
 }
 
+func TestRequireMethodMessageUsesCustomMessage(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
+
+	if RequireMethodMessage(rec, req, http.MethodPost, "Only POST is supported") {
+		t.Fatal("RequireMethodMessage should reject GET when POST is required")
+	}
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if strings.TrimSpace(rec.Body.String()) != `{"error":"Only POST is supported"}` {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
 func TestServeFileSupportsHeadAndCachePolicy(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "index.html")
