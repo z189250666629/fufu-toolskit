@@ -60,6 +60,9 @@ func mcyLogin() error {
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("MCY login HTTP %d", resp.StatusCode)
+	}
 	cookies := resp.Cookies()
 	if len(cookies) > 0 {
 		parts := make([]string, 0, len(cookies))

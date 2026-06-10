@@ -63,3 +63,26 @@ func TestMCYPostReturnsErrorForInvalidJSONResponse(t *testing.T) {
 		t.Fatalf("data=%#v err=%v", data, err)
 	}
 }
+
+func TestMCYLoginReturnsErrorForHTTPFailure(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = ""
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{Name: "mcy_session", Value: "bad"})
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`login failed`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "p")
+
+	err := mcyLogin()
+	if err == nil || !strings.Contains(err.Error(), "500") {
+		t.Fatalf("expected HTTP 500 login error, got %v", err)
+	}
+	if mcyCookie != "" {
+		t.Fatalf("mcyCookie should stay empty on login failure, got %q", mcyCookie)
+	}
+}
