@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { createStartAllSupervisor } from './start-all-supervisor.mjs';
+import { createStartAllSupervisor, installSignalShutdownHandlers } from './start-all-supervisor.mjs';
 
 const supervisor = createStartAllSupervisor({
   spawn,
@@ -9,12 +9,4 @@ const supervisor = createStartAllSupervisor({
 });
 
 supervisor.start();
-
-process.on('SIGINT', () => {
-  supervisor.stopAll();
-  process.exit(130);
-});
-process.on('SIGTERM', () => {
-  supervisor.stopAll();
-  process.exit(143);
-});
+installSignalShutdownHandlers(supervisor);

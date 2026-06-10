@@ -24,8 +24,20 @@ export function createStartAllSupervisor({
 
   const children = [];
   const exited = new Set();
+  const exitWaiters = [];
   let stopping = false;
   let exitCode = 0;
+
+  function allChildrenExited() {
+    return children.every((child) => exited.has(child));
+  }
+
+  function notifyExitWaiters() {
+    if (!allChildrenExited()) return;
+    while (exitWaiters.length > 0) {
+      exitWaiters.shift()();
+    }
+  }
 
   function createPrefixWriter(stream, name) {
     let atLineStart = true;
@@ -56,11 +68,13 @@ export function createStartAllSupervisor({
         child.kill(signal);
       }
     }
+    return waitForAllExited();
   }
 
   function handleExit(item, child, code, signal) {
     exited.add(child);
     logger.log(`[${item.name}] exited with ${signal ? `signal ${signal}` : `code ${code}`}`);
+    notifyExitWaiters();
 
     if (!stopping) {
       exitCode = typeof code === 'number' && code > 0 ? code : 1;
@@ -72,6 +86,7 @@ export function createStartAllSupervisor({
   function handleError(item, child, error) {
     exited.add(child);
     logger.log(`[${item.name}] failed to start: ${error?.message || error}`);
+    notifyExitWaiters();
 
     if (!stopping) {
       exitCode = 1;
@@ -96,6 +111,15 @@ export function createStartAllSupervisor({
     return children;
   }
 
+  function waitForAllExited() {
+    if (allChildrenExited()) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      exitWaiters.push(resolve);
+    });
+  }
+
   return {
     get children() {
       return children;
@@ -104,6 +128,33 @@ export function createStartAllSupervisor({
       return exitCode;
     },
     start,
-    stopAll
+    stopAll,
+    waitForAllExited
   };
+}
+
+export function installSignalShutdownHandlers(supervisor, {
+  process = globalThis.process,
+  setTimeout = globalThis.setTimeout,
+  clearTimeout = globalThis.clearTimeout,
+  graceMs = 5000
+} = {}) {
+  let shuttingDown = false;
+
+  function shutdown(code) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    process.exitCode = code;
+    supervisor.stopAll();
+    const timer = setTimeout(() => {
+      process.exit(code);
+    }, graceMs);
+    supervisor.waitForAllExited().then(() => {
+      clearTimeout(timer);
+      process.exit(code);
+    });
+  }
+
+  process.on('SIGINT', () => shutdown(130));
+  process.on('SIGTERM', () => shutdown(143));
 }

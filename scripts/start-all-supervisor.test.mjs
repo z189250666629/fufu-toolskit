@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
-import { createStartAllSupervisor } from './start-all-supervisor.mjs';
+import { createStartAllSupervisor, installSignalShutdownHandlers } from './start-all-supervisor.mjs';
 
 class FakeChild extends EventEmitter {
   constructor() {
@@ -125,4 +125,80 @@ test('startAll prefixes every line from multiline stdout chunks', () => {
   spawned[0].stdout.emit('data', 'ready\nlistening\n');
 
   assert.equal(writes.join(''), '[network] ready\n[network] listening\n');
+});
+
+test('stopAll waits until every child exits', async () => {
+  const spawned = [];
+  const supervisor = createStartAllSupervisor({
+    logger: { log: () => {} },
+    stdout: { write: () => {} },
+    stderr: { write: () => {} },
+    spawn: () => {
+      const child = new FakeChild();
+      spawned.push(child);
+      return child;
+    }
+  });
+
+  supervisor.start();
+
+  let resolved = false;
+  const stopped = supervisor.stopAll().then(() => {
+    resolved = true;
+  });
+
+  await Promise.resolve();
+  assert.equal(resolved, false);
+
+  spawned[0].emit('exit', null, 'SIGTERM');
+  await Promise.resolve();
+  assert.equal(resolved, false);
+
+  spawned[1].emit('exit', null, 'SIGTERM');
+  spawned[2].emit('exit', null, 'SIGTERM');
+  await stopped;
+
+  assert.equal(resolved, true);
+});
+
+test('signal shutdown waits for children before exiting', async () => {
+  let resolveExited;
+  const stopped = [];
+  const exits = [];
+  const clearedTimers = [];
+  const handlers = {};
+  const supervisor = {
+    stopAll: () => stopped.push('stop'),
+    waitForAllExited: () => new Promise((resolve) => {
+      resolveExited = resolve;
+    })
+  };
+  const fakeProcess = {
+    exitCode: undefined,
+    on: (signal, handler) => {
+      handlers[signal] = handler;
+    },
+    exit: (code) => {
+      exits.push(code);
+    }
+  };
+
+  installSignalShutdownHandlers(supervisor, {
+    process: fakeProcess,
+    setTimeout: () => 'timer-1',
+    clearTimeout: (timer) => clearedTimers.push(timer),
+    graceMs: 50
+  });
+
+  handlers.SIGINT();
+
+  assert.deepEqual(stopped, ['stop']);
+  assert.equal(fakeProcess.exitCode, 130);
+  assert.deepEqual(exits, []);
+
+  resolveExited();
+  await Promise.resolve();
+
+  assert.deepEqual(clearedTimers, ['timer-1']);
+  assert.deepEqual(exits, [130]);
 });
