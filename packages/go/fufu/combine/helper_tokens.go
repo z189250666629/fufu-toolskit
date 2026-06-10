@@ -3,6 +3,7 @@ package combine
 import (
 	"fufu/newapi"
 	"fufu/tokens"
+	"sort"
 )
 
 func resolvedFromToken(t tokens.Token) ResolvedToken {
@@ -67,13 +68,18 @@ func majorityGroup(tokens []ResolvedToken) string {
 		}
 		counts[g]++
 	}
-	winner := "mix"
-	max := 0
-	for g, c := range counts {
-		if c > max {
-			winner = g
-			max = c
-		}
+	groups := make([]string, 0, len(counts))
+	for g := range counts {
+		groups = append(groups, g)
 	}
-	return winner
+	sort.Slice(groups, func(i, j int) bool {
+		if counts[groups[i]] == counts[groups[j]] {
+			return groups[i] < groups[j]
+		}
+		return counts[groups[i]] > counts[groups[j]]
+	})
+	if len(groups) > 0 {
+		return groups[0]
+	}
+	return "mix"
 }

@@ -78,6 +78,17 @@ func TestConversionFallbacks(t *testing.T) {
 	}
 }
 
+func TestCombineMajorityGroupTieBreaksDeterministically(t *testing.T) {
+	tokens := []ResolvedToken{
+		{Group: "vip"},
+		{Group: "default"},
+	}
+
+	if got := majorityGroup(tokens); got != "default" {
+		t.Fatalf("majorityGroup tie = %q, want default", got)
+	}
+}
+
 func TestHTTPAndStatusHelpers(t *testing.T) {
 	msg := upstreamStatusMessage(APIResponse{StatusCode: 502}, "失败")
 	if !strings.Contains(msg, "502") {
