@@ -13,7 +13,7 @@ func (a *App) handleAuth(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := decodeJSON(r.Body, &p); err != nil {
-		writeJSON(w, 400, map[string]string{"error": "请求格式错误"})
+		writeBadJSONRequest(w)
 		return
 	}
 	matched, ok := matchRoleByPassword(a.passwords, p.Password)
@@ -45,7 +45,7 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 		Keys []string `json:"keys"`
 	}
 	if err := decodeJSON(r.Body, &p); err != nil {
-		writeJSON(w, 400, map[string]string{"error": "请求格式错误"})
+		writeBadJSONRequest(w)
 		return
 	}
 	if len(p.Keys) == 0 {
@@ -69,7 +69,7 @@ func (a *App) handleMerge(w http.ResponseWriter, r *http.Request) {
 	a.cleanMergeJobs()
 	var p MergePayload
 	if err := decodeJSON(r.Body, &p); err != nil {
-		writeJSON(w, 400, map[string]string{"error": "请求格式错误"})
+		writeBadJSONRequest(w)
 		return
 	}
 	role := roleFromContext(r.Context())
@@ -89,7 +89,7 @@ func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
 		Keys []string `json:"keys"`
 	}
 	if err := decodeJSON(r.Body, &p); err != nil {
-		writeJSON(w, 400, map[string]string{"error": "请求格式错误"})
+		writeBadJSONRequest(w)
 		return
 	}
 	jobID, err := randomHex(16)
@@ -138,7 +138,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		Group        string  `json:"group"`
 	}
 	if err := decodeJSON(r.Body, &p); err != nil {
-		writeJSON(w, 400, map[string]string{"error": "请求格式错误"})
+		writeBadJSONRequest(w)
 		return
 	}
 	if !validateGenerateParams(p.Count, p.Quota, p.IntervalUnit) {

@@ -38,3 +38,16 @@ func TestWriteJSONEncodeFailureReturnsStableError(t *testing.T) {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
+
+func TestWriteBadJSONRequestUsesConsistentMessage(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	writeBadJSONRequest(rec)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if strings.TrimSpace(rec.Body.String()) != `{"error":"请求格式错误"}` {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
