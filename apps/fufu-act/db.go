@@ -19,24 +19,45 @@ func initDB(path string) (*sql.DB, error) {
 			return nil, err
 		}
 	}
-	migrateCol(d, "cards", "source", "TEXT NOT NULL DEFAULT 'act'")
-	migrateCol(d, "cards", "purchase_time", "TEXT")
-	migrateCol(d, "cards", "rigged", "TEXT")
+	migrations := []struct {
+		table string
+		col   string
+		typ   string
+	}{
+		{table: "cards", col: "source", typ: "TEXT NOT NULL DEFAULT 'act'"},
+		{table: "cards", col: "purchase_time", typ: "TEXT"},
+		{table: "cards", col: "rigged", typ: "TEXT"},
+	}
+	for _, migration := range migrations {
+		if err := migrateCol(d, migration.table, migration.col, migration.typ); err != nil {
+			_ = d.Close()
+			return nil, err
+		}
+	}
 	return d, nil
 }
 
-func migrateCol(d *sql.DB, table, col, typ string) {
-	rows, _ := d.Query("PRAGMA table_info(" + table + ")")
+func migrateCol(d *sql.DB, table, col, typ string) error {
+	rows, err := d.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return err
+	}
 	defer rows.Close()
 	for rows.Next() {
 		var cid int
 		var name, ctype string
 		var notnull int
 		var dflt, pk any
-		_ = rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk)
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return err
+		}
 		if name == col {
-			return
+			return nil
 		}
 	}
-	_, _ = d.Exec("ALTER TABLE " + table + " ADD COLUMN " + col + " " + typ)
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = d.Exec("ALTER TABLE " + table + " ADD COLUMN " + col + " " + typ)
+	return err
 }
