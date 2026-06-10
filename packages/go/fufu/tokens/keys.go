@@ -30,7 +30,7 @@ func NormalizeKeys(raw []string) []string {
 	seen := map[string]bool{}
 	keys := []string{}
 	for _, item := range raw {
-		for _, part := range strings.FieldsFunc(item, func(r rune) bool { return r == '\n' || r == '\r' || r == '\t' || r == ' ' || r == ',' || r == ';' }) {
+		for _, part := range strings.FieldsFunc(item, isKeyPartSeparator) {
 			key := EnsureFullKey(part)
 			if len(key) <= 10 {
 				continue
@@ -43,6 +43,15 @@ func NormalizeKeys(raw []string) []string {
 		}
 	}
 	return keys
+}
+
+func isKeyPartSeparator(r rune) bool {
+	switch r {
+	case '\n', '\r', '\t', ' ', ',', ';', '，', '；', '"', '\'', '[', ']', '{', '}', '(', ')', '\\':
+		return true
+	default:
+		return false
+	}
 }
 
 func MajorityGroup(tokens []Token) string {

@@ -18,6 +18,19 @@ func TestNormalizeKeys(t *testing.T) {
 	}
 }
 
+func TestNormalizeKeysAcceptsFullWidthPunctuationAndQuotedJSONPaste(t *testing.T) {
+	got := NormalizeKeys([]string{`["sk-alpha123456789"， "beta123456789"；"sk-gamma123456789"]`})
+	want := []string{"sk-alpha123456789", "sk-beta123456789", "sk-gamma123456789"}
+	if len(got) != len(want) {
+		t.Fatalf("NormalizeKeys = %#v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("NormalizeKeys = %#v, want %#v", got, want)
+		}
+	}
+}
+
 func TestBatchSearchFoundAndMissing(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.URL.Query().Get("token")

@@ -19,3 +19,12 @@ func TestCombineNormalizeKeysMatchesSharedTokenNormalizationForPastedInput(t *te
 		t.Fatalf("normalizeKeys() = %#v, want shared token normalization %#v", got, want)
 	}
 }
+
+func TestCombineNormalizeKeysAcceptsFullWidthPunctuationAndQuotedJSONPaste(t *testing.T) {
+	raw := []string{`["sk-alpha123456789"， "beta123456789"；"sk-gamma123456789"]`}
+	got := normalizeKeys(raw)
+	want := tokenkeys.NormalizeKeys(raw)
+	if !reflect.DeepEqual(got, want) || len(got) != 3 {
+		t.Fatalf("normalizeKeys() = %#v, want shared token normalization %#v", got, want)
+	}
+}
