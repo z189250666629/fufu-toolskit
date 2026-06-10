@@ -74,7 +74,14 @@ func main() {
 	mux.HandleFunc("/api/", apiRoute)
 	mux.HandleFunc("/", staticRoute)
 	fmt.Printf("fufu-act Go backend listening on :%s\n", port)
-	panic(http.ListenAndServe("0.0.0.0:"+port, mux))
+	if err := serve(port, mux); err != nil {
+		fmt.Fprintf(os.Stderr, "server stopped: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func serve(port string, handler http.Handler) error {
+	return http.ListenAndServe("0.0.0.0:"+port, handler)
 }
 func initAll() error {
 	tokenSvc = nil

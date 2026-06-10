@@ -4,6 +4,7 @@ import (
 	"context"
 	"fufu/activity"
 	"fufu/tokens"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -71,6 +72,27 @@ func TestPostRejectsNonPOST(t *testing.T) {
 
 	if w.Code != http.StatusMethodNotAllowed || !strings.Contains(w.Body.String(), "Only POST") {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestServeReturnsListenerErrors(t *testing.T) {
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = serve(port, http.NewServeMux())
+
+	if err == nil {
+		t.Fatal("serve should return bind errors instead of panicking")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "bind") && !strings.Contains(strings.ToLower(err.Error()), "address already in use") {
+		t.Fatalf("serve returned unexpected error: %v", err)
 	}
 }
 
