@@ -122,3 +122,17 @@ func TestLoadManagedSitesReportsInlineShapeError(t *testing.T) {
 		t.Fatalf("expected shape error, got %q", msg)
 	}
 }
+
+func TestLoadManagedSitesReportsNonObjectEntries(t *testing.T) {
+	clearPrimaryEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `["bad"]`)
+
+	sites, msg := LoadManagedSites(t.TempDir())
+
+	if len(sites) != 0 {
+		t.Fatalf("sites = %#v", sites)
+	}
+	if !strings.Contains(msg, "配置文件格式无效") || !strings.Contains(msg, "第 1 项") {
+		t.Fatalf("expected non-object item error, got %q", msg)
+	}
+}

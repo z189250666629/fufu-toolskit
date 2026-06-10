@@ -33,24 +33,26 @@ func coerceItemsWithMessage(data any) ([]map[string]any, string) {
 			if !ok {
 				return nil, "配置文件格式无效: " + key + " 应为数组"
 			}
-			return toMaps(arr), ""
+			return toMaps(arr)
 		}
 		return nil, "配置文件格式无效: 缺少 managedApiSites 数组"
 	}
 	if arr, ok := data.([]any); ok {
-		return toMaps(arr), ""
+		return toMaps(arr)
 	}
 	return nil, "配置文件格式无效: 根节点应为数组或对象"
 }
 
-func toMaps(arr []any) []map[string]any {
+func toMaps(arr []any) ([]map[string]any, string) {
 	items := []map[string]any{}
-	for _, item := range arr {
-		if obj, ok := item.(map[string]any); ok {
-			items = append(items, obj)
+	for i, item := range arr {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Sprintf("配置文件格式无效: 第 %d 项应为对象", i+1)
 		}
+		items = append(items, obj)
 	}
-	return items
+	return items, ""
 }
 
 func NormalizeManagedSites(data any, allowedNames map[string]bool) ([]newapi.Site, string) {
