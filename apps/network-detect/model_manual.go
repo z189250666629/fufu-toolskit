@@ -58,7 +58,7 @@ func testModel(siteName, model, group string) (map[string]any, error) {
 	if site == nil {
 		return nil, &httpError{Status: 404, Message: "站点不存在"}
 	}
-	key := modelManualKey(siteName, model)
+	key := modelManualKey(siteName, model, group)
 	now := time.Now().Unix()
 	if v, ok := testCooldowns.Load(key); ok && v.(int64) > now {
 		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: v.(int64)}
@@ -81,14 +81,14 @@ func testModel(siteName, model, group string) (map[string]any, error) {
 			break
 		}
 	}
-	rec := testRecord{OK: res.OK, Status: map[bool]string{true: "operational", false: "down"}[res.OK], Stream: stream, TestedAt: time.Now().Unix(), Message: truncate(testMessage(res), 180), NextAllowedAt: next}
+	rec := testRecord{OK: res.OK, Status: map[bool]string{true: "operational", false: "down"}[res.OK], Group: group, Stream: stream, TestedAt: time.Now().Unix(), Message: truncate(testMessage(res), 180), NextAllowedAt: next}
 	testResults.Store(key, rec)
 	modelCache.Lock()
 	if modelCache.Value != nil {
-		applyManual(modelCache.Value, siteName, model, rec, next)
+		applyManual(modelCache.Value, siteName, model, group, rec, next)
 	}
 	modelCache.Unlock()
-	return map[string]any{"siteName": siteName, "model": model, "test": rec}, nil
+	return map[string]any{"siteName": siteName, "model": model, "group": group, "test": rec}, nil
 }
 
 func supportsStream(model string) bool {
@@ -113,24 +113,34 @@ func truncate(s string, n int) string {
 	return string([]rune(s)[:n])
 }
 
-func applyManual(ms *ModelStatus, siteName, model string, rec testRecord, next int64) {
+func applyManualToCell(c *ModelCell, rec testRecord, next int64) {
+	c.ManualTest = rec
+	c.NextTestAllowedAt = next
+	if rec.OK {
+		c.SuccessCount++
+		c.LastSuccessAt = rec.TestedAt
+	} else {
+		c.FailureCount++
+		c.LastFailureAt = rec.TestedAt
+	}
+	c.RequestCount = c.SuccessCount + c.FailureCount
+	c.SuccessRate = rate(c.SuccessCount, c.FailureCount)
+	c.Status = statusFromCounts(c.SuccessCount, c.FailureCount)
+	c.LastSeenAt = maxInt64(c.LastSuccessAt, c.LastFailureAt)
+}
+
+func applyManual(ms *ModelStatus, siteName, model, group string, rec testRecord, next int64) {
 	for i := range ms.Models {
 		if ms.Models[i].Model == model {
 			if c := ms.Models[i].PerSite[siteName]; c != nil {
 				oldStatus := ms.Models[i].Status
-				c.ManualTest = rec
-				c.NextTestAllowedAt = next
-				if rec.OK {
-					c.SuccessCount++
-					c.LastSuccessAt = rec.TestedAt
+				if group != "" {
+					if groupCell := c.GroupStats[group]; groupCell != nil {
+						applyManualToCell(groupCell, rec, next)
+					}
 				} else {
-					c.FailureCount++
-					c.LastFailureAt = rec.TestedAt
+					applyManualToCell(c, rec, next)
 				}
-				c.RequestCount = c.SuccessCount + c.FailureCount
-				c.SuccessRate = rate(c.SuccessCount, c.FailureCount)
-				c.Status = statusFromCounts(c.SuccessCount, c.FailureCount)
-				c.LastSeenAt = maxInt64(c.LastSuccessAt, c.LastFailureAt)
 				recomputeModelRowSummary(&ms.Models[i])
 				updateModelStatusTotalsForRowStatus(ms, oldStatus, ms.Models[i].Status)
 			}

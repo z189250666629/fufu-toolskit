@@ -122,6 +122,7 @@ type ModelStatus struct {
 type testRecord struct {
 	OK            bool   `json:"ok"`
 	Status        string `json:"status"`
+	Group         string `json:"group,omitempty"`
 	Stream        bool   `json:"stream"`
 	TestedAt      int64  `json:"testedAt"`
 	Message       string `json:"message"`

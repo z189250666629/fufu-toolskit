@@ -9,7 +9,9 @@ import {
 } from './model_test_runner.js';
 
 test('modelCellKey separates site and model without ambiguity', () => {
-  assert.equal(modelCellKey('site', 'model'), 'site\u0000model');
+  assert.equal(modelCellKey('site', 'model'), 'site\u0000model\u0000');
+  assert.equal(modelCellKey('site', 'model', 'vip'), 'site\u0000model\u0000vip');
+  assert.notEqual(modelCellKey('site', 'model', 'vip'), modelCellKey('site', 'model', 'default'));
 });
 
 test('updateModelCell replaces the matching per-site cell', () => {
@@ -63,7 +65,7 @@ test('runModelCellTest toggles testing state and writes success message', async 
     postJsonImpl: async (path, body) => {
       assert.equal(path, '/api/newapi/model-status/test');
       assert.deepEqual(body, { siteName: 'site', model: 'model-a', group: 'vip' });
-      assert.equal(state.testingCells.has(modelCellKey('site', 'model-a')), true);
+      assert.equal(state.testingCells.has(modelCellKey('site', 'model-a', 'vip')), true);
       return { cell: { status: 'operational' }, test: { message: 'ok' } };
     },
     render: () => { renders += 1; }
@@ -102,7 +104,7 @@ test('runModelCellTest records cooldown and failure message on API error', async
 });
 
 test('runModelCellTest skips missing or already running cells', async () => {
-  const key = modelCellKey('site', 'model-a');
+  const key = modelCellKey('site', 'model-a', 'vip');
   const state = {
     testingCells: new Set([key]),
     modelTestMessage: '',
@@ -122,6 +124,7 @@ test('runModelCellTest skips missing or already running cells', async () => {
     state,
     siteName: 'site',
     model: 'model-a',
+    group: 'vip',
     postJsonImpl: async () => { posted = true; },
     render: () => {}
   }), false);

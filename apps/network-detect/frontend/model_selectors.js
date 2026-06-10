@@ -32,8 +32,8 @@ export function groupCellFor(row, siteName, group) {
     model: row.model,
     configured: true,
     groups: [group],
-    manualTest: cell.manualTest,
-    nextTestAllowedAt: cell.nextTestAllowedAt
+    manualTest: groupCell.manualTest,
+    nextTestAllowedAt: groupCell.nextTestAllowedAt
   });
 }
 

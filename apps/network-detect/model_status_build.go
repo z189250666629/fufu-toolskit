@@ -75,12 +75,18 @@ func buildModelStatus() *ModelStatus {
 				logKey := modelGroupLogKey(model, g)
 				gs := buildCell(site.Name, model, groupChans, successByMG[logKey], errorByMG[logKey], pricing[model])
 				gs.Groups = []string{g}
+				if rec, ok := testResults.Load(modelManualKey(site.Name, model, g)); ok {
+					gs.ManualTest = rec
+				}
+				if until, ok := testCooldowns.Load(modelManualKey(site.Name, model, g)); ok {
+					gs.NextTestAllowedAt = until.(int64)
+				}
 				cell.GroupStats[g] = gs
 			}
-			if rec, ok := testResults.Load(modelManualKey(site.Name, model)); ok {
+			if rec, ok := testResults.Load(modelManualKey(site.Name, model, "")); ok {
 				cell.ManualTest = rec
 			}
-			if until, ok := testCooldowns.Load(modelManualKey(site.Name, model)); ok {
+			if until, ok := testCooldowns.Load(modelManualKey(site.Name, model, "")); ok {
 				cell.NextTestAllowedAt = until.(int64)
 			}
 			row.PerSite[site.Name] = cell

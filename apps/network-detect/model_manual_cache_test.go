@@ -17,7 +17,7 @@ func TestApplyManualRecomputesCachedRowSummary(t *testing.T) {
 		},
 	}
 
-	applyManual(status, "site-a", "gpt-test", testRecord{OK: true, Status: "operational", TestedAt: 123}, 456)
+	applyManual(status, "site-a", "gpt-test", "", testRecord{OK: true, Status: "operational", TestedAt: 123}, 456)
 
 	row := status.Models[0]
 	if row.Status != "operational" || row.OperationalSites != 1 || row.ConfiguredSites != 1 {
