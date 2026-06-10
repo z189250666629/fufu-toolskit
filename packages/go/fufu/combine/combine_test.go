@@ -237,6 +237,28 @@ func TestHandleSearchKeysRejectsBlankOnlyKeys(t *testing.T) {
 	}
 }
 
+func TestHandleSearchKeysRedactsLookupErrorsFromPublicAPI(t *testing.T) {
+	app := NewApp(Config{URL: "http://internal.example.local/%zz", Token: "secret-token", UserID: "1"}, nil)
+	secretKey := "sk-public-search-secret-1234567890"
+	req := httptest.NewRequest(http.MethodPost, "/api/search-keys", strings.NewReader(`{"keys":["`+secretKey+`"]}`))
+	w := httptest.NewRecorder()
+
+	app.handleSearchKeys(w, req)
+
+	body := strings.TrimSpace(w.Body.String())
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	if body != `{"error":"查询失败，请稍后重试"}` {
+		t.Fatalf("expected safe public error, got %s", body)
+	}
+	for _, leaked := range []string{"internal.example.local", "%zz", "parse", "invalid URL", "secret-token", secretKey} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("search-keys error leaked %q in %s", leaked, body)
+		}
+	}
+}
+
 func TestHandleMergeRejectsEmptyKeysBeforeQueuing(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/merge", strings.NewReader(`{"keys":["  ","sk-"]}`))

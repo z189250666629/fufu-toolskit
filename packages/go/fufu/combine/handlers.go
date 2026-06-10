@@ -55,12 +55,14 @@ func (a *App) handleSearchKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	keys, found, missing, err := a.resolveTokensForSearch(r.Context(), keys)
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		log.Printf("combine search token lookup failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "查询失败，请稍后重试"})
 		return
 	}
 	traceResults, err := a.traceResultsForKeys(r.Context(), keys)
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		log.Printf("combine search trace lookup failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "查询失败，请稍后重试"})
 		return
 	}
 	writeJSON(w, 200, buildSearchKeysResponse(keys, found, missing, a.quotaUnit, time.Since(started).Milliseconds(), traceResults))
