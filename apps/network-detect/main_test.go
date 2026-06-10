@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fufu/combine"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -54,6 +55,11 @@ func TestCombineAPIRoutes(t *testing.T) {
 	}
 	if isCombineAPI("/api/health") {
 		t.Fatalf("network health endpoint should not be routed to combine app")
+	}
+	for _, path := range []string{"/api/auth", "/api/session", "/api/search-keys", "/api/merge", "/api/public-merge", "/api/generate", "/api/merge-status/job-1", "/api/token/1", "/api/health"} {
+		if isCombineAPI(path) != combine.IsAPIPath(path) {
+			t.Fatalf("%s route mismatch: network=%v combine=%v", path, isCombineAPI(path), combine.IsAPIPath(path))
+		}
 	}
 }
 

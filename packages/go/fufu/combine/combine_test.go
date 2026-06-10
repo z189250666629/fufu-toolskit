@@ -109,9 +109,27 @@ func TestPublicAPIRoutes(t *testing.T) {
 		if !isPublicAPI(path) {
 			t.Fatalf("%s should be public", path)
 		}
+		if !IsAPIPath(path) {
+			t.Fatalf("%s should be a combine API path", path)
+		}
 	}
 	if isPublicAPI("/api/session") {
 		t.Fatalf("session endpoint should require authentication")
+	}
+	if IsAPIPath("/api/health") {
+		t.Fatalf("network health endpoint should not be a combine API path")
+	}
+}
+
+func TestHandleAPIRejectsWrongMethodWithMethodNotAllowed(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/auth", nil)
+	w := httptest.NewRecorder()
+
+	app.handleAPI(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed || strings.TrimSpace(w.Body.String()) != `{"error":"Only POST"}` {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
 }
 

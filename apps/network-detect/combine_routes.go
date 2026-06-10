@@ -4,7 +4,6 @@ import (
 	"fufu/combine"
 	"fufu/config"
 	"path/filepath"
-	"strings"
 )
 
 func setupCombine() {
@@ -23,5 +22,5 @@ func setupCombine() {
 }
 
 func isCombineAPI(path string) bool {
-	return path == "/api/auth" || path == "/api/session" || path == "/api/search-keys" || path == "/api/merge" || path == "/api/public-merge" || path == "/api/generate" || strings.HasPrefix(path, "/api/merge-status/") || strings.HasPrefix(path, "/api/token/")
+	return combine.IsAPIPath(path)
 }

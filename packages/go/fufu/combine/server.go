@@ -19,10 +19,20 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func isPublicAPI(path string) bool {
-	return path == "/api/auth" || path == "/api/search-keys" || path == "/api/public-merge" || strings.HasPrefix(path, "/api/merge-status/")
+	route, ok := findAPIPath(path)
+	return ok && route.Public
 }
 
 func (a *App) handleAPI(w http.ResponseWriter, r *http.Request) {
+	route, ok := findAPIPath(r.URL.Path)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
+		return
+	}
+	if r.Method != route.Method {
+		writeJSONError(w, http.StatusMethodNotAllowed, "Only "+route.Method)
+		return
+	}
 	if !isPublicAPI(r.URL.Path) {
 		role, ok := a.authenticate(r)
 		if !ok {
@@ -32,21 +42,21 @@ func (a *App) handleAPI(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(context.WithValue(r.Context(), roleContextKey, role))
 	}
 	switch {
-	case r.URL.Path == "/api/auth" && r.Method == http.MethodPost:
+	case r.URL.Path == "/api/auth":
 		a.handleAuth(w, r)
-	case r.URL.Path == "/api/session" && r.Method == http.MethodGet:
+	case r.URL.Path == "/api/session":
 		a.handleSession(w, r)
-	case r.URL.Path == "/api/search-keys" && r.Method == http.MethodPost:
+	case r.URL.Path == "/api/search-keys":
 		a.handleSearchKeys(w, r)
-	case r.URL.Path == "/api/merge" && r.Method == http.MethodPost:
+	case r.URL.Path == "/api/merge":
 		a.handleMerge(w, r)
-	case r.URL.Path == "/api/public-merge" && r.Method == http.MethodPost:
+	case r.URL.Path == "/api/public-merge":
 		a.handlePublicMerge(w, r)
-	case strings.HasPrefix(r.URL.Path, "/api/merge-status/") && r.Method == http.MethodGet:
+	case strings.HasPrefix(r.URL.Path, "/api/merge-status/"):
 		a.handleMergeStatus(w, r)
-	case r.URL.Path == "/api/generate" && r.Method == http.MethodPost:
+	case r.URL.Path == "/api/generate":
 		a.handleGenerate(w, r)
-	case strings.HasPrefix(r.URL.Path, "/api/token/") && r.Method == http.MethodDelete:
+	case strings.HasPrefix(r.URL.Path, "/api/token/"):
 		a.handleDeleteToken(w, r)
 	default:
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
