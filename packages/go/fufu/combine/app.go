@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 func LoadConfig(path string) (Config, error) { return loadConfig(path) }
@@ -40,12 +39,12 @@ func loadConfig(path string) (Config, error) {
 }
 
 func newApp(cfg Config, db *sql.DB) *App {
+	apiClient := newapi.NewClient(newapi.Site{Name: cfg.Name, URL: cfg.URL, Token: cfg.Token, UserID: cfg.UserID, QuotaUnit: cfg.QuotaUnit, Currency: "$", RechargeRatio: 1})
 	return &App{
-		config: cfg, apiURL: cfg.URL, apiToken: cfg.Token, userID: cfg.UserID, quotaUnit: cfg.QuotaUnit,
+		config: cfg, quotaUnit: cfg.QuotaUnit,
 		db:        db,
-		client:    &http.Client{Timeout: 60 * time.Second},
-		apiClient: newapi.NewClient(newapi.Site{Name: cfg.Name, URL: cfg.URL, Token: cfg.Token, UserID: cfg.UserID, QuotaUnit: cfg.QuotaUnit, Currency: "$", RechargeRatio: 1}),
-		tokenSvc:  tokens.NewService(newapi.NewClient(newapi.Site{Name: cfg.Name, URL: cfg.URL, Token: cfg.Token, UserID: cfg.UserID, QuotaUnit: cfg.QuotaUnit, Currency: "$", RechargeRatio: 1})),
+		apiClient: apiClient,
+		tokenSvc:  tokens.NewService(apiClient),
 		passwords: map[string]struct {
 			Hash string
 			Role Role

@@ -2,7 +2,6 @@ package combine
 
 import (
 	"context"
-	"fufu/newapi"
 	"fufu/tokens"
 	"sync"
 )
@@ -112,11 +111,4 @@ func (a *App) searchTokenByName(ctx context.Context, name string) (*tokens.Token
 		a.tokenSvc = tokens.NewService(a.apiClient)
 	}
 	return a.tokenSvc.SearchTokenByName(ctx, name)
-}
-
-func (a *App) apiRequest(ctx context.Context, method, endpoint string, body any) (APIResponse, map[string]any, error) {
-	if a.apiClient == nil {
-		a.apiClient = newapi.NewClient(newapi.Site{Name: a.config.Name, URL: a.apiURL, Token: a.apiToken, UserID: a.userID, QuotaUnit: a.quotaUnit, Currency: "$", RechargeRatio: 1})
-	}
-	return a.apiClient.Request(ctx, method, endpoint, body)
 }

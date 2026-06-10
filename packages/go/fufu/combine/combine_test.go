@@ -18,6 +18,26 @@ func TestEvaluatePublicMergeEligibility(t *testing.T) {
 	}
 }
 
+func TestNewAppSharesNewAPIClientWithTokenService(t *testing.T) {
+	app := newApp(Config{
+		Name:      "test",
+		URL:       "https://newapi.example.test",
+		Token:     "site-token",
+		UserID:    "user-1",
+		QuotaUnit: 123,
+	}, nil)
+
+	if app.apiClient == nil {
+		t.Fatalf("apiClient is nil")
+	}
+	if app.tokenSvc == nil {
+		t.Fatalf("tokenSvc is nil")
+	}
+	if app.tokenSvc.Client != app.apiClient {
+		t.Fatalf("tokenSvc.Client and app.apiClient should share the same instance")
+	}
+}
+
 func TestMergeLockRejectsConcurrentIDs(t *testing.T) {
 	app := &App{mergeLocks: map[int]struct{}{}}
 	if !app.acquireMergeLock([]int{1, 2}) {

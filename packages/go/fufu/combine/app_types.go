@@ -11,11 +11,7 @@ import (
 
 type App struct {
 	config    Config
-	apiURL    string
-	apiToken  string
-	userID    string
 	quotaUnit int64
-	client    *http.Client
 	apiClient *newapi.Client
 	tokenSvc  *tokens.Service
 	db        *sql.DB
