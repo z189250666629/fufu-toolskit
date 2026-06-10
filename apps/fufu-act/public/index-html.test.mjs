@@ -33,6 +33,18 @@ test('prize drawer reports load failures instead of silently swallowing them', a
   assert.doesNotMatch(fetchPrizesSource, /catch \(e\) \{ \/\* silent \*\/ \}/);
 });
 
+test('prize drawer uses backend weight metadata instead of hardcoded weights', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const fetchPrizesStart = source.indexOf('async function fetchPrizes()');
+  const fetchPrizesEnd = source.indexOf('function renderPrizeTable(rows)');
+  const fetchPrizesSource = source.slice(fetchPrizesStart, fetchPrizesEnd);
+
+  assert.match(fetchPrizesSource, /p\.weight/);
+  assert.match(fetchPrizesSource, /p\.totalWeight/);
+  assert.doesNotMatch(fetchPrizesSource, /const weights = \{/);
+  assert.doesNotMatch(fetchPrizesSource, /1:\s*1100/);
+});
+
 test('history refresh marks stale state without clearing previous rows', async () => {
   const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const refreshStart = source.indexOf('async function refreshHistory()');

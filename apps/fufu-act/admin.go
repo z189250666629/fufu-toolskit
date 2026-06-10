@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"fufu/activity"
 	"fufu/auth"
 	"net/http"
 	"os"
@@ -22,17 +23,45 @@ func handleAdminStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePrizes(w http.ResponseWriter, r *http.Request) {
-	prizes := []map[string]int{}
-	for _, p := range prizePool {
-		if p.Type == "win" {
-			prizes = append(prizes, map[string]int{"dollars": p.Dollars})
-		}
+	tierPoolsOut := map[string][]prizeWeightResponse{}
+	for dollars, pool := range activity.TierPools {
+		tierPoolsOut[strconv.Itoa(dollars)] = buildPrizeWeightRows(pool)
 	}
 	spinMapOut := map[string]int{}
 	for dollars, spins := range spinMap {
 		spinMapOut[strconv.FormatFloat(dollars, 'f', -1, 64)] = spins
 	}
-	writeJSON(w, 200, map[string]any{"prizes": prizes, "spinMap": spinMapOut})
+	writeJSON(w, 200, map[string]any{
+		"prizes":            buildPrizeWeightRows(prizePool),
+		"tierPools":         tierPoolsOut,
+		"postJackpotPrizes": buildPrizeWeightRows(activity.PostJackpotPool),
+		"spinMap":           spinMapOut,
+	})
+}
+
+type prizeWeightResponse struct {
+	Dollars     int `json:"dollars"`
+	Weight      int `json:"weight"`
+	TotalWeight int `json:"totalWeight"`
+}
+
+func buildPrizeWeightRows(pool []activity.Prize) []prizeWeightResponse {
+	total := sumPoolWeights(pool)
+	prizes := []prizeWeightResponse{}
+	for _, p := range pool {
+		if p.Type == "win" {
+			prizes = append(prizes, prizeWeightResponse{Dollars: p.Dollars, Weight: p.Weight, TotalWeight: total})
+		}
+	}
+	return prizes
+}
+
+func sumPoolWeights(pool []activity.Prize) int {
+	total := 0
+	for _, p := range pool {
+		total += p.Weight
+	}
+	return total
 }
 
 func buildAdminStats() (map[string]any, error) {

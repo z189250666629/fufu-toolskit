@@ -1475,14 +1475,10 @@
           serverErrorMessage: '奖池暂时无法加载',
           clientErrorMessage: '奖池暂时无法加载',
         });
-        const weights = {
-          1: 1100, 5: 2500, 10: 2000, 20: 2000,
-          50: 1300, 100: 600, 200: 300, 500: 195, 1000: 5,
-        };
-        const total = Object.values(weights).reduce((a, b) => a + b, 0);
         const rows = data.prizes.map(p => {
-          const w = weights[p.dollars] || 0;
-          return { dollars: p.dollars, pct: ((w / total) * 100).toFixed(2) };
+          const weight = Number(p.weight) || 0;
+          const totalWeight = Number(p.totalWeight) || 0;
+          return { dollars: p.dollars, pct: totalWeight > 0 ? ((weight / totalWeight) * 100).toFixed(2) : '0.00' };
         });
         renderPrizeTable(rows);
       } catch (e) {
