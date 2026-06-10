@@ -378,6 +378,26 @@ func TestAddQuotaUsesDefaultQuotaUnitWhenServiceQuotaUnitUnset(t *testing.T) {
 	}
 }
 
+func TestAddQuotaReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{map[string]any{"id": 8, "key": "quota-key-456", "name": "quota-card", "remain_quota": 10, "status": 1}}})
+		case r.Method == http.MethodPut && r.URL.Path == "/api/token/":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "quota update denied"})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	err := svc.AddQuota(context.Background(), "sk-quota-key-456", 1)
+	if err == nil || !strings.Contains(err.Error(), "quota update denied") {
+		t.Fatalf("expected payload error, got %v", err)
+	}
+}
+
 func TestGetTokenReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/token/9" {

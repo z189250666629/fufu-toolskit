@@ -99,12 +99,15 @@ func (s *Service) AddQuota(ctx context.Context, key string, dollars int64) error
 			raw["name"] = truncated
 		}
 	}
-	res, _, err := s.UpdateTokenRaw(ctx, raw)
+	res, data, err := s.UpdateTokenRaw(ctx, raw)
 	if err != nil {
 		return err
 	}
 	if !res.OK() {
 		return fmt.Errorf("fufu PUT failed: %s", res.BodyOr(strconv.Itoa(res.StatusCode)))
+	}
+	if !newapi.IsSuccess(data) {
+		return fmt.Errorf("%s", newapi.ErrorMessage(data, res.StatusCode, "fufu quota update failed"))
 	}
 	return nil
 }
