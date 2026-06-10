@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"fufu/newapi"
@@ -113,6 +114,16 @@ func TestLoadPrimarySitePrefersEnvThenConfigFile(t *testing.T) {
 			t.Fatalf("file defaults not applied: %#v", site)
 		}
 	})
+}
+
+func TestLoadPrimarySiteReportsManagedSiteConfigErrorWhenNoLegacyConfig(t *testing.T) {
+	clearPrimaryEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `not-json`)
+
+	_, err := LoadPrimarySite(t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "NEWAPI_MANAGED_API_SITES 不是有效 JSON") {
+		t.Fatalf("expected managed-site config error, got %v", err)
+	}
 }
 
 func clearPrimaryEnv(t *testing.T) {

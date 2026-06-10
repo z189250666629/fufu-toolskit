@@ -28,7 +28,8 @@ func LoadPrimarySite(rootDir string) (newapi.Site, error) {
 	if url != "" && token != "" {
 		return newapi.Site{Name: stringOrDefault(Env("FUFU_COMBINE_NAME"), "次数fufu"), URL: url, Token: token, UserID: stringOrDefault(Env("FUFU_COMBINE_USER_ID"), stringOrDefault(Env("FUFU_API_USER_ID"), "1")), QuotaUnit: int64Value(stringOrDefault(Env("FUFU_COMBINE_QUOTA_UNIT"), Env("FUFU_QUOTA_UNIT")), newapi.DefaultQuotaUnit), Currency: "$", RechargeRatio: 1}, nil
 	}
-	if sites, _ := LoadManagedSites(rootDir); len(sites) > 0 {
+	sites, managedMsg := LoadManagedSites(rootDir)
+	if len(sites) > 0 {
 		return sites[0], nil
 	}
 	for _, path := range []string{filepath.Join(rootDir, "config.json")} {
@@ -49,6 +50,9 @@ func LoadPrimarySite(rootDir string) (newapi.Site, error) {
 			}
 			return newapi.Site{Name: stringOrDefault(cfg.Name, "次数fufu"), URL: NormalizeBaseURL(cfg.URL), Token: strings.TrimSpace(cfg.Token), UserID: cfg.UserID, QuotaUnit: cfg.QuotaUnit, Currency: "$", RechargeRatio: 1}, nil
 		}
+	}
+	if managedMsg != "" {
+		return newapi.Site{}, fmt.Errorf("%s", managedMsg)
 	}
 	return newapi.Site{}, fmt.Errorf("missing NewAPI primary site config")
 }
