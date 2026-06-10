@@ -24,3 +24,17 @@ func TestDecodeResponsePayloadToleratesEmptyAndInvalidBodies(t *testing.T) {
 		t.Fatalf("invalid payload = %#v", data)
 	}
 }
+
+func TestDecodeResponsePayloadRejectsTrailingJSONValue(t *testing.T) {
+	if data := decodeResponsePayload([]byte(`{"success":true} {}`)); len(data) != 0 {
+		t.Fatalf("trailing JSON payload = %#v", data)
+	}
+}
+
+func TestDecodeResponsePayloadAllowsTrailingWhitespace(t *testing.T) {
+	data := decodeResponsePayload([]byte("{\"success\":true}\n\t "))
+
+	if data["success"] != true {
+		t.Fatalf("payload with trailing whitespace = %#v", data)
+	}
+}
