@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/y2k-nav .
 FROM ${RUNTIME_IMAGE}
 WORKDIR /app
 RUN apk add --no-cache ca-certificates wget
-COPY --from=build /out/y2k-nav /app/y2k-nav
+COPY --from=build /out/y2k-nav /usr/local/bin/y2k-nav
 COPY apps/y2k-nav/index.html ./index.html
 COPY apps/y2k-nav/latency.mjs ./latency.mjs
 COPY apps/y2k-nav/theme.mjs ./theme.mjs
@@ -21,4 +21,4 @@ EXPOSE 80
 ENV PORT=80
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=5s \
   CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1
-CMD ["/app/y2k-nav"]
+CMD ["/usr/local/bin/y2k-nav"]

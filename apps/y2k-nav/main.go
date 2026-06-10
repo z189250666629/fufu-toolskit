@@ -62,10 +62,23 @@ func newStaticHandler(root string) http.Handler {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
+		if !isPublicBrowserAsset(path) {
+			http.NotFound(w, r)
+			return
+		}
 		if _, err := os.Stat(file); err != nil {
 			http.NotFound(w, r)
 			return
 		}
 		webutil.ServeFile(w, r, file, strings.HasSuffix(file, ".html"))
 	})
+}
+
+func isPublicBrowserAsset(path string) bool {
+	switch path {
+	case "/index.html", "/theme.mjs", "/latency.mjs":
+		return true
+	default:
+		return false
+	}
 }

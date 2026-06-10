@@ -14,16 +14,27 @@ function localModuleImports(html) {
 }
 
 function runtimeCopySources(file) {
+  return runtimeCopyInstructions(file).flatMap(({ sources }) => sources);
+}
+
+function runtimeCopyInstructions(file) {
   const runtimeStage = file.split(/\r?\nFROM\b/i).at(-1);
   return runtimeStage
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#') && /^COPY\b/i.test(line))
-    .flatMap((line) => {
+    .map((line) => {
       const parts = line.split(/\s+/).slice(1).filter((part) => !part.startsWith('--'));
-      return parts.slice(0, -1);
+      return { sources: parts.slice(0, -1), destination: parts.at(-1) ?? '' };
     })
-    .map((source) => source.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/$/, ''));
+    .map(({ sources, destination }) => ({
+      sources: sources.map(normalizeDockerPath),
+      destination: normalizeDockerPath(destination)
+    }));
+}
+
+function normalizeDockerPath(value) {
+  return value.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/$/, '');
 }
 
 test('dockerfile copies all y2k module assets referenced by index', () => {
@@ -37,5 +48,15 @@ test('dockerfile copies all y2k module assets referenced by index', () => {
       sources.some((source) => source === expected || expected.startsWith(`${source}/`)),
       `${expected} must be copied into the runtime image; COPY sources were ${JSON.stringify(sources)}`
     );
+  }
+});
+
+test('dockerfile keeps server binary outside the static document root', () => {
+  const instructions = runtimeCopyInstructions(dockerfile);
+  const binaryCopies = instructions.filter(({ sources }) => sources.includes('/out/y2k-nav'));
+  assert.ok(binaryCopies.length > 0, 'expected runtime image to copy the built y2k-nav binary');
+  for (const copy of binaryCopies) {
+    assert.notEqual(copy.destination, '/app/y2k-nav', 'server binary must not be copied into the /app static root');
+    assert.notEqual(copy.destination, 'y2k-nav', 'server binary must not be copied into the relative static root');
   }
 });

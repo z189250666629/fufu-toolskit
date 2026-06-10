@@ -100,6 +100,67 @@ func TestStaticHandlerDisablesHTMLCaching(t *testing.T) {
 	}
 }
 
+func TestStaticHandlerServesOnlyBrowserAssets(t *testing.T) {
+	root := t.TempDir()
+	allowed := map[string]string{
+		"/":            "index marker",
+		"/index.html":  "index marker",
+		"/theme.mjs":   "theme marker",
+		"/latency.mjs": "latency marker",
+	}
+	for path, marker := range map[string]string{
+		"index.html":             "index marker",
+		"theme.mjs":              "theme marker",
+		"latency.mjs":            "latency marker",
+		"main.go":                "secret source marker",
+		"main_test.go":           "secret test marker",
+		"Dockerfile":             "secret docker marker",
+		"package.json":           "secret package marker",
+		"go.mod":                 "secret gomod marker",
+		"docker_assets.test.mjs": "secret docker test marker",
+		"theme.test.mjs":         "secret theme test marker",
+		"latency.test.mjs":       "secret latency test marker",
+		"y2k-nav":                "secret binary marker",
+		"y2k-nav.exe":            "secret windows binary marker",
+		"tests/snapshot.txt":     "secret nested test marker",
+		"src/debug.txt":          "secret nested source marker",
+		".env.local":             "secret env marker",
+	} {
+		fullPath := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(fullPath, []byte(marker), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler := newStaticHandler(root)
+
+	for path, marker := range allowed {
+		t.Run("allow "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), marker) {
+				t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+	for _, path := range []string{"/main.go", "/main_test.go", "/Dockerfile", "/package.json", "/go.mod", "/docker_assets.test.mjs", "/theme.test.mjs", "/latency.test.mjs", "/y2k-nav", "/y2k-nav.exe", "/tests/snapshot.txt", "/src/debug.txt", "/.env.local"} {
+		t.Run("block "+path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if w.Code == http.StatusOK {
+				t.Fatalf("%s should not be served from runtime root: code=%d body=%s", path, w.Code, w.Body.String())
+			}
+			if strings.Contains(w.Body.String(), "secret ") {
+				t.Fatalf("%s leaked blocked file content: %s", path, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestStaticHandlerRejectsUnsafeOrWrongMethodRequests(t *testing.T) {
 	root := t.TempDir()
 	for _, tc := range []struct {
