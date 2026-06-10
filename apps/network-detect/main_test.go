@@ -63,6 +63,47 @@ func TestCombineAPIRoutes(t *testing.T) {
 	}
 }
 
+func TestNetworkAPIRouteMethods(t *testing.T) {
+	cases := []struct {
+		path   string
+		method string
+	}{
+		{path: "/api/health", method: http.MethodGet},
+		{path: "/api/client", method: http.MethodGet},
+		{path: "/api/connectivity/targets", method: http.MethodGet},
+		{path: "/api/newapi/sites", method: http.MethodGet},
+		{path: "/api/newapi/model-status", method: http.MethodGet},
+		{path: "/api/newapi/overview", method: http.MethodGet},
+		{path: "/api/newapi/model-status/test", method: http.MethodPost},
+	}
+
+	for _, tc := range cases {
+		route, ok := findNetworkAPIPath(tc.path)
+		if !ok {
+			t.Fatalf("%s should be a network API route", tc.path)
+		}
+		if route.Method != tc.method {
+			t.Fatalf("%s method=%s, want %s", tc.path, route.Method, tc.method)
+		}
+	}
+	for _, path := range []string{"/api/auth", "/api/merge-status/job-1", "/api/unknown"} {
+		if _, ok := findNetworkAPIPath(path); ok {
+			t.Fatalf("%s should not be a network-owned API route", path)
+		}
+	}
+}
+
+func TestHandleAPIRejectsWrongNetworkMethodBeforeHandler(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/newapi/sites", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed || strings.TrimSpace(w.Body.String()) != `{"error":"Only GET is supported"}` {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestWriteJSONErrorUsesStablePayload(t *testing.T) {
 	w := httptest.NewRecorder()
 

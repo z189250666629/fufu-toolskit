@@ -43,26 +43,23 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := r.URL.Path
-	switch {
-	case path == "/api/health":
-		if !requireMethod(w, r, http.MethodGet) {
-			return
-		}
+	route, ok := findNetworkAPIPath(path)
+	if !ok {
+		writeJSONError(w, 404, "API not found")
+		return
+	}
+	if !requireMethod(w, r, route.Method) {
+		return
+	}
+
+	switch path {
+	case "/api/health":
 		writeJSON(w, 200, map[string]any{"ok": true})
-	case path == "/api/client":
-		if !requireMethod(w, r, http.MethodGet) {
-			return
-		}
+	case "/api/client":
 		writeJSON(w, 200, map[string]any{"ip": clientIP(r), "serverTime": time.Now().UnixMilli(), "origin": r.Header.Get("Origin"), "userAgent": r.UserAgent()})
-	case path == "/api/connectivity/targets":
-		if !requireMethod(w, r, http.MethodGet) {
-			return
-		}
+	case "/api/connectivity/targets":
 		writeJSON(w, 200, map[string]any{"groups": connectivityGroups()})
-	case path == "/api/newapi/sites":
-		if !requireMethod(w, r, http.MethodGet) {
-			return
-		}
+	case "/api/newapi/sites":
 		sites, msg := config.LoadManagedSites(rootDir)
 		publics := []newapi.PublicSite{}
 		for _, s := range sites {
@@ -73,10 +70,7 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 			status = 500
 		}
 		writeJSON(w, status, map[string]any{"configured": len(sites) > 0, "error": msg, "sites": publics})
-	case path == "/api/newapi/model-status":
-		if !requireMethod(w, r, http.MethodGet) {
-			return
-		}
+	case "/api/newapi/model-status":
 		force := r.URL.Query().Get("refresh") == "1"
 		status := getModelStatus(force)
 		code := 200
@@ -84,16 +78,10 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 			code = 500
 		}
 		writeJSON(w, code, status)
-	case path == "/api/newapi/overview":
-		if !requireMethod(w, r, http.MethodGet) {
-			return
-		}
+	case "/api/newapi/overview":
 		overview := buildOverview(r.URL.Query())
 		writeJSON(w, 200, overview)
-	case path == "/api/newapi/model-status/test":
-		if !requireMethod(w, r, http.MethodPost) {
-			return
-		}
+	case "/api/newapi/model-status/test":
 		handleModelTest(w, r)
 	default:
 		writeJSONError(w, 404, "API not found")
