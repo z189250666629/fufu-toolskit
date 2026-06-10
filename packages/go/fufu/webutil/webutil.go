@@ -49,9 +49,13 @@ func IsPublicStaticPath(urlPath string) bool {
 		if strings.HasPrefix(segment, ".") {
 			return false
 		}
+		switch strings.ToLower(segment) {
+		case "__tests__", "tests", "testdata", "coverage":
+			return false
+		}
 	}
-	base := filepath.Base(filepath.FromSlash(urlPath))
-	return !strings.Contains(strings.ToLower(base), ".test.")
+	base := strings.ToLower(filepath.Base(filepath.FromSlash(urlPath)))
+	return !strings.Contains(base, ".test.") && !strings.Contains(base, ".spec.")
 }
 
 func NewHTTPServer(addr string, handler http.Handler) *http.Server {

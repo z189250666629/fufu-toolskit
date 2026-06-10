@@ -26,6 +26,32 @@ func TestSafePathStaysInsideRoot(t *testing.T) {
 	}
 }
 
+func TestIsPublicStaticPathRejectsTestArtifactsAndDotfiles(t *testing.T) {
+	for _, path := range []string{
+		"/app.test.mjs",
+		"/api.spec.mjs",
+		"/__tests__/fixture.js",
+		"/tests/snapshot.txt",
+		"/testdata/secret.json",
+		"/coverage/lcov.info",
+		"/.env.local",
+		"/assets/.secret/config.json",
+	} {
+		if IsPublicStaticPath(path) {
+			t.Fatalf("%s should not be public static content", path)
+		}
+	}
+	for _, path := range []string{
+		"/index.html",
+		"/assets/app.js",
+		"/styles/models/results.css",
+	} {
+		if !IsPublicStaticPath(path) {
+			t.Fatalf("%s should be public static content", path)
+		}
+	}
+}
+
 func TestWriteJSONSetsNoStoreAndContentType(t *testing.T) {
 	rec := httptest.NewRecorder()
 
