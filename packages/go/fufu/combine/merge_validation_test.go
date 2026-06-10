@@ -57,6 +57,23 @@ func TestValidateExecuteMergeRequestGuestPublicEligibility(t *testing.T) {
 	}
 }
 
+func TestValidateExecuteMergeRequestRejectsUnsupportedIntervalUnits(t *testing.T) {
+	for _, unit := range []int{0, 60, -1} {
+		params := ExecuteMergeParams{Role: RoleAdmin, IntervalUnit: unit}
+		err := validateExecuteMergeRequest(params, []ResolvedToken{{ID: 1, IntervalUnit: publicSourceUnit}})
+		if err == nil || !strings.Contains(err.Error(), "卡类型无效") {
+			t.Fatalf("unit %d err = %v", unit, err)
+		}
+	}
+
+	for _, unit := range []int{3, 8, 9} {
+		params := ExecuteMergeParams{Role: RoleAdmin, IntervalUnit: unit}
+		if err := validateExecuteMergeRequest(params, []ResolvedToken{{ID: 1, IntervalUnit: publicSourceUnit}}); err != nil {
+			t.Fatalf("allowed unit %d err = %v", unit, err)
+		}
+	}
+}
+
 func TestValidateExecuteMergeRequestRejectsTokensWithoutPositiveIDs(t *testing.T) {
 	params := ExecuteMergeParams{Role: RoleAdmin, IntervalUnit: 8}
 	tokens := []ResolvedToken{

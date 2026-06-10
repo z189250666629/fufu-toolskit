@@ -12,6 +12,9 @@ func validateExecuteMergeRequest(p ExecuteMergeParams, tokens []ResolvedToken) e
 			return fmt.Errorf("Token ID 无效：%s", keyMask(token.Key))
 		}
 	}
+	if !isAllowedMergeIntervalUnit(p.IntervalUnit) {
+		return errors.New("卡类型无效")
+	}
 	if p.Role == RoleGuest {
 		if p.CustomQuota || p.TotalQuota != nil || strings.TrimSpace(p.Name) != "" {
 			return errors.New("普通免登录合卡不支持指定额度或自定义命名")
@@ -50,4 +53,8 @@ func validateExecuteMergeRequest(p ExecuteMergeParams, tokens []ResolvedToken) e
 		return errors.New("无权指定额度")
 	}
 	return nil
+}
+
+func isAllowedMergeIntervalUnit(unit int) bool {
+	return unit == publicSourceUnit || unit == publicTargetUnit || unit == 9
 }
