@@ -8,6 +8,7 @@ const scriptsDirUrl = new URL('./', import.meta.url);
 const scriptsDir = fileURLToPath(scriptsDirUrl);
 const repoRootUrl = new URL('../', scriptsDirUrl);
 const repoRoot = fileURLToPath(repoRootUrl);
+const shellQuote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
 
 async function shellScripts() {
   return (await readdir(scriptsDirUrl))
@@ -70,7 +71,6 @@ test('deploy script cleans compose env file when deployment fails', { skip: bash
     await chmod(commandUrl, 0o755);
   }
 
-  const shellQuote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
   const envAssignments = {
     APP_NAME: 'fufu-act',
     APP_IMAGE: 'example/app',
@@ -104,4 +104,69 @@ test('deploy script cleans compose env file when deployment fails', { skip: bash
     { code: 'ENOENT' },
     'compose env file should be removed after failed deployment'
   );
+});
+
+test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
+  const tmpName = `.tmp/deploy-script-spaces-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
+  const fakeBinRel = `${tmpName}/bin`;
+  const composeRel = `${tmpName}/docker-compose.yml`;
+  const composeEnvRel = `${tmpName}/compose.env`;
+  const keyRel = `${tmpName}/home/key with spaces/id_ed25519`;
+
+  t.after(() => rm(tmpUrl, { recursive: true, force: true }));
+  await mkdir(new URL('bin/', tmpUrl), { recursive: true });
+  await mkdir(new URL('home/key with spaces/', tmpUrl), { recursive: true });
+  await writeFile(new URL('docker-compose.yml', tmpUrl), 'services:\n  app:\n    image: ${APP_IMAGE}:${APP_TAG}\n');
+
+  const checkKeyArg = [
+    '#!/usr/bin/env bash',
+    'while [ "$#" -gt 0 ]; do',
+    '  if [ "$1" = "-i" ]; then',
+    '    if [ "${2:-}" != "$EXPECTED_SSH_KEY_PATH" ]; then',
+    '      printf "bad ssh key path argument: <%s>\\n" "${2:-}" >&2',
+    '      exit 44',
+    '    fi',
+    '    exit 0',
+    '  fi',
+    '  shift',
+    'done',
+    'printf "missing -i ssh key argument\\n" >&2',
+    'exit 45',
+    ''
+  ].join('\n');
+  for (const [name, body] of Object.entries({
+    'ssh-keygen': '#!/usr/bin/env bash\nexit 0\n',
+    'ssh-keyscan': '#!/usr/bin/env bash\nprintf "example ssh-rsa test\\n"\n',
+    ssh: checkKeyArg,
+    scp: checkKeyArg
+  })) {
+    const commandUrl = new URL(`bin/${name}`, tmpUrl);
+    await writeFile(commandUrl, body);
+    await chmod(commandUrl, 0o755);
+  }
+
+  const envAssignments = {
+    APP_NAME: 'y2k-nav',
+    APP_IMAGE: 'example/y2k',
+    APP_TAG: 'test',
+    SSH_HOST: 'example.test',
+    SSH_USER: 'deploy',
+    SSH_PRIVATE_KEY: 'fake-key',
+    SSH_KEY_PATH: keyRel,
+    EXPECTED_SSH_KEY_PATH: keyRel,
+    DEPLOY_PATH: '/srv/fufu',
+    COMPOSE_FILE: composeRel,
+    COMPOSE_SERVICE_NAME: 'app',
+    COMPOSE_ENV_FILE: composeEnvRel,
+    HOME: `${tmpName}/home`
+  };
+  const command = [
+    `PATH="$PWD/${fakeBinRel}:$PATH"`,
+    ...Object.entries(envAssignments).map(([name, value]) => `${name}=${shellQuote(value)}`),
+    'bash scripts/deploy-docker-app.sh'
+  ].join(' ');
+  const result = spawnSync('bash', ['-c', command], { cwd: repoRoot, encoding: 'utf8' });
+
+  assert.equal(result.status, 0, `ssh/scp should receive SSH_KEY_PATH as one argument\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
 });

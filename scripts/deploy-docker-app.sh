@@ -45,7 +45,7 @@ REGISTRY="${REGISTRY:-ghcr.io}"
 SSH_PORT="${SSH_PORT:-22}"
 SSH_TARGET="$SSH_USER@$SSH_HOST"
 SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/.ssh/id_ed25519}"
-SSH_OPTS="-i $SSH_KEY_PATH -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+SSH_OPTS=(-i "$SSH_KEY_PATH" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
 COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-.deploy.env}"
 REMOTE_COMPOSE_FILE="$(basename "$COMPOSE_FILE")"
 CONTAINER_NAME="${CONTAINER_NAME:-$APP_NAME}"
@@ -119,25 +119,25 @@ case "$APP_NAME" in
 esac
 
 log "preparing remote directory $SSH_TARGET:$DEPLOY_PATH"
-ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_TARGET" "set -eu; mkdir -p '$DEPLOY_PATH' '$DEPLOY_PATH/data'"
+ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" "set -eu; mkdir -p '$DEPLOY_PATH' '$DEPLOY_PATH/data'"
 
 log "uploading compose and env files"
-scp $SSH_OPTS -P "$SSH_PORT" "$COMPOSE_FILE" "$SSH_TARGET:$DEPLOY_PATH/$REMOTE_COMPOSE_FILE"
-scp $SSH_OPTS -P "$SSH_PORT" "$COMPOSE_ENV_FILE" "$SSH_TARGET:$DEPLOY_PATH/.env"
+scp "${SSH_OPTS[@]}" -P "$SSH_PORT" "$COMPOSE_FILE" "$SSH_TARGET:$DEPLOY_PATH/$REMOTE_COMPOSE_FILE"
+scp "${SSH_OPTS[@]}" -P "$SSH_PORT" "$COMPOSE_ENV_FILE" "$SSH_TARGET:$DEPLOY_PATH/.env"
 if [ -n "$CONFIG_JSON_FILE" ]; then
-  scp $SSH_OPTS -P "$SSH_PORT" "$CONFIG_JSON_FILE" "$SSH_TARGET:$DEPLOY_PATH/config.json"
+  scp "${SSH_OPTS[@]}" -P "$SSH_PORT" "$CONFIG_JSON_FILE" "$SSH_TARGET:$DEPLOY_PATH/config.json"
 fi
 
 REGISTRY_USER_VALUE="${REGISTRY_USER:-${GHCR_USERNAME:-}}"
 REGISTRY_PASSWORD_VALUE="${REGISTRY_PASSWORD:-${GHCR_TOKEN:-}}"
 if [ -n "$REGISTRY_USER_VALUE" ] && [ -n "$REGISTRY_PASSWORD_VALUE" ]; then
   log "logging remote docker into $REGISTRY"
-  printf '%s' "$REGISTRY_PASSWORD_VALUE" | ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_TARGET" \
+  printf '%s' "$REGISTRY_PASSWORD_VALUE" | ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" \
     "docker login '$REGISTRY' -u '$REGISTRY_USER_VALUE' --password-stdin"
 fi
 
 log "deploying $APP_IMAGE:$APP_TAG"
-ssh $SSH_OPTS -p "$SSH_PORT" "$SSH_TARGET" "
+ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" "
   set -eu
   cd '$DEPLOY_PATH'
   docker compose --env-file .env -f '$REMOTE_COMPOSE_FILE' config --quiet
