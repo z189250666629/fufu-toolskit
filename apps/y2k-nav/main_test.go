@@ -15,6 +15,36 @@ func TestDefaultPortConstant(t *testing.T) {
 	}
 }
 
+func TestResolvePortUsesDefaultWhenEmpty(t *testing.T) {
+	port, err := resolvePort(" \t ")
+	if err != nil {
+		t.Fatalf("resolvePort returned error: %v", err)
+	}
+	if port != defaultPort {
+		t.Fatalf("port = %q, want default %q", port, defaultPort)
+	}
+}
+
+func TestResolvePortTrimsValidPort(t *testing.T) {
+	port, err := resolvePort(" 18820 ")
+	if err != nil {
+		t.Fatalf("resolvePort returned error: %v", err)
+	}
+	if port != "18820" {
+		t.Fatalf("port = %q, want 18820", port)
+	}
+}
+
+func TestResolvePortRejectsInvalidPort(t *testing.T) {
+	for _, value := range []string{"abc", "0", "-1", "65536", "80/tcp"} {
+		t.Run(value, func(t *testing.T) {
+			if port, err := resolvePort(value); err == nil {
+				t.Fatalf("resolvePort(%q) = %q, nil; want error", value, port)
+			}
+		})
+	}
+}
+
 func TestStaticHandlerServesRootIndex(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "index.html"), []byte("y2k home"), 0644); err != nil {

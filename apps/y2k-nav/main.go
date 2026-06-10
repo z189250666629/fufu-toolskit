@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"fufu/webutil"
@@ -13,14 +14,30 @@ const defaultPort = "33148"
 
 func main() {
 	wd, _ := os.Getwd()
-	port := strings.TrimSpace(os.Getenv("PORT"))
-	if port == "" {
-		port = defaultPort
+	port, err := resolvePort(os.Getenv("PORT"))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid PORT: %v\n", err)
+		os.Exit(1)
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/", newStaticHandler(wd))
 	fmt.Printf("y2k-nav Go static server listening on :%s\n", port)
 	panic(http.ListenAndServe("0.0.0.0:"+port, mux))
+}
+
+func resolvePort(value string) (string, error) {
+	port := strings.TrimSpace(value)
+	if port == "" {
+		return defaultPort, nil
+	}
+	number, err := strconv.Atoi(port)
+	if err != nil {
+		return "", fmt.Errorf("must be a number between 1 and 65535")
+	}
+	if number < 1 || number > 65535 {
+		return "", fmt.Errorf("must be between 1 and 65535")
+	}
+	return port, nil
 }
 
 func newStaticHandler(root string) http.Handler {
