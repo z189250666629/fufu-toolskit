@@ -52,6 +52,43 @@ func TestIsPublicStaticPathRejectsTestArtifactsAndDotfiles(t *testing.T) {
 	}
 }
 
+func TestReferencedBrowserAssetPathsFollowsLocalHTMLJSCSSReferences(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"index.html":      `<link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script><a href="https://example.test/ignored.css">x</a>`,
+		"app.js":          `import { boot } from "./boot.js"; import "./side-effect.js"; const lazy = import("./lazy.js"); export { thing } from "./exported.js";`,
+		"boot.js":         `export function boot() {}`,
+		"side-effect.js":  `export const ok = true;`,
+		"lazy.js":         `export const lazy = true;`,
+		"exported.js":     `export const thing = true;`,
+		"styles.css":      `@import url("./styles/base.css");`,
+		"styles/base.css": `.app { color: green; }`,
+		"debug.js":        `window.__debug = true;`,
+	}
+	for name, body := range files {
+		file := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	allowed := ReferencedBrowserAssetPaths(root, []string{"/index.html"})
+
+	for _, path := range []string{"/index.html", "/app.js", "/boot.js", "/side-effect.js", "/lazy.js", "/exported.js", "/styles.css", "/styles/base.css"} {
+		if _, ok := allowed[path]; !ok {
+			t.Fatalf("%s should be included in referenced browser asset allowlist: %#v", path, allowed)
+		}
+	}
+	for _, path := range []string{"/debug.js", "https://example.test/ignored.css"} {
+		if _, ok := allowed[path]; ok {
+			t.Fatalf("%s should not be included in referenced browser asset allowlist", path)
+		}
+	}
+}
+
 func TestWriteJSONSetsNoStoreAndContentType(t *testing.T) {
 	rec := httptest.NewRecorder()
 

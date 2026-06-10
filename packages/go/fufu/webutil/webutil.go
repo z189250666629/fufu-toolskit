@@ -6,7 +6,9 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +60,136 @@ func IsPublicStaticPath(urlPath string) bool {
 	}
 	base := strings.ToLower(filepath.Base(filepath.FromSlash(urlPath)))
 	return !strings.Contains(base, ".test.") && !strings.Contains(base, ".spec.")
+}
+
+var (
+	browserAttrRefPattern         = regexp.MustCompile(`(?i)\b(?:src|href)\s*=\s*["']([^"']+)["']`)
+	browserJSImportPattern        = regexp.MustCompile(`\bimport\s+(?:[^"']*?\s+from\s+)?["']([^"']+)["']`)
+	browserJSDynamicImportPattern = regexp.MustCompile(`\bimport\s*\(\s*["']([^"']+)["']\s*\)`)
+	browserJSExportPattern        = regexp.MustCompile(`\bexport\s+[^"']*?\s+from\s+["']([^"']+)["']`)
+	browserCSSImportPattern       = regexp.MustCompile(`(?i)@import\s+(?:url\(\s*)?["']?([^"')\s]+)["']?\s*\)?`)
+)
+
+// ReferencedBrowserAssetPaths returns the static browser assets reachable from
+// the provided HTML/CSS/JS entrypoints. It builds a positive allowlist so source
+// files that merely exist in the public directory are not exposed unless the app
+// actually references them.
+func ReferencedBrowserAssetPaths(root string, entrypoints []string) map[string]struct{} {
+	allowed := map[string]struct{}{}
+	queued := map[string]struct{}{}
+	queue := []string{}
+	enqueue := func(candidate string) {
+		candidate = normalizeBrowserAssetPath(candidate)
+		if candidate == "" {
+			return
+		}
+		if !IsPublicStaticPath(candidate) {
+			return
+		}
+		if _, ok := queued[candidate]; ok {
+			return
+		}
+		queued[candidate] = struct{}{}
+		queue = append(queue, candidate)
+	}
+	for _, entry := range entrypoints {
+		enqueue(entry)
+	}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		allowed[current] = struct{}{}
+		file, ok := SafePath(root, current)
+		if !ok {
+			continue
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		for _, ref := range browserAssetRefs(current, string(data)) {
+			enqueue(ref)
+		}
+	}
+	return allowed
+}
+
+func IsReferencedBrowserAsset(root, urlPath string, entrypoints []string) bool {
+	normalized := normalizeBrowserAssetPath(urlPath)
+	if normalized == "" {
+		return false
+	}
+	_, ok := ReferencedBrowserAssetPaths(root, entrypoints)[normalized]
+	return ok
+}
+
+func browserAssetRefs(fromPath, content string) []string {
+	refs := []string{}
+	for _, matches := range browserAttrRefPattern.FindAllStringSubmatch(content, -1) {
+		if ref, ok := resolveBrowserAssetRef(fromPath, matches[1]); ok {
+			refs = append(refs, ref)
+		}
+	}
+	for _, matches := range browserJSImportPattern.FindAllStringSubmatch(content, -1) {
+		if ref, ok := resolveBrowserAssetRef(fromPath, matches[1]); ok {
+			refs = append(refs, ref)
+		}
+	}
+	for _, matches := range browserJSDynamicImportPattern.FindAllStringSubmatch(content, -1) {
+		if ref, ok := resolveBrowserAssetRef(fromPath, matches[1]); ok {
+			refs = append(refs, ref)
+		}
+	}
+	for _, matches := range browserJSExportPattern.FindAllStringSubmatch(content, -1) {
+		if ref, ok := resolveBrowserAssetRef(fromPath, matches[1]); ok {
+			refs = append(refs, ref)
+		}
+	}
+	for _, matches := range browserCSSImportPattern.FindAllStringSubmatch(content, -1) {
+		if ref, ok := resolveBrowserAssetRef(fromPath, matches[1]); ok {
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
+func resolveBrowserAssetRef(fromPath, ref string) (string, bool) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" || strings.HasPrefix(ref, "#") || strings.HasPrefix(ref, "//") {
+		return "", false
+	}
+	if strings.Contains(ref, ":") {
+		return "", false
+	}
+	if cut := strings.IndexAny(ref, "?#"); cut >= 0 {
+		ref = ref[:cut]
+	}
+	if ref == "" {
+		return "", false
+	}
+	if strings.HasPrefix(ref, "/") {
+		return normalizeBrowserAssetPath(ref), true
+	}
+	base := path.Dir(normalizeBrowserAssetPath(fromPath))
+	return normalizeBrowserAssetPath(path.Join(base, ref)), true
+}
+
+func normalizeBrowserAssetPath(urlPath string) string {
+	urlPath = strings.TrimSpace(strings.ReplaceAll(urlPath, "\\", "/"))
+	if urlPath == "" {
+		return ""
+	}
+	if cut := strings.IndexAny(urlPath, "?#"); cut >= 0 {
+		urlPath = urlPath[:cut]
+	}
+	if !strings.HasPrefix(urlPath, "/") {
+		urlPath = "/" + urlPath
+	}
+	clean := path.Clean(urlPath)
+	if clean == "." || clean == "/" {
+		return "/index.html"
+	}
+	return clean
 }
 
 func NewHTTPServer(addr string, handler http.Handler) *http.Server {

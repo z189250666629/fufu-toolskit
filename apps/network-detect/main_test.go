@@ -171,9 +171,11 @@ func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{
+		"index.html":       `<script type="module" src="/app.js"></script><link rel="stylesheet" href="/styles.css">`,
 		"api.test.mjs":     "secret test marker",
 		".env.local":       "secret env marker",
 		"app.js":           "public app marker",
+		"styles.css":       `@import url("./assets/style.css");`,
 		"assets/style.css": "public css marker",
 	} {
 		file := filepath.Join(frontendDir, filepath.FromSlash(name))
@@ -202,6 +204,111 @@ func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
 	route(w, req)
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "public app marker") {
 		t.Fatalf("normal asset should still be served: code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestStaticRouteOnlyServesReferencedBrowserAssets(t *testing.T) {
+	oldRoot, oldFrontend, oldCombine := rootDir, frontendDir, combineDir
+	t.Cleanup(func() {
+		rootDir, frontendDir, combineDir = oldRoot, oldFrontend, oldCombine
+	})
+	tmp := t.TempDir()
+	rootDir = tmp
+	frontendDir = filepath.Join(tmp, "frontend")
+	combineDir = filepath.Join(tmp, "combine")
+	if err := os.MkdirAll(frontendDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"index.html":      `<script type="module" src="/app.js"></script><link rel="stylesheet" href="/styles.css">`,
+		"app.js":          `import { boot } from "./boot.js"; boot();`,
+		"boot.js":         `export function boot() {}`,
+		"styles.css":      `@import url("./styles/base.css");`,
+		"styles/base.css": `.app { color: green; }`,
+		"debug.js":        `window.__debugSecret = "should not be served";`,
+	} {
+		file := filepath.Join(frontendDir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, path := range []string{"/app.js", "/boot.js", "/styles.css", "/styles/base.css"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		route(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s should be served: code=%d body=%s", path, w.Code, w.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/debug.js", nil)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code == http.StatusOK {
+		t.Fatalf("unreferenced static asset should not be served: body=%s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "debugSecret") {
+		t.Fatalf("unreferenced static asset leaked body: %s", w.Body.String())
+	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("unreferenced static asset Cache-Control = %q", got)
+	}
+}
+
+func TestCombinePageReferencedScriptsAreServed(t *testing.T) {
+	oldRoot, oldFrontend, oldCombine := rootDir, frontendDir, combineDir
+	t.Cleanup(func() {
+		rootDir, frontendDir, combineDir = oldRoot, oldFrontend, oldCombine
+	})
+	tmp := t.TempDir()
+	rootDir = tmp
+	frontendDir = filepath.Join(tmp, "frontend")
+	combineDir = filepath.Join(tmp, "combine")
+	for _, dir := range []string{frontendDir, combineDir} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(combineDir, "index.html"), []byte(`
+<script src="/combine_card_units.js"></script>
+<script src="/combine_trace_results.js"></script>
+<script>
+const tokenSectionsModule = import('/combine_token_sections.js');
+</script>`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"combine_card_units.js":     "window.combineCardUnits = {};",
+		"combine_trace_results.js":  "window.combineTraceResults = {};",
+		"combine_token_sections.js": "export function renderFoundTokenSections() {}",
+		"unreferenced_combine.js":   "window.__combineDebugSecret = true;",
+	} {
+		if err := os.WriteFile(filepath.Join(frontendDir, name), []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, path := range []string{"/combine_card_units.js", "/combine_trace_results.js", "/combine_token_sections.js"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		route(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s should be served for combine page: code=%d body=%s", path, w.Code, w.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/unreferenced_combine.js", nil)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code == http.StatusOK {
+		t.Fatalf("unreferenced combine asset should not be served: body=%s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "combineDebugSecret") {
+		t.Fatalf("unreferenced combine asset leaked body: %s", w.Body.String())
 	}
 }
 

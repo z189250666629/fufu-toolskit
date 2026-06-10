@@ -17,6 +17,8 @@ const (
 	maxJSONBodyBytes int64 = 1 << 20
 )
 
+var publicStaticEntryPoints = []string{"/index.html", "/admin.html"}
+
 var errInvalidCardKey = errors.New("invalid card key")
 var errRequestBodyTooLarge = errors.New("request body too large")
 
@@ -82,6 +84,10 @@ func staticRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if info.IsDir() {
+		webutil.WriteStaticNotFound(w, r)
+		return
+	}
+	if !webutil.IsReferencedBrowserAsset(publicDir, p, publicStaticEntryPoints) {
 		webutil.WriteStaticNotFound(w, r)
 		return
 	}

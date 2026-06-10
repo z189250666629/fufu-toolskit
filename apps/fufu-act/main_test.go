@@ -273,6 +273,7 @@ func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, body := range map[string]string{
+		"index.html":            `<script src="activity-api.js"></script>`,
 		"activity-api.test.mjs": "secret test marker",
 		".env.local":            "secret env marker",
 		"activity-api.js":       "public api marker",
@@ -305,6 +306,53 @@ func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
 	}
 	if got := w.Header().Get("Cache-Control"); got != "public, max-age=300" {
 		t.Fatalf("normal asset Cache-Control = %q", got)
+	}
+}
+
+func TestStaticRouteOnlyServesReferencedBrowserAssets(t *testing.T) {
+	oldRoot := rootDir
+	defer func() { rootDir = oldRoot }()
+
+	tmp := t.TempDir()
+	rootDir = tmp
+	publicDir := filepath.Join(tmp, "public")
+	if err := os.MkdirAll(publicDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"index.html":         `<script src="activity-api.js"></script><script src="activity-render.js"></script><script src="scratch-card.js"></script>`,
+		"admin.html":         `<script src="activity-api.js"></script><script src="admin-render.js"></script>`,
+		"activity-api.js":    `window.activityApi = {};`,
+		"activity-render.js": `window.activityRender = {};`,
+		"scratch-card.js":    `window.scratchCard = {};`,
+		"admin-render.js":    `window.adminRender = {};`,
+		"debug.js":           `window.__debugSecret = "should not be served";`,
+	} {
+		if err := os.WriteFile(filepath.Join(publicDir, name), []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, path := range []string{"/activity-api.js", "/activity-render.js", "/scratch-card.js", "/admin-render.js", "/admin.html"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		staticRoute(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s should be served: code=%d body=%s", path, w.Code, w.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/debug.js", nil)
+	w := httptest.NewRecorder()
+	staticRoute(w, req)
+	if w.Code == http.StatusOK {
+		t.Fatalf("unreferenced static asset should not be served: body=%s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "debugSecret") {
+		t.Fatalf("unreferenced static asset leaked body: %s", w.Body.String())
+	}
+	if got := w.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("unreferenced static asset Cache-Control = %q", got)
 	}
 }
 
