@@ -28,6 +28,25 @@ func TestWorkspaceModules(t *testing.T) {
 	}
 }
 
+func TestY2KDockerfileCopiesSharedFufuModule(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("apps/y2k-nav/Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dockerfile := string(raw)
+	for _, want := range []string{
+		"WORKDIR /src",
+		"COPY packages/go/fufu ./packages/go/fufu",
+		"COPY apps/y2k-nav/go.mod ./apps/y2k-nav/go.mod",
+		"COPY apps/y2k-nav/main.go ./apps/y2k-nav/main.go",
+		"WORKDIR /src/apps/y2k-nav",
+	} {
+		if !strings.Contains(dockerfile, want) {
+			t.Fatalf("Dockerfile missing %q\n%s", want, dockerfile)
+		}
+	}
+}
+
 func fingerprintModule(t *testing.T, dir string) {
 	t.Helper()
 	err := filepath.WalkDir(filepath.FromSlash(dir), func(path string, d fs.DirEntry, err error) error {
