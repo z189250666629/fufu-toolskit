@@ -50,6 +50,20 @@ func TestSanitizeChannelParsesModelsAndGroups(t *testing.T) {
 	}
 }
 
+func TestSanitizeChannelAcceptsArrayModelsAndGroups(t *testing.T) {
+	channel := sanitizeChannel(map[string]any{
+		"models": []any{"model-b", "model-a", "model-b"},
+		"groups": []any{"vip", "default", "vip"},
+	})
+
+	if strings.Join(channel.Models, ",") != "model-a,model-b" {
+		t.Fatalf("models = %#v", channel.Models)
+	}
+	if strings.Join(channel.Groups, ",") != "default,vip" {
+		t.Fatalf("groups = %#v", channel.Groups)
+	}
+}
+
 func TestBuildCellSummarizesChannelsLogsAndPricing(t *testing.T) {
 	price := Pricing{Input: 0.1, Output: 0.2, Currency: "CNY"}
 	cell := buildCell(

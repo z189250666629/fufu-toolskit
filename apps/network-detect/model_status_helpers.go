@@ -21,7 +21,7 @@ func firstInt(raw map[string]any, keys ...string) int64 {
 }
 
 func sanitizeChannel(raw map[string]any) Channel {
-	return Channel{ID: toInt(raw["id"]), Name: firstNonEmpty(str(raw["name"]), str(raw["channel_name"])), Status: toInt(raw["status"]), Models: parseList(firstNonEmpty(str(raw["models"]), str(raw["model"]))), Groups: parseList(firstNonEmpty(str(raw["group"]), str(raw["groups"]))), ResponseTime: firstInt(raw, "response_time", "responseTime", "test_time"), Raw: raw}
+	return Channel{ID: toInt(raw["id"]), Name: firstNonEmpty(str(raw["name"]), str(raw["channel_name"])), Status: toInt(raw["status"]), Models: parseListValue(raw["models"], raw["model"]), Groups: parseListValue(raw["group"], raw["groups"]), ResponseTime: firstInt(raw, "response_time", "responseTime", "test_time"), Raw: raw}
 }
 
 func parseList(raw string) []string {
@@ -34,6 +34,30 @@ func parseList(raw string) []string {
 		return cleanList(arr)
 	}
 	return cleanList(strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || r == '\n' || r == '\r' || r == ' ' || r == '|' }))
+}
+
+func parseListValue(values ...any) []string {
+	for _, value := range values {
+		switch x := value.(type) {
+		case []string:
+			if out := cleanList(x); len(out) > 0 {
+				return out
+			}
+		case []any:
+			items := make([]string, 0, len(x))
+			for _, item := range x {
+				items = append(items, str(item))
+			}
+			if out := cleanList(items); len(out) > 0 {
+				return out
+			}
+		default:
+			if out := parseList(str(value)); len(out) > 0 {
+				return out
+			}
+		}
+	}
+	return nil
 }
 
 func cleanList(in []string) []string {
