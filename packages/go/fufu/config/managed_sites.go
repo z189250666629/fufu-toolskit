@@ -130,6 +130,9 @@ func LoadManagedSites(rootDir string) ([]newapi.Site, string) {
 	candidates := []string{}
 	configured := Env("NEWAPI_MANAGED_API_CONFIG")
 	if configured != "" {
+		if !filepath.IsAbs(configured) && rootDir != "" {
+			configured = filepath.Join(rootDir, configured)
+		}
 		candidates = append(candidates, configured)
 	} else {
 		candidates = append(candidates, filepath.Join(rootDir, "newapi-managed-api-sites.json"))

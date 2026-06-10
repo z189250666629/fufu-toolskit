@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -81,6 +82,30 @@ func TestLoadManagedSitesReportsExplicitConfigReadError(t *testing.T) {
 	}
 	if !strings.Contains(msg, "missing-managed-sites.json") || msg == "" {
 		t.Fatalf("expected explicit config read error, got %q", msg)
+	}
+}
+
+func TestLoadManagedSitesResolvesRelativeExplicitConfigPathFromRoot(t *testing.T) {
+	clearPrimaryEnv(t)
+	root := t.TempDir()
+	t.Chdir(t.TempDir())
+
+	configPath := filepath.Join(root, "configs", "managed-sites.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte(`{"managedApiSites":[{"name":"root-site","url":"https://root.example.test","token":"root-token"}]}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join("configs", "managed-sites.json"))
+
+	sites, msg := LoadManagedSites(root)
+
+	if msg != "" {
+		t.Fatalf("msg = %q", msg)
+	}
+	if len(sites) != 1 || sites[0].Name != "root-site" || sites[0].URL != "https://root.example.test" {
+		t.Fatalf("sites = %#v", sites)
 	}
 }
 
