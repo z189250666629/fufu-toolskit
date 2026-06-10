@@ -45,6 +45,46 @@ func TestWriteJSONSetsNoStoreAndContentType(t *testing.T) {
 	}
 }
 
+func TestWriteJSONErrorUsesStableEnvelope(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	WriteJSONError(rec, http.StatusTeapot, "bad card")
+
+	if rec.Code != http.StatusTeapot {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if strings.TrimSpace(rec.Body.String()) != `{"error":"bad card"}` {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
+}
+
+func TestRequireMethodRejectsUnexpectedVerb(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
+
+	if RequireMethod(rec, req, http.MethodPost) {
+		t.Fatal("RequireMethod should reject GET when POST is required")
+	}
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if strings.TrimSpace(rec.Body.String()) != `{"error":"Only POST"}` {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+
+	okRec := httptest.NewRecorder()
+	okReq := httptest.NewRequest(http.MethodPost, "/api/test", nil)
+	if !RequireMethod(okRec, okReq, http.MethodPost) {
+		t.Fatal("RequireMethod should allow POST")
+	}
+	if okRec.Code != http.StatusOK {
+		t.Fatalf("allowed request should not write response, code=%d", okRec.Code)
+	}
+}
+
 func TestServeFileSupportsHeadAndCachePolicy(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "index.html")

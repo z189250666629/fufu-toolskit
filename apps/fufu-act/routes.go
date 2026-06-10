@@ -25,14 +25,12 @@ func apiRoute(w http.ResponseWriter, r *http.Request) {
 	case "/api/scratch/reset":
 		post(w, r, handleScratchReset)
 	case "/api/admin/stats":
-		if r.Method != http.MethodGet {
-			writeJSONError(w, 405, "Only GET")
+		if !webutil.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 		handleAdminStats(w, r)
 	case "/api/prizes":
-		if r.Method != http.MethodGet {
-			writeJSONError(w, 405, "Only GET")
+		if !webutil.RequireMethod(w, r, http.MethodGet) {
 			return
 		}
 		handlePrizes(w, r)
@@ -42,8 +40,7 @@ func apiRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func post(w http.ResponseWriter, r *http.Request, fn func(http.ResponseWriter, *http.Request)) {
-	if r.Method != http.MethodPost {
-		writeJSONError(w, 405, "Only POST")
+	if !webutil.RequireMethod(w, r, http.MethodPost) {
 		return
 	}
 	fn(w, r)
@@ -76,7 +73,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func writeJSONError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]string{"error": message})
+	webutil.WriteJSONError(w, status, message)
 }
 
 func readBody(r *http.Request, out any) error {

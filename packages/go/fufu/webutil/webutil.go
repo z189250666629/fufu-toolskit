@@ -49,6 +49,18 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	_, _ = w.Write(body)
 }
 
+func WriteJSONError(w http.ResponseWriter, status int, message string) {
+	WriteJSON(w, status, map[string]string{"error": message})
+}
+
+func RequireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method == method {
+		return true
+	}
+	WriteJSONError(w, http.StatusMethodNotAllowed, "Only "+method)
+	return false
+}
+
 func ServeFile(w http.ResponseWriter, r *http.Request, file string, noStore bool) {
 	data, err := os.ReadFile(file)
 	if err != nil {
