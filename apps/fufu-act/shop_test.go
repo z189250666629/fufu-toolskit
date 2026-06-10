@@ -239,6 +239,28 @@ func TestMCYPostReturnsErrorForInvalidJSONResponse(t *testing.T) {
 	}
 }
 
+func TestMCYPostRejectsOversizedResponseBody(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = "session=ok"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":"`))
+		_, _ = w.Write([]byte(strings.Repeat("x", (16<<20)+1)))
+		_, _ = w.Write([]byte(`"}`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	data, err := mcyPost(context.Background(), "/check", map[string]any{"ok": true})
+	if err == nil || !errors.Is(err, ErrShopInvalidResponse) {
+		t.Fatalf("dataPresent=%v err=%v, want ErrShopInvalidResponse", data != nil, err)
+	}
+	if !strings.Contains(err.Error(), "response body too large") {
+		t.Fatalf("unexpected oversized response error: %v", err)
+	}
+}
+
 func TestMCYLoginReturnsErrorForHTTPFailure(t *testing.T) {
 	oldCookie := mcyCookie
 	t.Cleanup(func() { mcyCookie = oldCookie })

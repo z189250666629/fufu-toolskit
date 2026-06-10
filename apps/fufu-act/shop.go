@@ -7,11 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"fufu/config"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 )
+
+const maxMCYResponseBodyBytes int64 = 16 << 20
 
 var mcyHTTPClient = &http.Client{Timeout: 15 * time.Second}
 var mcyCookieMu sync.RWMutex
@@ -197,11 +200,25 @@ func mcyPost(ctx context.Context, endpoint string, payload any) (map[string]any,
 	}
 	defer resp.Body.Close()
 	var data map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrShopInvalidResponse, err)
+	if err := decodeMCYResponse(resp.Body, &data); err != nil {
+		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return data, mcyHTTPError{status: resp.StatusCode}
 	}
 	return data, nil
+}
+
+func decodeMCYResponse(r io.Reader, out any) error {
+	limited := &io.LimitedReader{R: r, N: maxMCYResponseBodyBytes + 1}
+	if err := json.NewDecoder(limited).Decode(out); err != nil {
+		if limited.N <= 0 {
+			return fmt.Errorf("%w: response body too large", ErrShopInvalidResponse)
+		}
+		return fmt.Errorf("%w: %v", ErrShopInvalidResponse, err)
+	}
+	if limited.N <= 0 {
+		return fmt.Errorf("%w: response body too large", ErrShopInvalidResponse)
+	}
+	return nil
 }
