@@ -104,6 +104,48 @@ func TestHandleAPIRejectsWrongNetworkMethodBeforeHandler(t *testing.T) {
 	}
 }
 
+func TestConnectivityTargetsReturnsConfigErrorForInvalidInlineJSON(t *testing.T) {
+	clearConnectivityEnv(t)
+	t.Setenv("CONNECTIVITY_TARGETS", "not-json")
+	req := httptest.NewRequest(http.MethodGet, "/api/connectivity/targets", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "CONNECTIVITY_TARGETS") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestConnectivityTargetsFallsBackWhenInlineJSONUnset(t *testing.T) {
+	clearConnectivityEnv(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/connectivity/targets", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "api.fufuapi.top") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func clearConnectivityEnv(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{
+		"CONNECTIVITY_TARGETS",
+		"CONNECTIVITY_API_URLS",
+		"FUFU_API_URLS",
+		"NEWAPI_API_SITE_URL",
+		"CONNECTIVITY_TOKEN_URLS",
+		"FUFU_TOKEN_URLS",
+		"NEWAPI_TOKEN_SITE_URL",
+		"CONNECTIVITY_API_NAME",
+		"CONNECTIVITY_TOKEN_NAME",
+	} {
+		t.Setenv(name, "")
+	}
+}
+
 func TestWriteJSONErrorUsesStablePayload(t *testing.T) {
 	w := httptest.NewRecorder()
 

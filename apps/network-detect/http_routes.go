@@ -58,7 +58,12 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 	case "/api/client":
 		writeJSON(w, 200, map[string]any{"ip": clientIP(r), "serverTime": time.Now().UnixMilli(), "origin": r.Header.Get("Origin"), "userAgent": r.UserAgent()})
 	case "/api/connectivity/targets":
-		writeJSON(w, 200, map[string]any{"groups": connectivityGroups()})
+		groups, errMsg := connectivityGroupsWithError()
+		if errMsg != "" {
+			writeJSONError(w, 500, errMsg)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"groups": groups})
 	case "/api/newapi/sites":
 		sites, msg := config.LoadManagedSites(rootDir)
 		publics := []newapi.PublicSite{}
