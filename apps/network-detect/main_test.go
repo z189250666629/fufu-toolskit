@@ -229,6 +229,38 @@ func TestNewAPISitesMasksManagedSiteConfigParseErrors(t *testing.T) {
 	}
 }
 
+func TestNewAPISitesMasksExplicitManagedSiteConfigPath(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(t.TempDir(), "sk-secret-managed-sites.json"))
+	req := httptest.NewRequest(http.MethodGet, "/api/newapi/sites", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := strings.TrimSpace(w.Body.String())
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	var payload struct {
+		Configured bool   `json:"configured"`
+		Error      string `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("invalid JSON response: %v body=%s", err, body)
+	}
+	if payload.Configured || payload.Error != "NEWAPI_MANAGED_API_CONFIG 读取失败" {
+		t.Fatalf("unexpected payload: %#v body=%s", payload, body)
+	}
+	for _, leaked := range []string{"sk-secret", "managed-sites.json", rootDir, "open ", "no such file"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("explicit config error leaked %q in %s", leaked, body)
+		}
+	}
+}
+
 func clearConnectivityEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
