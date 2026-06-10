@@ -3,8 +3,8 @@ package combine
 import (
 	"encoding/json"
 	"fmt"
+	"fufu/webutil"
 	"io"
-	"log"
 	"net/http"
 )
 
@@ -16,11 +16,7 @@ func upstreamStatusMessage(r APIResponse, fallback string) string {
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		log.Printf("write json: %v", err)
-	}
+	webutil.WriteJSON(w, status, payload)
 }
 
 func decodeJSON(r io.Reader, out any) error {
