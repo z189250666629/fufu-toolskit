@@ -53,6 +53,32 @@ test('startAll stops remaining children when a service exits non-zero', () => {
   assert.match(logs.at(-1), /\[network\] exited with code 1/);
 });
 
+test('startAll stops remaining children when a service exits zero unexpectedly', () => {
+  const spawned = [];
+  const fatalExits = [];
+  const supervisor = createStartAllSupervisor({
+    logger: { log: () => {} },
+    stdout: { write: () => {} },
+    stderr: { write: () => {} },
+    onFatalExit: (code, item) => fatalExits.push([code, item.name]),
+    spawn: () => {
+      const child = new FakeChild();
+      spawned.push(child);
+      return child;
+    }
+  });
+
+  supervisor.start();
+
+  spawned[0].emit('exit', 0, null);
+
+  assert.equal(spawned[0].killed, false);
+  assert.deepEqual(spawned[1].killSignals, ['SIGTERM']);
+  assert.deepEqual(spawned[2].killSignals, ['SIGTERM']);
+  assert.deepEqual(fatalExits, [[1, 'network']]);
+  assert.equal(supervisor.exitCode, 1);
+});
+
 test('startAll stops remaining children when a service emits spawn error', () => {
   const spawned = [];
   const logs = [];

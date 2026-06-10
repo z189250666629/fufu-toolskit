@@ -62,8 +62,7 @@ export function createStartAllSupervisor({
     exited.add(child);
     logger.log(`[${item.name}] exited with ${signal ? `signal ${signal}` : `code ${code}`}`);
 
-    const failed = (typeof code === 'number' && code !== 0) || signal;
-    if (!stopping && failed) {
+    if (!stopping) {
       exitCode = typeof code === 'number' && code > 0 ? code : 1;
       stopAll();
       onFatalExit(exitCode, item, signal);
