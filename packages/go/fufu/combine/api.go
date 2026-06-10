@@ -11,6 +11,8 @@ func (a *App) searchTokensConcurrent(ctx context.Context, keys []string) ([]Sear
 	if len(keys) == 0 {
 		return results, nil
 	}
+	searchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	jobs := make(chan int)
 	errCh := make(chan error, 1)
 	var wg sync.WaitGroup
@@ -19,13 +21,14 @@ func (a *App) searchTokensConcurrent(ctx context.Context, keys []string) ([]Sear
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				found, err := a.searchTokenByKey(ctx, keys[idx])
+				found, err := a.searchTokenByKey(searchCtx, keys[idx])
 				if err != nil {
 					select {
 					case errCh <- err:
 					default:
 					}
-					continue
+					cancel()
+					return
 				}
 				results[idx] = SearchTokenResult{Key: keys[idx], Found: found}
 			}
@@ -35,12 +38,18 @@ func (a *App) searchTokensConcurrent(ctx context.Context, keys []string) ([]Sear
 		select {
 		case jobs <- i:
 		case err := <-errCh:
+			cancel()
 			close(jobs)
 			wg.Wait()
 			return nil, err
-		case <-ctx.Done():
+		case <-searchCtx.Done():
 			close(jobs)
 			wg.Wait()
+			select {
+			case err := <-errCh:
+				return nil, err
+			default:
+			}
 			return nil, ctx.Err()
 		}
 	}

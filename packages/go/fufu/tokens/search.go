@@ -81,6 +81,8 @@ func (s *Service) BatchSearch(ctx context.Context, raw []string) ([]string, []To
 	if len(keys) == 0 {
 		return keys, nil, nil, nil
 	}
+	searchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	concurrency := s.Concurrency
 	if concurrency <= 0 {
 		concurrency = DefaultSearchConcurrency
@@ -97,13 +99,14 @@ func (s *Service) BatchSearch(ctx context.Context, raw []string) ([]string, []To
 		go func() {
 			defer wg.Done()
 			for idx := range jobs {
-				found, err := s.SearchTokenByKey(ctx, keys[idx])
+				found, err := s.SearchTokenByKey(searchCtx, keys[idx])
 				if err != nil {
 					select {
 					case errCh <- err:
 					default:
 					}
-					continue
+					cancel()
+					return
 				}
 				results[idx] = SearchResult{Key: keys[idx], Found: found}
 			}
@@ -113,12 +116,18 @@ func (s *Service) BatchSearch(ctx context.Context, raw []string) ([]string, []To
 		select {
 		case jobs <- i:
 		case err := <-errCh:
+			cancel()
 			close(jobs)
 			wg.Wait()
 			return nil, nil, nil, err
-		case <-ctx.Done():
+		case <-searchCtx.Done():
 			close(jobs)
 			wg.Wait()
+			select {
+			case err := <-errCh:
+				return nil, nil, nil, err
+			default:
+			}
 			return nil, nil, nil, ctx.Err()
 		}
 	}
