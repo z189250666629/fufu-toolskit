@@ -117,3 +117,31 @@ test('loadModelStatusState preserves error data with generated timestamp', async
   assert.deepEqual(state.modelStatus, { generatedAt: 456, configured: false });
   assert.equal(state.initialized, false);
 });
+
+test('loadModelStatusState keeps the latest overlapping response', async () => {
+  const state = {
+    loading: false,
+    error: '',
+    modelTestMessage: '',
+    modelStatus: null,
+    initialized: false
+  };
+  const pending = [];
+  const fetchJsonImpl = async () => new Promise((resolve) => pending.push(resolve));
+
+  const first = loadModelStatusState(state, { fetchJsonImpl, render: () => {} });
+  const second = loadModelStatusState(state, { refresh: true, fetchJsonImpl, render: () => {} });
+  assert.equal(pending.length, 2);
+
+  pending[1]({ generatedAt: 2, configured: true });
+  await second;
+  assert.equal(state.modelStatus.generatedAt, 2);
+
+  pending[0]({ generatedAt: 1, configured: true });
+  await first;
+
+  assert.equal(state.loading, false);
+  assert.equal(state.error, '');
+  assert.equal(state.initialized, true);
+  assert.equal(state.modelStatus.generatedAt, 2);
+});

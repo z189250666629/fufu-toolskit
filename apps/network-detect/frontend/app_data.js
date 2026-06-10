@@ -29,20 +29,27 @@ export async function loadModelStatusState(state, {
   fetchJsonImpl,
   render
 }) {
+  const requestSeq = (Number.isFinite(state.modelStatusRequestSeq) ? state.modelStatusRequestSeq : 0) + 1;
+  state.modelStatusRequestSeq = requestSeq;
+  const isLatestRequest = () => state.modelStatusRequestSeq === requestSeq;
   state.loading = true;
   state.error = '';
   state.modelTestMessage = '';
   if (renderStart) render();
 
   try {
-    state.modelStatus = await fetchJsonImpl(`/api/newapi/model-status${refresh ? '?refresh=1' : ''}`);
+    const modelStatus = await fetchJsonImpl(`/api/newapi/model-status${refresh ? '?refresh=1' : ''}`);
+    if (!isLatestRequest()) return;
+    state.modelStatus = modelStatus;
     state.initialized = true;
   } catch (error) {
+    if (!isLatestRequest()) return;
     state.error = error.message;
     if (error.data && typeof error.data === 'object' && Number.isFinite(Number(error.data.generatedAt))) {
       state.modelStatus = error.data;
     }
   } finally {
+    if (!isLatestRequest()) return;
     state.loading = false;
     render();
   }
