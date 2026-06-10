@@ -1,0 +1,48 @@
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
+
+func newJSONServer(t *testing.T, payload any) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewEncoder(w).Encode(payload); err != nil {
+			t.Fatalf("encode payload: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestFindShopPurchaseReturnsBlankWhenPurchaseTimeMissing(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = "session=ok"
+
+	srv := newJSONServer(t, map[string]any{"data": map[string]any{"list": []any{map[string]any{}}}})
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	if got := findShopPurchase("card-1"); got != "" {
+		t.Fatalf("missing purchase_time = %q, want blank", got)
+	}
+}
+
+func TestMCYPostReturnsErrorForInvalidRequestURL(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = "session=ok"
+	t.Setenv("MCY_BASE_URL", ":// bad-url")
+
+	defer func() {
+		if x := recover(); x != nil {
+			t.Fatalf("mcyPost should return an error, not panic: %v", x)
+		}
+	}()
+	if _, err := mcyPost("/check", map[string]any{"ok": true}); err == nil {
+		t.Fatal("mcyPost should reject invalid request URLs")
+	}
+}

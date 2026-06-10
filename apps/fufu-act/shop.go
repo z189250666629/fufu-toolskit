@@ -24,13 +24,25 @@ func findShopPurchase(cardKey string) string {
 		return ""
 	}
 	if d, ok := data["data"].(map[string]any); ok {
-		if arr, ok := d["list"].([]any); ok && len(arr) > 0 {
-			if obj, ok := arr[0].(map[string]any); ok {
-				return fmt.Sprint(obj["purchase_time"])
-			}
-		}
+		return extractPurchaseTime(d)
 	}
 	return ""
+}
+
+func extractPurchaseTime(data map[string]any) string {
+	arr, ok := data["list"].([]any)
+	if !ok || len(arr) == 0 {
+		return ""
+	}
+	obj, ok := arr[0].(map[string]any)
+	if !ok {
+		return ""
+	}
+	purchaseTime, ok := obj["purchase_time"]
+	if !ok || purchaseTime == nil {
+		return ""
+	}
+	return fmt.Sprint(purchaseTime)
 }
 
 func mcyConfig() (string, string, string, string) {
@@ -66,8 +78,14 @@ func mcyLogin() error {
 
 func mcyPost(endpoint string, payload any) (map[string]any, error) {
 	base, _, _, _ := mcyConfig()
-	b, _ := json.Marshal(payload)
-	req, _ := http.NewRequest(http.MethodPost, base+endpoint, bytes.NewReader(b))
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, base+endpoint, bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", mcyCookie)
 	resp, err := http.DefaultClient.Do(req)
