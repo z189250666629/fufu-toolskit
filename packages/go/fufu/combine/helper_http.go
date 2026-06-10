@@ -30,6 +30,10 @@ func writeTooManyKeysRequest(w http.ResponseWriter) {
 	writeJSONError(w, http.StatusBadRequest, "Too many keys")
 }
 
+func writeMergeBusy(w http.ResponseWriter) {
+	writeJSONError(w, http.StatusTooManyRequests, "任务繁忙，请稍后再试")
+}
+
 func writeJSONDecodeError(w http.ResponseWriter, err error) {
 	var maxBytesErr *http.MaxBytesError
 	if errors.As(err, &maxBytesErr) {

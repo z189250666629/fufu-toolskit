@@ -29,3 +29,15 @@ func TestCleanMergeJobsKeepsNonTerminalJobs(t *testing.T) {
 		t.Fatalf("error job should be cleaned after TTL")
 	}
 }
+
+func TestActiveMergeJobCountIgnoresTerminalJobs(t *testing.T) {
+	app := &App{mergeJobs: map[string]MergeJob{
+		"queued": {Status: "queued"},
+		"done":   {Status: "done"},
+		"error":  {Status: "error"},
+	}}
+
+	if got := app.activeMergeJobCount(); got != 1 {
+		t.Fatalf("active job count = %d, want 1", got)
+	}
+}

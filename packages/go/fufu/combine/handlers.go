@@ -94,7 +94,10 @@ func (a *App) handleMerge(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]string{"error": "创建任务失败"})
 		return
 	}
-	a.setMergeJob(jobID, buildQueuedMergeJobPatch(len(p.Keys), role, "准备合并..."))
+	if !a.tryQueueMergeJob(jobID, buildQueuedMergeJobPatch(len(p.Keys), role, "准备合并...")) {
+		writeMergeBusy(w)
+		return
+	}
 	go a.runMergeJob(jobID, p, role)
 	writeJSON(w, 200, buildMergeAcceptedResponse(jobID))
 }
@@ -123,7 +126,10 @@ func (a *App) handlePublicMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role := RoleGuest
-	a.setMergeJob(jobID, buildQueuedMergeJobPatch(len(keys), role, "准备普通合卡..."))
+	if !a.tryQueueMergeJob(jobID, buildQueuedMergeJobPatch(len(keys), role, "准备普通合卡...")) {
+		writeMergeBusy(w)
+		return
+	}
 	go a.runMergeJob(jobID, MergePayload{Keys: keys, IntervalUnit: publicTargetUnit}, RoleGuest)
 	writeJSON(w, 200, buildMergeAcceptedResponse(jobID))
 }

@@ -406,3 +406,22 @@ func TestHandlePublicMergeRejectsTooManyKeysBeforeQueuing(t *testing.T) {
 		t.Fatalf("too many keys should not queue public merge jobs: %#v", app.mergeJobs)
 	}
 }
+
+func TestHandlePublicMergeRejectsWhenActiveJobsAtLimit(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	now := time.Now().UnixMilli()
+	for i := 0; i < 20; i++ {
+		app.mergeJobs["active-"+strconv.Itoa(i)] = MergeJob{Status: "queued", CreatedAt: now, UpdatedAt: now, Role: RoleGuest}
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/public-merge", strings.NewReader(`{"keys":["sk-active-limit-a","sk-active-limit-b"]}`))
+	w := httptest.NewRecorder()
+
+	app.handlePublicMerge(w, req)
+
+	if w.Code != http.StatusTooManyRequests || !strings.Contains(w.Body.String(), "任务繁忙") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(app.mergeJobs) != 20 {
+		t.Fatalf("active job limit should not queue another job: %#v", app.mergeJobs)
+	}
+}

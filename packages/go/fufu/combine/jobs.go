@@ -34,6 +34,35 @@ func isTerminalMergeJobStatus(status string) bool {
 	return status == "done" || status == "error"
 }
 
+func (a *App) activeMergeJobCount() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return activeMergeJobCountLocked(a.mergeJobs)
+}
+
+func activeMergeJobCountLocked(jobs map[string]MergeJob) int {
+	count := 0
+	for _, job := range jobs {
+		if !isTerminalMergeJobStatus(job.Status) {
+			count++
+		}
+	}
+	return count
+}
+
+func (a *App) tryQueueMergeJob(jobID string, p MergeJobPatch) bool {
+	nowMs := time.Now().UnixMilli()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if activeMergeJobCountLocked(a.mergeJobs) >= maxActiveMergeJobs {
+		return false
+	}
+	job := MergeJob{CreatedAt: nowMs, Status: "queued"}
+	applyMergeJobPatch(&job, p, nowMs)
+	a.mergeJobs[jobID] = job
+	return true
+}
+
 func (a *App) setMergeJob(jobID string, p MergeJobPatch) {
 	nowMs := time.Now().UnixMilli()
 	a.mu.Lock()
@@ -42,6 +71,11 @@ func (a *App) setMergeJob(jobID string, p MergeJobPatch) {
 	if !ok {
 		job = MergeJob{CreatedAt: nowMs, Status: "queued"}
 	}
+	applyMergeJobPatch(&job, p, nowMs)
+	a.mergeJobs[jobID] = job
+}
+
+func applyMergeJobPatch(job *MergeJob, p MergeJobPatch, nowMs int64) {
 	job.UpdatedAt = nowMs
 	if p.Status != nil {
 		job.Status = *p.Status
@@ -70,7 +104,6 @@ func (a *App) setMergeJob(jobID string, p MergeJobPatch) {
 	if p.MergeID != nil {
 		job.MergeID = *p.MergeID
 	}
-	a.mergeJobs[jobID] = job
 }
 
 func (a *App) getMergeJob(jobID string) (MergeJob, bool) {
