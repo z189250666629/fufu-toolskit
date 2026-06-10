@@ -96,6 +96,31 @@ func TestServeReturnsListenerErrors(t *testing.T) {
 	}
 }
 
+func TestRunReturnsInitErrorsWithoutPanic(t *testing.T) {
+	oldRoot := rootDir
+	oldDB := db
+	t.Cleanup(func() {
+		if db != nil && db != oldDB {
+			_ = db.Close()
+		}
+		rootDir = oldRoot
+		db = oldDB
+	})
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "data"), []byte("not a directory"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := run(tmp, defaultPort)
+
+	if err == nil {
+		t.Fatal("run should return init errors")
+	}
+	if !strings.Contains(err.Error(), "create database directory") {
+		t.Fatalf("run error = %v", err)
+	}
+}
+
 func TestHTTPServerHasTimeouts(t *testing.T) {
 	server := newHTTPServer("18820", http.NewServeMux())
 	if server.Addr != "0.0.0.0:18820" {

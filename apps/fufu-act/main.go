@@ -61,13 +61,23 @@ type ScratchGame struct {
 
 func main() {
 	wd, _ := os.Getwd()
+	port := strings.TrimSpace(os.Getenv("SLOT_PORT"))
+	if err := run(wd, port); err != nil {
+		fmt.Fprintf(os.Stderr, "server stopped: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run(wd, port string) error {
 	rootDir = wd
 	if err := initAll(); err != nil {
-		panic(err)
+		return err
 	}
-	defer db.Close()
+	if db != nil {
+		defer db.Close()
+	}
 	go creditWorker()
-	port := strings.TrimSpace(os.Getenv("SLOT_PORT"))
+	port = strings.TrimSpace(port)
 	if port == "" {
 		port = defaultPort
 	}
@@ -75,10 +85,7 @@ func main() {
 	mux.HandleFunc("/api/", apiRoute)
 	mux.HandleFunc("/", staticRoute)
 	fmt.Printf("fufu-act Go backend listening on :%s\n", port)
-	if err := serve(port, mux); err != nil {
-		fmt.Fprintf(os.Stderr, "server stopped: %v\n", err)
-		os.Exit(1)
-	}
+	return serve(port, mux)
 }
 
 func serve(port string, handler http.Handler) error {
