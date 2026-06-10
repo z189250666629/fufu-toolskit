@@ -18,17 +18,29 @@ func tokenValue(item map[string]any) string {
 }
 
 func coerceItems(data any) []map[string]any {
+	items, _ := coerceItemsWithMessage(data)
+	return items
+}
+
+func coerceItemsWithMessage(data any) ([]map[string]any, string) {
 	if obj, ok := data.(map[string]any); ok {
 		for _, key := range []string{"managedApiSites", "managedSites", "managed_sites", "sources", "admin_instances", "instances"} {
-			if arr, ok := obj[key].([]any); ok {
-				return toMaps(arr)
+			value, exists := obj[key]
+			if !exists {
+				continue
 			}
+			arr, ok := value.([]any)
+			if !ok {
+				return nil, "配置文件格式无效: " + key + " 应为数组"
+			}
+			return toMaps(arr), ""
 		}
+		return nil, "配置文件格式无效: 缺少 managedApiSites 数组"
 	}
 	if arr, ok := data.([]any); ok {
-		return toMaps(arr)
+		return toMaps(arr), ""
 	}
-	return nil
+	return nil, "配置文件格式无效: 根节点应为数组或对象"
 }
 
 func toMaps(arr []any) []map[string]any {
@@ -42,7 +54,10 @@ func toMaps(arr []any) []map[string]any {
 }
 
 func NormalizeManagedSites(data any, allowedNames map[string]bool) ([]newapi.Site, string) {
-	items := coerceItems(data)
+	items, formatMsg := coerceItemsWithMessage(data)
+	if formatMsg != "" {
+		return nil, formatMsg
+	}
 	seen := map[string]bool{}
 	sites := []newapi.Site{}
 	for _, item := range items {
@@ -113,7 +128,8 @@ func LoadManagedSites(rootDir string) ([]newapi.Site, string) {
 		return sites, ""
 	}
 	candidates := []string{}
-	if configured := Env("NEWAPI_MANAGED_API_CONFIG"); configured != "" {
+	configured := Env("NEWAPI_MANAGED_API_CONFIG")
+	if configured != "" {
 		candidates = append(candidates, configured)
 	} else {
 		candidates = append(candidates, filepath.Join(rootDir, "newapi-managed-api-sites.json"))
@@ -125,6 +141,9 @@ func LoadManagedSites(rootDir string) ([]newapi.Site, string) {
 	for _, path := range candidates {
 		raw, err := os.ReadFile(path)
 		if err != nil {
+			if configured != "" {
+				return nil, filepath.Base(path) + " 读取失败: " + err.Error()
+			}
 			continue
 		}
 		data, err := decodeManagedSitesJSON(string(raw))
@@ -133,7 +152,7 @@ func LoadManagedSites(rootDir string) ([]newapi.Site, string) {
 			continue
 		}
 		sites, msg := NormalizeManagedSites(data, nil)
-		if len(sites) > 0 || Env("NEWAPI_MANAGED_API_CONFIG") != "" {
+		if len(sites) > 0 || configured != "" {
 			return sites, msg
 		}
 		lastErr = msg

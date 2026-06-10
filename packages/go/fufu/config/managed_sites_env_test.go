@@ -1,6 +1,8 @@
 package config
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"fufu/newapi"
@@ -63,5 +65,35 @@ func TestManagedSiteFromEnvAllowsManagedAPIKindAlias(t *testing.T) {
 	site, ok := managedSiteFromEnv(managedSiteEnvDef{Prefix: "NEWAPI_SAMPLE"})
 	if !ok || site.Kind != "managed_api" {
 		t.Fatalf("expected managed_api kind, got ok=%v site=%#v", ok, site)
+	}
+}
+
+func TestLoadManagedSitesReportsExplicitConfigReadError(t *testing.T) {
+	clearPrimaryEnv(t)
+	root := t.TempDir()
+	configPath := filepath.Join(root, "missing-managed-sites.json")
+	t.Setenv("NEWAPI_MANAGED_API_CONFIG", configPath)
+
+	sites, msg := LoadManagedSites(root)
+
+	if len(sites) != 0 {
+		t.Fatalf("sites = %#v", sites)
+	}
+	if !strings.Contains(msg, "missing-managed-sites.json") || msg == "" {
+		t.Fatalf("expected explicit config read error, got %q", msg)
+	}
+}
+
+func TestLoadManagedSitesReportsInlineShapeError(t *testing.T) {
+	clearPrimaryEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `{"managedApiSites":{}}`)
+
+	sites, msg := LoadManagedSites(t.TempDir())
+
+	if len(sites) != 0 {
+		t.Fatalf("sites = %#v", sites)
+	}
+	if !strings.Contains(msg, "配置文件格式无效") {
+		t.Fatalf("expected shape error, got %q", msg)
 	}
 }
