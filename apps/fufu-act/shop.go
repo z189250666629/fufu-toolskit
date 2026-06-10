@@ -9,10 +9,13 @@ import (
 	"fufu/config"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
 var mcyHTTPClient = &http.Client{Timeout: 15 * time.Second}
+var mcyCookieMu sync.RWMutex
+var mcyLoginMu sync.Mutex
 
 var (
 	ErrShopLoginFailed     = errors.New("shop login failed")
@@ -31,25 +34,17 @@ func findShopPurchase(ctx context.Context, cardKey string) (ShopPurchaseLookup, 
 		return lookup, nil
 	}
 	lookup.Configured = true
-	if mcyCookie == "" {
-		if err := mcyLogin(ctx); err != nil {
-			return lookup, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
-		}
+	if err := ensureMCYCookie(ctx); err != nil {
+		return lookup, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
 	}
-	if mcyCookie == "" {
-		return lookup, ErrShopLoginFailed
-	}
+	staleCookie := getMCYCookie()
 	data, err := mcyPost(ctx, "/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
 	if err != nil {
 		if !isMCYAuthError(err) {
 			return lookup, classifyShopRequestError(err)
 		}
-		mcyCookie = ""
-		if err := mcyLogin(ctx); err != nil {
+		if err := refreshMCYCookie(ctx, staleCookie); err != nil {
 			return lookup, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
-		}
-		if mcyCookie == "" {
-			return lookup, ErrShopLoginFailed
 		}
 		data, err = mcyPost(ctx, "/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
 		if err != nil {
@@ -88,6 +83,52 @@ func extractPurchaseTime(data map[string]any) string {
 
 func mcyConfig() (string, string, string, string) {
 	return strings.TrimRight(firstNonEmpty(config.Env("MCY_BASE_URL"), config.Env("SHOP_BASE_URL")), "/"), firstNonEmpty(config.Env("MCY_USERNAME"), config.Env("SHOP_USERNAME")), firstNonEmpty(config.Env("MCY_PASSWORD"), config.Env("SHOP_PASSWORD")), firstNonEmpty(config.Env("MCY_LOGIN_ENDPOINT"), "/admin/login")
+}
+
+func getMCYCookie() string {
+	mcyCookieMu.RLock()
+	defer mcyCookieMu.RUnlock()
+	return mcyCookie
+}
+
+func setMCYCookie(value string) {
+	mcyCookieMu.Lock()
+	mcyCookie = value
+	mcyCookieMu.Unlock()
+}
+
+func ensureMCYCookie(ctx context.Context) error {
+	if getMCYCookie() != "" {
+		return nil
+	}
+	mcyLoginMu.Lock()
+	defer mcyLoginMu.Unlock()
+	if getMCYCookie() != "" {
+		return nil
+	}
+	if err := mcyLogin(ctx); err != nil {
+		return err
+	}
+	if getMCYCookie() == "" {
+		return ErrShopLoginFailed
+	}
+	return nil
+}
+
+func refreshMCYCookie(ctx context.Context, staleCookie string) error {
+	mcyLoginMu.Lock()
+	defer mcyLoginMu.Unlock()
+	if current := getMCYCookie(); current != "" && current != staleCookie {
+		return nil
+	}
+	setMCYCookie("")
+	if err := mcyLogin(ctx); err != nil {
+		return err
+	}
+	if getMCYCookie() == "" {
+		return ErrShopLoginFailed
+	}
+	return nil
 }
 
 type mcyHTTPError struct {
@@ -132,7 +173,7 @@ func mcyLogin(ctx context.Context) error {
 			parts = append(parts, cookie.Name+"="+cookie.Value)
 		}
 		if len(parts) > 0 {
-			mcyCookie = strings.Join(parts, "; ")
+			setMCYCookie(strings.Join(parts, "; "))
 		}
 	}
 	return nil
@@ -149,7 +190,7 @@ func mcyPost(ctx context.Context, endpoint string, payload any) (map[string]any,
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Cookie", mcyCookie)
+	req.Header.Set("Cookie", getMCYCookie())
 	resp, err := mcyHTTPClient.Do(req)
 	if err != nil {
 		return nil, err

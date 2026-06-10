@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -151,6 +153,57 @@ func TestFindShopPurchaseRefreshesExpiredCookie(t *testing.T) {
 	}
 	if postAttempts != 2 || loginAttempts != 1 {
 		t.Fatalf("postAttempts=%d loginAttempts=%d", postAttempts, loginAttempts)
+	}
+}
+
+func TestFindShopPurchaseConcurrentAuthRefreshIsRaceFree(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = ""
+
+	var loginAttempts atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/admin/login":
+			loginAttempts.Add(1)
+			time.Sleep(5 * time.Millisecond)
+			http.SetCookie(w, &http.Cookie{Name: "mcy_session", Value: "fresh"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodPost && r.URL.Path == "/plugin/virtual-card-ship/card/get":
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"list": []any{map[string]any{"purchase_time": "2026-06-10 12:00:00"}}}})
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.String())
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "p")
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 12)
+	for i := 0; i < cap(errs); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			got, err := findShopPurchase(context.Background(), "card-1")
+			if err != nil {
+				errs <- err
+				return
+			}
+			if got.PurchaseTime != "2026-06-10 12:00:00" {
+				errs <- errors.New("unexpected purchase time: " + got.PurchaseTime)
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	if got := loginAttempts.Load(); got != 1 {
+		t.Fatalf("concurrent empty-cookie lookups should share one auth refresh, got %d login attempts", got)
 	}
 }
 

@@ -90,7 +90,7 @@ func initAll() error {
 	} else {
 		tokenSvc = tokens.NewService(newapi.NewClient(site))
 	}
-	mcyCookie = config.Env("MCY_COOKIE")
+	setMCYCookie(config.Env("MCY_COOKIE"))
 	return nil
 }
 
