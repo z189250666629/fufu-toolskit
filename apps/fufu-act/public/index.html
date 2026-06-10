@@ -1698,7 +1698,7 @@
       scratchPosMap = [0,1,2,3,4,5,6,7,8];
       scratchRevealed = [];
       scratchMines = [];
-      scratchIsTest = (data.cardName || '').includes('test');
+      scratchIsTest = (data.cardName || '').toLowerCase().includes('test');
 
       if (data.scratchGame) {
         renderScratchState(data.scratchGame);

@@ -199,7 +199,7 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{404, "请先登录"}
 		}
-		if !strings.Contains(card.CardName, "test") {
+		if !strings.Contains(strings.ToLower(card.CardName), "test") {
 			return nil, httpErr{403, "仅测试卡可重开"}
 		}
 		if g, ok := getScratch(key); ok && g.Status == "playing" {
