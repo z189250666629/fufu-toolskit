@@ -94,6 +94,53 @@ func TestStaticMissingAssetsDoNotUseSPAFallback(t *testing.T) {
 	}
 }
 
+func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
+	oldRoot, oldFrontend, oldCombine := rootDir, frontendDir, combineDir
+	t.Cleanup(func() {
+		rootDir, frontendDir, combineDir = oldRoot, oldFrontend, oldCombine
+	})
+	tmp := t.TempDir()
+	rootDir = tmp
+	frontendDir = filepath.Join(tmp, "frontend")
+	combineDir = filepath.Join(tmp, "combine")
+	if err := os.MkdirAll(frontendDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"api.test.mjs":     "secret test marker",
+		".env.local":       "secret env marker",
+		"app.js":           "public app marker",
+		"assets/style.css": "public css marker",
+	} {
+		file := filepath.Join(frontendDir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, path := range []string{"/api.test.mjs", "/.env.local"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		route(w, req)
+		if w.Code == http.StatusOK {
+			t.Fatalf("%s should not be served: body=%s", path, w.Body.String())
+		}
+		if strings.Contains(w.Body.String(), "secret") {
+			t.Fatalf("%s leaked secret marker: %s", path, w.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "public app marker") {
+		t.Fatalf("normal asset should still be served: code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestCombineAPIRoutes(t *testing.T) {
 	for _, path := range []string{
 		"/api/auth",

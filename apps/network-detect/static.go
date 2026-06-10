@@ -12,6 +12,10 @@ func serveStatic(w http.ResponseWriter, r *http.Request, path string) {
 	if path == "/" {
 		path = "/index.html"
 	}
+	if !webutil.IsPublicStaticPath(path) {
+		http.NotFound(w, r)
+		return
+	}
 	file, ok := webutil.SafePath(frontendDir, path)
 	if !ok {
 		http.Error(w, "Forbidden", 403)

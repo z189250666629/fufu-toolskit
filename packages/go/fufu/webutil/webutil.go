@@ -37,6 +37,22 @@ func SafePath(root, urlPath string) (string, bool) {
 	return file, true
 }
 
+// IsPublicStaticPath reports whether an HTTP static asset path is safe to serve
+// from bundled browser assets. It rejects dotfiles and test artifacts that may
+// be present in source trees but should not be exposed by the production server.
+func IsPublicStaticPath(urlPath string) bool {
+	for _, segment := range strings.Split(strings.ReplaceAll(urlPath, "\\", "/"), "/") {
+		if segment == "" {
+			continue
+		}
+		if strings.HasPrefix(segment, ".") {
+			return false
+		}
+	}
+	base := filepath.Base(filepath.FromSlash(urlPath))
+	return !strings.Contains(strings.ToLower(base), ".test.")
+}
+
 func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	body, err := json.Marshal(payload)
 	if err != nil {

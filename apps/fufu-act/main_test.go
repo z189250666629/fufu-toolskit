@@ -148,6 +148,46 @@ func TestStaticRouteRejectsDirectoryListing(t *testing.T) {
 	}
 }
 
+func TestStaticRouteRejectsTestArtifactsAndDotfiles(t *testing.T) {
+	oldRoot := rootDir
+	defer func() { rootDir = oldRoot }()
+
+	tmp := t.TempDir()
+	rootDir = tmp
+	publicDir := filepath.Join(tmp, "public")
+	if err := os.MkdirAll(publicDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{
+		"activity-api.test.mjs": "secret test marker",
+		".env.local":            "secret env marker",
+		"activity-api.js":       "public api marker",
+	} {
+		if err := os.WriteFile(filepath.Join(publicDir, name), []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for _, path := range []string{"/activity-api.test.mjs", "/.env.local"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		staticRoute(w, req)
+		if w.Code == http.StatusOK {
+			t.Fatalf("%s should not be served: body=%s", path, w.Body.String())
+		}
+		if strings.Contains(w.Body.String(), "secret") {
+			t.Fatalf("%s leaked secret marker: %s", path, w.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/activity-api.js", nil)
+	w := httptest.NewRecorder()
+	staticRoute(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "public api marker") {
+		t.Fatalf("normal asset should still be served: code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestInitAllResetsTokenConfigStateOnPrimarySiteError(t *testing.T) {
 	oldRoot := rootDir
 	oldDB := db
