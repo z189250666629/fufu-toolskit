@@ -127,6 +127,30 @@ test('startAll prefixes every line from multiline stdout chunks', () => {
   assert.equal(writes.join(''), '[network] ready\n[network] listening\n');
 });
 
+test('startAll runs workspace commands from the configured repo root', () => {
+  const spawned = [];
+  const supervisor = createStartAllSupervisor({
+    cwd: 'C:\\repo\\fufu-toolskit',
+    logger: { log: () => {} },
+    stdout: { write: () => {} },
+    stderr: { write: () => {} },
+    spawn: (command, args, options) => {
+      const child = new FakeChild();
+      spawned.push({ command, args, options });
+      return child;
+    }
+  });
+
+  supervisor.start();
+
+  assert.equal(spawned.length, 3);
+  assert.deepEqual(spawned.map((entry) => entry.options.cwd), [
+    'C:\\repo\\fufu-toolskit',
+    'C:\\repo\\fufu-toolskit',
+    'C:\\repo\\fufu-toolskit'
+  ]);
+});
+
 test('stopAll waits until every child exits', async () => {
   const spawned = [];
   const supervisor = createStartAllSupervisor({

@@ -1,8 +1,12 @@
+import { fileURLToPath } from 'node:url';
+
 export const DEFAULT_COMMANDS = [
   { name: 'network', command: 'npm', args: ['--prefix', 'apps/network-detect', 'start'] },
   { name: 'act', command: 'npm', args: ['--prefix', 'apps/fufu-act', 'start'] },
   { name: 'y2k', command: 'npm', args: ['--prefix', 'apps/y2k-nav', 'start'] }
 ];
+
+const DEFAULT_CWD = fileURLToPath(new URL('../', import.meta.url));
 
 export function npmCommand(command, platform) {
   return platform === 'win32' && command === 'npm' ? 'npm.cmd' : command;
@@ -13,6 +17,7 @@ export function createStartAllSupervisor({
   spawn,
   platform = process.platform,
   env = process.env,
+  cwd = DEFAULT_CWD,
   stdout = process.stdout,
   stderr = process.stderr,
   logger = console,
@@ -100,7 +105,8 @@ export function createStartAllSupervisor({
       const child = spawn(npmCommand(item.command, platform), item.args, {
         stdio: 'pipe',
         shell: false,
-        env
+        env,
+        cwd
       });
       children.push(child);
       child.stdout?.on('data', createPrefixWriter(stdout, item.name));
