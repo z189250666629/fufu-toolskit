@@ -85,11 +85,7 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	}
 	rec := testRecord{OK: res.OK, Status: map[bool]string{true: "operational", false: "down"}[res.OK], Group: group, Stream: stream, TestedAt: time.Now().Unix(), Message: truncate(testMessage(res), 180), NextAllowedAt: next}
 	testResults.Store(key, rec)
-	modelCache.Lock()
-	if modelCache.Value != nil {
-		applyManual(modelCache.Value, siteName, model, group, rec, next)
-	}
-	modelCache.Unlock()
+	applyManualToCachedStatus(siteName, model, group, rec, next)
 	return map[string]any{"siteName": siteName, "model": model, "group": group, "test": rec}, nil
 }
 
@@ -148,6 +144,74 @@ func applyManual(ms *ModelStatus, siteName, model, group string, rec testRecord,
 			}
 		}
 	}
+}
+
+func applyManualToCachedStatus(siteName, model, group string, rec testRecord, next int64) {
+	modelCache.Lock()
+	defer modelCache.Unlock()
+	if modelCache.Value == nil {
+		return
+	}
+	nextStatus := cloneModelStatus(modelCache.Value)
+	applyManual(nextStatus, siteName, model, group, rec, next)
+	modelCache.Value = nextStatus
+}
+
+func cloneModelStatus(status *ModelStatus) *ModelStatus {
+	if status == nil {
+		return nil
+	}
+	clone := *status
+	if status.Sites != nil {
+		clone.Sites = make([]SiteStatus, len(status.Sites))
+		for i, site := range status.Sites {
+			clone.Sites[i] = site
+			clone.Sites[i].Groups = append([]string(nil), site.Groups...)
+		}
+	}
+	if status.Models != nil {
+		clone.Models = make([]ModelRow, len(status.Models))
+		for i := range status.Models {
+			clone.Models[i] = cloneModelRow(status.Models[i])
+		}
+	}
+	if status.Totals != nil {
+		clone.Totals = make(map[string]int, len(status.Totals))
+		for key, value := range status.Totals {
+			clone.Totals[key] = value
+		}
+	}
+	return &clone
+}
+
+func cloneModelRow(row ModelRow) ModelRow {
+	clone := row
+	if row.PerSite != nil {
+		clone.PerSite = make(map[string]*ModelCell, len(row.PerSite))
+		for key, cell := range row.PerSite {
+			clone.PerSite[key] = cloneModelCell(cell)
+		}
+	}
+	return clone
+}
+
+func cloneModelCell(cell *ModelCell) *ModelCell {
+	if cell == nil {
+		return nil
+	}
+	clone := *cell
+	clone.Groups = append([]string(nil), cell.Groups...)
+	if cell.Pricing != nil {
+		price := *cell.Pricing
+		clone.Pricing = &price
+	}
+	if cell.GroupStats != nil {
+		clone.GroupStats = make(map[string]*ModelCell, len(cell.GroupStats))
+		for key, groupCell := range cell.GroupStats {
+			clone.GroupStats[key] = cloneModelCell(groupCell)
+		}
+	}
+	return &clone
 }
 
 func buildOverview(ctx context.Context, q url.Values) map[string]any {
