@@ -80,6 +80,8 @@ func TestDeploymentSitesFromEnv(t *testing.T) {
 
 func TestLoadPrimarySitePrefersEnvThenConfigFile(t *testing.T) {
 	t.Run("env", func(t *testing.T) {
+		clearPrimaryEnv(t)
+		t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(t.TempDir(), "missing-managed-sites.json"))
 		t.Setenv("FUFU_COMBINE_API_URL", "https://combine.example.test/")
 		t.Setenv("FUFU_COMBINE_API_TOKEN", "combine-token")
 		t.Setenv("FUFU_COMBINE_USER_ID", "9")
@@ -114,6 +116,27 @@ func TestLoadPrimarySitePrefersEnvThenConfigFile(t *testing.T) {
 			t.Fatalf("file defaults not applied: %#v", site)
 		}
 	})
+}
+
+func TestLoadPrimarySitePrefersCurrentEnvOverLegacyCombineEnv(t *testing.T) {
+	clearPrimaryEnv(t)
+	t.Setenv("FUFU_COMBINE_API_URL", "https://legacy-combine.example.test/")
+	t.Setenv("FUFU_COMBINE_API_TOKEN", "legacy-combine-token")
+	t.Setenv("FUFU_COMBINE_NAME", "legacy-combine")
+	t.Setenv("FUFU_API_BASE_URL", "https://activity-api.example.test/")
+	t.Setenv("FUFU_API_TOKEN", "activity-token")
+	t.Setenv("FUFU_API_USER_ID", "9")
+
+	site, err := LoadPrimarySite(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if site.URL != "https://activity-api.example.test" || site.Token != "activity-token" || site.UserID != "9" {
+		t.Fatalf("FUFU_API_* should win over legacy FUFU_COMBINE_*: %#v", site)
+	}
+	if site.Name == "legacy-combine" {
+		t.Fatalf("FUFU_API_* should not inherit FUFU_COMBINE_NAME: %#v", site)
+	}
 }
 
 func TestLoadPrimarySiteReportsManagedSiteConfigErrorWhenNoLegacyConfig(t *testing.T) {
@@ -191,6 +214,7 @@ func clearPrimaryEnv(t *testing.T) {
 		"FUFU_COMBINE_NAME",
 		"FUFU_API_BASE_URL",
 		"FUFU_API_TOKEN",
+		"FUFU_API_NAME",
 		"FUFU_API_USER_ID",
 		"FUFU_QUOTA_UNIT",
 		"NEWAPI_API_SITE_URL",

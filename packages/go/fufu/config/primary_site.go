@@ -11,9 +11,6 @@ import (
 )
 
 func LoadPrimarySite(rootDir string) (newapi.Site, error) {
-	if site, ok := fufuCombinePrimarySiteFromEnv(); ok {
-		return site, nil
-	}
 	if site, ok := fufuAPIPrimarySiteFromEnv(); ok {
 		return site, nil
 	}
@@ -29,6 +26,9 @@ func LoadPrimarySite(rootDir string) (newapi.Site, error) {
 	sites, managedMsg := LoadManagedSites(rootDir)
 	if len(sites) > 0 {
 		return sites[0], nil
+	}
+	if site, ok := fufuCombinePrimarySiteFromEnv(); ok {
+		return site, nil
 	}
 	var legacyErr error
 	for _, path := range []string{filepath.Join(rootDir, "config.json")} {
@@ -79,7 +79,7 @@ func fufuAPIPrimarySiteFromEnv() (newapi.Site, bool) {
 	return primarySiteFromEnv(primarySiteEnvDef{
 		URL:       Env("FUFU_API_BASE_URL"),
 		Token:     Env("FUFU_API_TOKEN"),
-		Name:      Env("FUFU_COMBINE_NAME"),
+		Name:      Env("FUFU_API_NAME"),
 		UserID:    Env("FUFU_API_USER_ID"),
 		QuotaUnit: Env("FUFU_QUOTA_UNIT"),
 	})
