@@ -122,6 +122,32 @@ func TestStaticRouteServesPublicIndex(t *testing.T) {
 	}
 }
 
+func TestStaticRouteRejectsDirectoryListing(t *testing.T) {
+	oldRoot := rootDir
+	defer func() { rootDir = oldRoot }()
+
+	tmp := t.TempDir()
+	rootDir = tmp
+	assetsDir := filepath.Join(tmp, "public", "assets")
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(assetsDir, "secret.txt"), []byte("do not list me"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/assets/", nil)
+	w := httptest.NewRecorder()
+	staticRoute(w, req)
+
+	if w.Code == http.StatusOK {
+		t.Fatalf("directory listing should not be served: code=%d body=%s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "secret.txt") {
+		t.Fatalf("directory listing leaked file names: %s", w.Body.String())
+	}
+}
+
 func TestInitAllResetsTokenConfigStateOnPrimarySiteError(t *testing.T) {
 	oldRoot := rootDir
 	oldDB := db

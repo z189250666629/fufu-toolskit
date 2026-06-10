@@ -71,7 +71,12 @@ func staticRoute(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Forbidden", 403)
 		return
 	}
-	if _, err := os.Stat(file); err != nil {
+	info, err := os.Stat(file)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if info.IsDir() {
 		http.NotFound(w, r)
 		return
 	}
