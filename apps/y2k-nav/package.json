@@ -6,6 +6,8 @@
     "dev": "go run .",
     "start": "go run .",
     "build": "go build -o y2k-nav .",
-    "test": "go test ./..."
+    "test:go": "go test ./...",
+    "test:frontend": "node --test *.test.mjs",
+    "test": "npm run test:go && npm run test:frontend"
   }
 }

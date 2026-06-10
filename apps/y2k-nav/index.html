@@ -320,34 +320,13 @@ body::before {
 
 </div>
 
+<script type="module">
+import { initTheme } from './theme.mjs';
+
+initTheme();
+</script>
 <script>
 (function() {
-  const html = document.documentElement;
-  const btn = document.getElementById('themeToggle');
-  const icon = document.getElementById('themeIcon');
-  const stored = localStorage.getItem('theme');
-
-  function applyTheme(dark) {
-    html.setAttribute('data-theme', dark ? 'dark' : 'light');
-    icon.textContent = dark ? '☀' : '☽';
-    localStorage.setItem('theme', dark ? 'dark' : 'light');
-  }
-
-  if (stored) {
-    applyTheme(stored === 'dark');
-  } else {
-    applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
-  }
-
-  btn.addEventListener('click', function() {
-    const isDark = html.getAttribute('data-theme') === 'dark';
-    applyTheme(!isDark);
-  });
-
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-    if (!localStorage.getItem('theme')) applyTheme(e.matches);
-  });
-
   document.querySelectorAll('a[data-ping]').forEach(function(a) {
     var url = a.getAttribute('data-ping');
     var el = a.querySelector('.latency');
