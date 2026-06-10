@@ -151,7 +151,11 @@ ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" "
   i=0
   READY=0
   while [ \$i -lt 30 ]; do
-    STATUS=\$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \"\$CID\")
+    STATUS=\$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \"\$CID\" 2>/dev/null || true)
+    if [ -z \"\$STATUS\" ]; then
+      echo \"container status: inspect_failed\"
+      break
+    fi
     echo \"container status: \$STATUS\"
     if [ \"\$STATUS\" = 'healthy' ] || [ \"\$STATUS\" = 'running' ]; then
       READY=1
