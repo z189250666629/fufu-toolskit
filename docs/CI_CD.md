@@ -44,8 +44,8 @@ GitHub Actions 部署环境固定使用 `toolskit`。不要新增或切换到 `d
 | `NEWAPI_TOKEN_SITE_TOKEN` | Token 站 token |
 | `NEWAPI_MANAGED_API_SITES` | network 完整站点配置，可选 |
 | `NEWAPI_MANAGED_API_CONFIG` | network 完整站点配置，可选；适合放非密钥 JSON 配置 |
-| `CONNECTIVITY_API_URLS` | network URL 检测列表，可选多地址覆盖；留空时复用 `NEWAPI_API_SITE_URL` |
-| `CONNECTIVITY_TOKEN_URLS` | network URL 检测列表，可选多地址覆盖；留空时复用 `NEWAPI_TOKEN_SITE_URL` |
+| `CONNECTIVITY_API_URLS` | network URL 检测列表，可选多地址覆盖；留空时复用非内网 `NEWAPI_API_SITE_URL` |
+| `CONNECTIVITY_TOKEN_URLS` | network URL 检测列表，可选多地址覆盖；留空时复用非内网 `NEWAPI_TOKEN_SITE_URL` |
 | `FUFU_API_BASE_URL` | fufu-act 可覆盖 NewAPI URL |
 | `FUFU_API_TOKEN` | fufu-act 可覆盖 NewAPI token |
 | `FUFU_API_USER_ID` | fufu-act NewAPI user id，默认 `1` |
@@ -53,7 +53,7 @@ GitHub Actions 部署环境固定使用 `toolskit`。不要新增或切换到 `d
 | `MCY_BASE_URL` / `MCY_COOKIE` / `MCY_USERNAME` / `MCY_PASSWORD` | fufu-act 商城校验，可选 |
 | `ADMIN_TOKEN` | fufu-act 后台 token；未设置时后台接口拒绝访问 |
 
-其中 token、password、cookie、`ADMIN_TOKEN` 这类敏感值优先放 GitHub Secrets；URL、端口、路径等非敏感值放 Variables。`CONNECTIVITY_*` 不是必填重复变量，只有需要同一站点多地址探测时才配置。
+其中 token、password、cookie、`ADMIN_TOKEN` 这类敏感值优先放 GitHub Secrets；URL、端口、路径等非敏感值放 Variables。`CONNECTIVITY_*` 不是必填重复变量，只有需要同一站点多地址探测，或确实要让浏览器检测内网/本机地址时才配置。
 
 ## 本地检查
 

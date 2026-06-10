@@ -37,12 +37,13 @@ export {
 function renderSiteStatusCard(site, group, summary, windowLabel) {
   const meta = modelStatusMeta(summary.status, true);
   const siteError = site.logError || site.channelsError || site.pricingError || '';
+  const siteDisplayUrl = site.site.displayUrl || '地址已隐藏';
   return `
     <article class="model-site-card" data-slot="card">
       <div class="model-site-head" data-slot="card-header">
         <div>
           <h3 data-slot="card-title">${escapeHtml(modelSiteDisplayName(site.site.name))}</h3>
-          <p data-slot="card-description">${escapeHtml(site.site.url)} · ${escapeHtml(group || '-')}</p>
+          <p data-slot="card-description">${escapeHtml(siteDisplayUrl)} · ${escapeHtml(group || '-')}</p>
         </div>
         ${renderChip(meta.label, meta.tone, 'status')}
       </div>

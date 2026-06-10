@@ -68,7 +68,7 @@ $env:PORT = '8080'
 ```
 
 也支持 `NEWAPI_MANAGED_API_SITES` / `NEWAPI_MANAGED_API_CONFIG`。合卡功能复用同一套 NewAPI 配置。
-`CONNECTIVITY_API_URLS`、`CONNECTIVITY_TOKEN_URLS` 仅是可选多地址检测覆盖；留空时分别复用 `NEWAPI_API_SITE_URL`、`NEWAPI_TOKEN_SITE_URL`，不要为了单站点重复新增变量。
+`CONNECTIVITY_API_URLS`、`CONNECTIVITY_TOKEN_URLS` 仅是可选多地址检测覆盖；留空时分别复用非内网的 `NEWAPI_API_SITE_URL`、`NEWAPI_TOKEN_SITE_URL`，不要为了单站点重复新增变量。若确实要让浏览器检测内网/本机地址，必须显式配置 `CONNECTIVITY_*`。
 
 ### fufu-act / activity
 

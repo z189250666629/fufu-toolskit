@@ -27,7 +27,8 @@ type Site struct {
 
 type PublicSite struct {
 	Name                string  `json:"name"`
-	URL                 string  `json:"url"`
+	URL                 string  `json:"url,omitempty"`
+	DisplayURL          string  `json:"displayUrl"`
 	UserID              string  `json:"userId"`
 	Kind                string  `json:"kind,omitempty"`
 	SkipUserHeader      bool    `json:"skipUserHeader,omitempty"`
@@ -39,7 +40,7 @@ type PublicSite struct {
 }
 
 func (s Site) Public() PublicSite {
-	return PublicSite{Name: s.Name, URL: s.URL, UserID: s.UserID, Kind: s.Kind, SkipUserHeader: s.SkipUserHeader, QuotaUnit: s.QuotaUnit, Currency: s.Currency, RechargeRatio: s.RechargeRatio, ChannelListEndpoint: s.ChannelListEndpoint, Note: s.Note}
+	return PublicSite{Name: s.Name, DisplayURL: "地址已隐藏", UserID: s.UserID, Kind: s.Kind, SkipUserHeader: s.SkipUserHeader, QuotaUnit: s.QuotaUnit, Currency: s.Currency, RechargeRatio: s.RechargeRatio, ChannelListEndpoint: s.ChannelListEndpoint, Note: s.Note}
 }
 
 type Client struct {

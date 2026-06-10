@@ -110,3 +110,50 @@ test('renderModelAvailability surfaces pricing errors on site card', () => {
   assert.match(html, /pricing failed &lt;script&gt;/);
   assert.doesNotMatch(html, /pricing failed <script>/);
 });
+
+test('renderModelAvailability hides raw managed site URLs', () => {
+  const html = renderModelAvailability({
+    state: {
+      loading: false,
+      error: '',
+      modelFilter: '',
+      testingCells: new Set(),
+      groupSelectOpen: false,
+      modelStatus: {
+        configured: true,
+        windowSeconds: 3600,
+        expiresAt: 0,
+        sites: [{
+          site: {
+            name: 'private-site',
+            displayUrl: '地址已隐藏',
+            url: 'http://10.0.0.5:3000/admin'
+          },
+          groups: ['vip']
+        }],
+        models: [{
+          model: 'model-a',
+          perSite: {
+            'private-site': {
+              configured: true,
+              groupStats: {
+                vip: {
+                  configured: true,
+                  status: 'operational',
+                  requestCount: 1,
+                  successCount: 1,
+                  failureCount: 0,
+                  enabledChannelCount: 1
+                }
+              }
+            }
+          }
+        }]
+      }
+    }
+  });
+
+  assert.match(html, /地址已隐藏/);
+  assert.doesNotMatch(html, /10\.0\.0\.5/);
+  assert.doesNotMatch(html, /http:\/\/10\.0\.0\.5:3000\/admin/);
+});

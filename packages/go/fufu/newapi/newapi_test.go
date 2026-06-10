@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -29,6 +30,24 @@ func TestRequestAddsAuthHeadersAndParsesJSON(t *testing.T) {
 	}
 	if data["success"] != true {
 		t.Fatalf("decoded success = %#v", data["success"])
+	}
+}
+
+func TestPublicSiteHidesRawURLAndToken(t *testing.T) {
+	public := Site{Name: "private-site", URL: "http://10.0.0.5:3000/admin", Token: "sk-private", UserID: "1"}.Public()
+	raw, err := json.Marshal(public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(raw)
+
+	for _, leaked := range []string{"http://10.0.0.5:3000/admin", "10.0.0.5", "3000", "sk-private"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("public site leaked %q in %s", leaked, body)
+		}
+	}
+	if public.DisplayURL == "" {
+		t.Fatalf("public site should expose a safe display label: %#v", public)
 	}
 }
 

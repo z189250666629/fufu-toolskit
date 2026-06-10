@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHealth(t *testing.T) {
@@ -280,6 +281,112 @@ func TestNewAPISitesMasksExplicitManagedSiteConfigPath(t *testing.T) {
 		if strings.Contains(body, leaked) {
 			t.Fatalf("explicit config error leaked %q in %s", leaked, body)
 		}
+	}
+}
+
+func TestNewAPISitesDoesNotExposeRawManagedSiteURLs(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	rawURL := "http://10.0.0.5:3000/admin"
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `[{"name":"private-site","url":"`+rawURL+`","token":"sk-private"}]`)
+	req := httptest.NewRequest(http.MethodGet, "/api/newapi/sites", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := w.Body.String()
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	for _, leaked := range []string{rawURL, "10.0.0.5", "3000", "sk-private"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("public managed-site response leaked %q in %s", leaked, body)
+		}
+	}
+	if !strings.Contains(body, `"displayUrl"`) {
+		t.Fatalf("response should provide a safe displayUrl instead of raw url: %s", body)
+	}
+}
+
+func TestNewAPIStatusEndpointsDoNotExposeRawManagedSiteURLs(t *testing.T) {
+	oldRootDir := rootDir
+	oldValue := modelCache.Value
+	oldExpires := modelCache.Expires
+	oldKey := modelCache.Key
+	t.Cleanup(func() {
+		rootDir = oldRootDir
+		modelCache.Lock()
+		modelCache.Value = oldValue
+		modelCache.Expires = oldExpires
+		modelCache.Key = oldKey
+		modelCache.Unlock()
+	})
+	rootDir = t.TempDir()
+	modelCache.Lock()
+	modelCache.Value = nil
+	modelCache.Expires = time.Time{}
+	modelCache.Key = ""
+	modelCache.Unlock()
+	clearManagedSiteEnv(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"success": true, "data": []any{}})
+	}))
+	defer server.Close()
+	t.Setenv("NEWAPI_MANAGED_API_SITES", managedSiteConfigJSON("private-site", server.URL))
+
+	for _, path := range []string{"/api/newapi/model-status", "/api/newapi/overview"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+
+		handleAPI(w, req)
+
+		body := w.Body.String()
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s code=%d body=%s", path, w.Code, body)
+		}
+		for _, leaked := range []string{server.URL, "127.0.0.1", "localhost"} {
+			if strings.Contains(body, leaked) {
+				t.Fatalf("%s leaked raw managed-site URL detail %q in %s", path, leaked, body)
+			}
+		}
+	}
+}
+
+func TestConnectivityTargetsDoNotExposePrivateNewAPIFallbackURLs(t *testing.T) {
+	clearConnectivityEnv(t)
+	t.Setenv("NEWAPI_API_SITE_URL", "http://10.0.0.5:3000")
+	req := httptest.NewRequest(http.MethodGet, "/api/connectivity/targets", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := w.Body.String()
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	for _, leaked := range []string{"10.0.0.5", "3000", "http://10.0.0.5:3000"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("connectivity targets leaked private NewAPI fallback URL %q in %s", leaked, body)
+		}
+	}
+	if !strings.Contains(body, "api.fufuapi.top") {
+		t.Fatalf("private NewAPI fallback should fall back to public defaults, got %s", body)
+	}
+}
+
+func TestConnectivityTargetsKeepExplicitPrivateConnectivityURLs(t *testing.T) {
+	clearConnectivityEnv(t)
+	t.Setenv("CONNECTIVITY_API_URLS", "http://10.0.0.5:3000")
+	req := httptest.NewRequest(http.MethodGet, "/api/connectivity/targets", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := w.Body.String()
+	if w.Code != http.StatusOK || !strings.Contains(body, "10.0.0.5") {
+		t.Fatalf("explicit connectivity URL should be preserved for browser checks: code=%d body=%s", w.Code, body)
 	}
 }
 
