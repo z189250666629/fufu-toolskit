@@ -35,7 +35,7 @@ func TestValidateGenerateParams(t *testing.T) {
 		{count: 100, quota: 1, intervalUnit: -1},
 	}
 	for _, tc := range validCases {
-		if !validateGenerateParams(tc.count, tc.quota, tc.intervalUnit) {
+		if !validateGenerateParams(tc.count, tc.quota, tc.intervalUnit, 500000) {
 			t.Fatalf("expected valid params: %#v", tc)
 		}
 	}
@@ -51,9 +51,15 @@ func TestValidateGenerateParams(t *testing.T) {
 		{count: 1, quota: 1, intervalUnit: 0},
 	}
 	for _, tc := range invalidCases {
-		if validateGenerateParams(tc.count, tc.quota, tc.intervalUnit) {
+		if validateGenerateParams(tc.count, tc.quota, tc.intervalUnit, 500000) {
 			t.Fatalf("expected invalid params: %#v", tc)
 		}
+	}
+}
+
+func TestValidateGenerateParamsRejectsQuotaThatRoundsToZero(t *testing.T) {
+	if validateGenerateParams(1, 0.0000001, 60, 500000) {
+		t.Fatal("quota that rounds to zero should be invalid")
 	}
 }
 

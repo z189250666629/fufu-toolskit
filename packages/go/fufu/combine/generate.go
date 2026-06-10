@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-func validateGenerateParams(count int, quota float64, intervalUnit int) bool {
-	return count >= 1 && count <= 100 && quota > 0 && intervalUnit != 0
+func validateGenerateParams(count int, quota float64, intervalUnit int, quotaUnit int64) bool {
+	return count >= 1 && count <= 100 && quota > 0 && intervalUnit != 0 && generateTotalQuota(quota, quotaUnit) > 0
 }
 
 func generateTotalQuota(quota float64, quotaUnit int64) int64 {

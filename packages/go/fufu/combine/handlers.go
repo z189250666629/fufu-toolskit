@@ -152,7 +152,7 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		writeBadJSONRequest(w)
 		return
 	}
-	if !validateGenerateParams(p.Count, p.Quota, p.IntervalUnit) {
+	if !validateGenerateParams(p.Count, p.Quota, p.IntervalUnit, a.quotaUnit) {
 		writeJSON(w, 400, map[string]string{"error": "参数无效"})
 		return
 	}
