@@ -353,6 +353,7 @@
 
     /* ---- admin logic ---- */
     let timer = null;
+    let loadSeq = 0;
 
     function startAuto() {
       stopAuto();
@@ -366,6 +367,7 @@
     }
 
     async function load() {
+      const seq = ++loadSeq;
       const tok = document.getElementById('token').value.trim();
       const errEl = document.getElementById('err');
       errEl.textContent = '';
@@ -377,10 +379,12 @@
           serverErrorMessage: '统计加载失败，请稍后重试',
           clientErrorMessage: '统计加载失败，请稍后重试',
         });
+        if (seq !== loadSeq) return;
         render(data);
         const prefix = timer ? '自动刷新中（每 10 秒）— ' : '';
         document.getElementById('info').textContent = prefix + '最后更新：' + new Date().toLocaleTimeString('zh-CN');
       } catch(e) {
+        if (seq !== loadSeq) return;
         errEl.textContent = activityApi.safeErrorMessage(e, '统计加载失败，请稍后重试');
       }
     }
