@@ -25,7 +25,7 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 			return nil, httpErr{403, "此卡密不参与刮刮乐活动"}
 		}
 		if g, ok := getScratch(key); ok {
-			return map[string]any{"cells": 9, "revealed": jsonArr(g.Revealed), "prize": g.PrizeDollars, "status": g.Status}, nil
+			return scratchStartResponse(g), nil
 		}
 		mines := []int{}
 		for len(mines) < scratchMines {
@@ -43,7 +43,7 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 		mb, _ := json.Marshal(mines)
 		if _, err := db.Exec(`INSERT INTO scratch_games (card_key,mine_pos) VALUES (?,?)`, key, string(mb)); err != nil {
 			if g, ok := getScratch(key); ok {
-				return map[string]any{"cells": 9, "revealed": jsonArr(g.Revealed), "prize": g.PrizeDollars, "status": g.Status}, nil
+				return scratchStartResponse(g), nil
 			}
 			return nil, err
 		}
@@ -111,7 +111,11 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		if status == "won" && prize > 0 {
 			enqueueCredit(key, prize)
 		}
-		return map[string]any{"hit": false, "prize": prize, "status": status, "revealed": revealed}, nil
+		response := map[string]any{"hit": false, "prize": prize, "status": status, "revealed": revealed}
+		if isScratchGameOver(status) {
+			response["mines"] = mines
+		}
+		return response, nil
 	})
 	if err != nil {
 		writeHTTPError(w, err)
@@ -200,6 +204,24 @@ func getScratch(key string) (ScratchGame, bool) {
 	var g ScratchGame
 	err := db.QueryRow(`SELECT id,card_key,mine_pos,revealed,prize_dollars,status FROM scratch_games WHERE card_key=?`, key).Scan(&g.ID, &g.CardKey, &g.MinePos, &g.Revealed, &g.PrizeDollars, &g.Status)
 	return g, err == nil
+}
+
+func scratchGameResponse(g ScratchGame) map[string]any {
+	response := map[string]any{"revealed": jsonArr(g.Revealed), "prize": g.PrizeDollars, "status": g.Status}
+	if isScratchGameOver(g.Status) {
+		response["mines"] = jsonArr(g.MinePos)
+	}
+	return response
+}
+
+func scratchStartResponse(g ScratchGame) map[string]any {
+	response := scratchGameResponse(g)
+	response["cells"] = 9
+	return response
+}
+
+func isScratchGameOver(status string) bool {
+	return status == "won" || status == "lost" || status == "cashout"
 }
 
 func jsonArr(s string) []int {

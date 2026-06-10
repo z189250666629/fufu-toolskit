@@ -84,12 +84,7 @@ func respondCard(w http.ResponseWriter, card Card) {
 	var sg any
 	if isScratch {
 		if g, ok := getScratch(card.CardKey); ok {
-			gameOver := g.Status == "won" || g.Status == "lost" || g.Status == "cashout"
-			m := map[string]any{"revealed": jsonArr(g.Revealed), "prize": g.PrizeDollars, "status": g.Status}
-			if gameOver {
-				m["mines"] = jsonArr(g.MinePos)
-			}
-			sg = m
+			sg = scratchGameResponse(g)
 		}
 	}
 	writeJSON(w, 200, map[string]any{"cardKey": card.CardKey, "cardName": card.CardName, "dollars": card.Dollars, "totalSpins": card.TotalSpins, "usedSpins": card.UsedSpins, "remainingSpins": card.TotalSpins - card.UsedSpins, "totalWon": card.TotalWon, "wonJackpot": card.WonJackpot != 0, "history": hist, "isScratch": isScratch, "scratchGame": sg})
