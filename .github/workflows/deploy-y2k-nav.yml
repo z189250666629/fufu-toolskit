@@ -38,7 +38,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: apps/y2k-nav/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - run: go test -count=1 ./...
+      - run: npm --prefix apps/y2k-nav run test:frontend
   docker:
     needs: verify
     runs-on: ubuntu-latest

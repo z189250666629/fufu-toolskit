@@ -73,6 +73,20 @@ test('deploy workflow verify jobs run uncached Go tests', async () => {
   }
 });
 
+test('deploy workflow verify jobs run frontend tests before packaging images', async () => {
+  const expectations = new Map([
+    ['.github/workflows/deploy-act.yml', 'npm --prefix apps/fufu-act run test:frontend'],
+    ['.github/workflows/deploy-network.yml', 'npm --prefix apps/network-detect run test:frontend'],
+    ['.github/workflows/deploy-y2k-nav.yml', 'npm --prefix apps/y2k-nav run test:frontend']
+  ]);
+
+  for (const [path, frontendTestCommand] of expectations) {
+    const source = await readRepoFile(path);
+    assert.match(source, /actions\/setup-node@v4/, `${path} should install Node in deploy verification`);
+    assert.match(source, new RegExp(`^\\s*-\\s*run:\\s*${frontendTestCommand.replaceAll('/', '\\/')}\\s*$`, 'm'), `${path} should run app frontend tests in deploy verification`);
+  }
+});
+
 test('repo docs and agent instructions do not recommend cache-prone Go tests', async () => {
   for (const path of [
     'README.md',

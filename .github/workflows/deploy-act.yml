@@ -41,7 +41,11 @@ jobs:
           cache-dependency-path: |
             apps/fufu-act/go.sum
             packages/go/fufu/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - run: go test -count=1 ./...
+      - run: npm --prefix apps/fufu-act run test:frontend
   docker:
     needs: verify
     runs-on: ubuntu-latest
