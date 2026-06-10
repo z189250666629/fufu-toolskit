@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"fufu/activity"
 	"fufu/newapi"
 	"net/http"
@@ -21,7 +23,11 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeMissingCardKey(w)
 		return
 	}
-	card, ok := getCard(key)
+	card, ok, lookupErr := lookupCard(key)
+	if lookupErr != nil {
+		writeJSONError(w, http.StatusInternalServerError, "服务器错误")
+		return
+	}
 	if !ok {
 		if tokenSvc == nil {
 			writeJSONError(w, 503, "NewAPI 未配置: "+errString(tokenConfigErr))
@@ -71,7 +77,11 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, 500, err.Error())
 			return
 		}
-		card, _ = getCard(key)
+		card, ok, lookupErr = lookupCard(key)
+		if lookupErr != nil || !ok {
+			writeJSONError(w, http.StatusInternalServerError, "服务器错误")
+			return
+		}
 	}
 	respondCard(w, card)
 }
@@ -114,9 +124,20 @@ func loadSpinHistory(cardKey string) ([]map[string]any, error) {
 }
 
 func getCard(key string) (Card, bool) {
+	c, ok, _ := lookupCard(key)
+	return c, ok
+}
+
+func lookupCard(key string) (Card, bool, error) {
 	var c Card
 	err := db.QueryRow(`SELECT card_key,card_name,dollars,total_spins,used_spins,won_jackpot,total_won,source,purchase_time,rigged FROM cards WHERE card_key=?`, key).Scan(&c.CardKey, &c.CardName, &c.Dollars, &c.TotalSpins, &c.UsedSpins, &c.WonJackpot, &c.TotalWon, &c.Source, &c.PurchaseTime, &c.Rigged)
-	return c, err == nil
+	if err == nil {
+		return c, true, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return Card{}, false, nil
+	}
+	return Card{}, false, err
 }
 
 func nullString(s string) any {

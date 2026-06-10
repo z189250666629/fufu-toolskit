@@ -51,3 +51,19 @@ func TestHandleSpinRejectsUnsupportedStoredDollarTier(t *testing.T) {
 		t.Fatalf("spin_log rows = %d", logs)
 	}
 }
+
+func TestHandleSpinReturnsServerErrorWhenCardLookupFails(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"spin-card"}`))
+	w := httptest.NewRecorder()
+
+	handleSpin(w, req)
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}

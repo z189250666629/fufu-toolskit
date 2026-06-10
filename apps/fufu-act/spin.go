@@ -23,7 +23,10 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := withCardLock(key, func() (any, error) {
-		card, ok := getCard(key)
+		card, ok, lookupErr := lookupCard(key)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
 		if !ok {
 			return nil, httpErr{404, "请先登录"}
 		}
@@ -85,7 +88,10 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 		committed = true
-		updated, ok := getCard(key)
+		updated, ok, lookupErr := lookupCard(key)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
 		if !ok {
 			return nil, httpErr{500, "服务器错误"}
 		}
