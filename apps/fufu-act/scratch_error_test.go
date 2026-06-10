@@ -84,6 +84,41 @@ func TestScratchRevealRejectsCorruptMinePositions(t *testing.T) {
 	}
 }
 
+func TestScratchRevealRejectsInvalidPersistedScratchArrays(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		minePos  string
+		revealed string
+	}{
+		{name: "duplicate mines", minePos: "[7,7]", revealed: "[]"},
+		{name: "mine out of range", minePos: "[7,9]", revealed: "[]"},
+		{name: "wrong mine count", minePos: "[7]", revealed: "[]"},
+		{name: "duplicate revealed", minePos: "[7,8]", revealed: "[0,0]"},
+		{name: "revealed out of range", minePos: "[7,8]", revealed: "[9]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupScratchLockTestDB(t)
+			seedScratchGame(t, "scratch-card", tc.minePos, tc.revealed, 0, "playing")
+
+			req := httptest.NewRequest(http.MethodPost, "/api/scratch/reveal", strings.NewReader(`{"cardKey":"scratch-card","cellIndex":0}`))
+			w := httptest.NewRecorder()
+
+			handleScratchReveal(w, req)
+
+			if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "进度异常") {
+				t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+			}
+			var status, revealed string
+			if err := db.QueryRow(`SELECT status,revealed FROM scratch_games WHERE card_key=?`, "scratch-card").Scan(&status, &revealed); err != nil {
+				t.Fatal(err)
+			}
+			if status != "playing" || revealed != tc.revealed {
+				t.Fatalf("invalid scratch state should not mutate game, status=%q revealed=%s", status, revealed)
+			}
+		})
+	}
+}
+
 func TestScratchRevealRequiresEligibleScratchCard(t *testing.T) {
 	setupScratchLockTestDB(t)
 	if _, err := db.Exec(`INSERT INTO scratch_games (card_key, mine_pos, revealed, prize_dollars, status) VALUES (?,?,?,?,?)`, "orphan-scratch", "[7,8]", "[]", 0, "playing"); err != nil {

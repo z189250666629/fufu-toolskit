@@ -103,7 +103,7 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		if _, err := requireScratchEligibleCard(r.Context(), key); err != nil {
 			return nil, err
 		}
-		revealed, err := parseScratchIntArray(g.Revealed)
+		revealed, err := parseScratchRevealedCells(g.Revealed)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 				return nil, httpErr{400, "此格已刮开"}
 			}
 		}
-		mines, err := parseScratchIntArray(g.MinePos)
+		mines, err := parseScratchMineCells(g.MinePos)
 		if err != nil {
 			return nil, err
 		}
@@ -193,11 +193,11 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 		if _, err := requireScratchEligibleCard(r.Context(), key); err != nil {
 			return nil, err
 		}
-		revealed, err := parseScratchIntArray(g.Revealed)
+		revealed, err := parseScratchRevealedCells(g.Revealed)
 		if err != nil {
 			return nil, err
 		}
-		mines, err := parseScratchIntArray(g.MinePos)
+		mines, err := parseScratchMineCells(g.MinePos)
 		if err != nil {
 			return nil, err
 		}
@@ -304,13 +304,13 @@ func lookupScratch(key string) (ScratchGame, bool, error) {
 }
 
 func scratchGameResponse(g ScratchGame) (map[string]any, error) {
-	revealed, err := parseScratchIntArray(g.Revealed)
+	revealed, err := parseScratchRevealedCells(g.Revealed)
 	if err != nil {
 		return nil, err
 	}
 	response := map[string]any{"revealed": revealed, "prize": g.PrizeDollars, "status": g.Status}
 	if isScratchGameOver(g.Status) {
-		mines, err := parseScratchIntArray(g.MinePos)
+		mines, err := parseScratchMineCells(g.MinePos)
 		if err != nil {
 			return nil, err
 		}
@@ -348,6 +348,42 @@ func parseScratchIntArray(s string) ([]int, error) {
 		return []int{}, nil
 	}
 	return a, nil
+}
+
+func parseScratchRevealedCells(s string) ([]int, error) {
+	cells, err := parseScratchIntArray(s)
+	if err != nil {
+		return nil, err
+	}
+	if !validScratchCells(cells, scratchMaxReveals) {
+		return nil, httpErr{http.StatusBadRequest, "刮刮乐进度异常，请重开"}
+	}
+	return cells, nil
+}
+
+func parseScratchMineCells(s string) ([]int, error) {
+	cells, err := parseScratchIntArray(s)
+	if err != nil {
+		return nil, err
+	}
+	if len(cells) != scratchMines || !validScratchCells(cells, scratchMines) {
+		return nil, httpErr{http.StatusBadRequest, "刮刮乐进度异常，请重开"}
+	}
+	return cells, nil
+}
+
+func validScratchCells(cells []int, maxCount int) bool {
+	if len(cells) > maxCount {
+		return false
+	}
+	seen := map[int]bool{}
+	for _, cell := range cells {
+		if cell < 0 || cell > 8 || seen[cell] {
+			return false
+		}
+		seen[cell] = true
+	}
+	return true
 }
 
 func intContains(a []int, v int) bool {
