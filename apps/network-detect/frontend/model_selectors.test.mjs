@@ -46,6 +46,17 @@ test('activeModelScope chooses selected site and token group', () => {
   assert.equal(activeModelScope(modelStatus, { selectedModelSite: 'missing' }).siteName, '次数fufu');
 });
 
+test('activeModelScope falls back when mix group is unavailable', () => {
+  const status = {
+    sites: [
+      { site: { name: '次数fufu' }, groups: ['vip', 'default'] }
+    ]
+  };
+
+  assert.equal(activeModelScope(status, {}).group, 'vip');
+  assert.equal(activeModelScope(status, { selectedTokenGroup: 'default' }).group, 'default');
+});
+
 test('manual test display can override unknown cells', () => {
   const got = applyManualTestDisplay({
     status: 'unknown',

@@ -14,9 +14,8 @@ export function activeModelScope(modelStatus, stateLike = {}) {
   const preferredSite = sites.find((item) => item.site.name === stateLike.selectedModelSite) || sites[0] || null;
   const siteName = preferredSite?.site.name || '';
   const groups = preferredSite?.groups || [];
-  const group = siteName === '次数fufu'
-    ? 'mix'
-    : (stateLike.selectedTokenGroup && groups.includes(stateLike.selectedTokenGroup) ? stateLike.selectedTokenGroup : groups[0] || '');
+  const selectedGroup = stateLike.selectedTokenGroup && groups.includes(stateLike.selectedTokenGroup) ? stateLike.selectedTokenGroup : '';
+  const group = selectedGroup || (siteName === '次数fufu' && groups.includes('mix') ? 'mix' : groups[0] || '');
   return { site: preferredSite, siteName, group, groups };
 }
 
