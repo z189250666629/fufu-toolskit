@@ -48,7 +48,7 @@ func processCredits() {
 			}
 			_, _ = db.Exec(`UPDATE credit_queue SET retries=?, status=?, error=? WHERE id=?`, nr, status, err.Error(), id)
 		} else {
-			_, _ = db.Exec(`UPDATE credit_queue SET status='done', processed_at=datetime('now') WHERE id=?`, id)
+			_, _ = db.Exec(`UPDATE credit_queue SET status='done', error=NULL, processed_at=datetime('now') WHERE id=?`, id)
 		}
 	}
 	if err := rows.Err(); err != nil {
