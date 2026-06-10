@@ -9,31 +9,44 @@ import (
 )
 
 func loadSiteLogs(site newapi.Site, typ int, start, end int64) ([]LogRow, string) {
-	q := url.Values{}
-	q.Set("p", "1")
-	q.Set("page", "1")
-	q.Set("size", strconv.Itoa(modelLogPageSize))
-	q.Set("page_size", strconv.Itoa(modelLogPageSize))
-	q.Set("type", strconv.Itoa(typ))
-	q.Set("start_timestamp", strconv.FormatInt(start, 10))
-	q.Set("end_timestamp", strconv.FormatInt(end, 10))
-	paths := []string{"/api/log/self?" + q.Encode(), "/api/log/?" + q.Encode()}
+	paths := []string{"/api/log/self", "/api/log/"}
 	var last string
 	for _, p := range paths {
-		res := newAPIGet(context.Background(), site, p, 12*time.Second)
-		if res.OK {
-			rows := []LogRow{}
+		rows := []LogRow{}
+		for page := 1; len(rows) < modelLogMaxRowsPerType; page++ {
+			res := newAPIGet(context.Background(), site, logPathForPage(p, typ, start, end, page), 12*time.Second)
+			if !res.OK {
+				last = res.Error
+				break
+			}
+			before := len(rows)
 			for _, raw := range items(res.Data) {
 				rows = append(rows, sanitizeLog(raw))
 			}
 			if len(rows) > modelLogMaxRowsPerType {
 				rows = rows[:modelLogMaxRowsPerType]
 			}
+			if len(rows)-before < modelLogPageSize {
+				return rows, ""
+			}
+		}
+		if len(rows) > 0 {
 			return rows, ""
 		}
-		last = res.Error
 	}
 	return nil, last
+}
+
+func logPathForPage(path string, typ int, start, end int64, page int) string {
+	q := url.Values{}
+	q.Set("p", strconv.Itoa(page))
+	q.Set("page", strconv.Itoa(page))
+	q.Set("size", strconv.Itoa(modelLogPageSize))
+	q.Set("page_size", strconv.Itoa(modelLogPageSize))
+	q.Set("type", strconv.Itoa(typ))
+	q.Set("start_timestamp", strconv.FormatInt(start, 10))
+	q.Set("end_timestamp", strconv.FormatInt(end, 10))
+	return path + "?" + q.Encode()
 }
 
 func loadSiteChannels(site newapi.Site) ([]Channel, string) {
