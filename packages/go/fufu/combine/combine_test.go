@@ -231,6 +231,9 @@ func TestHandleAPIRejectsWrongMethodWithMethodNotAllowed(t *testing.T) {
 	if w.Code != http.StatusMethodNotAllowed || strings.TrimSpace(w.Body.String()) != `{"error":"Only POST"}` {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
+	if got := w.Header().Get("Allow"); got != http.MethodPost {
+		t.Fatalf("Allow = %q", got)
+	}
 }
 
 func TestStaticHandlerRejectsDirectoryListingsTestArtifactsAndDotfiles(t *testing.T) {

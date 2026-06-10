@@ -2,6 +2,7 @@ package combine
 
 import (
 	"context"
+	"fufu/webutil"
 	"net/http"
 	"strings"
 	"time"
@@ -30,7 +31,7 @@ func (a *App) handleAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != route.Method {
-		writeJSONError(w, http.StatusMethodNotAllowed, "Only "+route.Method)
+		webutil.RequireMethodMessage(w, r, route.Method, "Only "+route.Method)
 		return
 	}
 	if !isPublicAPI(r.URL.Path) {
