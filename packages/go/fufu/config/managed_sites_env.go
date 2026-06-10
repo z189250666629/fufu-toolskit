@@ -28,12 +28,16 @@ func managedSiteFromEnv(def managedSiteEnvDef) (newapi.Site, bool) {
 	if ratio == "" {
 		ratio = def.DefaultRatio
 	}
+	kind, ok := normalizeManagedSiteKind(Env(def.Prefix + "_KIND"))
+	if !ok {
+		return newapi.Site{}, false
+	}
 	return newapi.Site{
 		Name:                stringOrDefault(Env(def.Prefix+"_NAME"), def.DefaultName),
 		URL:                 url,
 		Token:               token,
 		UserID:              stringOrDefault(Env(def.Prefix+"_USER_ID"), "1"),
-		Kind:                stringOrDefault(Env(def.Prefix+"_KIND"), "api"),
+		Kind:                kind,
 		QuotaUnit:           int64Value(Env(def.Prefix+"_QUOTA_UNIT"), newapi.DefaultQuotaUnit),
 		Currency:            stringOrDefault(Env(def.Prefix+"_CURRENCY"), "$"),
 		RechargeRatio:       floatValue(ratio, 1),

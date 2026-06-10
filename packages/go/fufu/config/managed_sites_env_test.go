@@ -44,3 +44,24 @@ func TestManagedSiteFromEnvRequiresURLAndToken(t *testing.T) {
 		t.Fatalf("expected missing token to skip site, got ok=%v site=%#v", ok, site)
 	}
 }
+
+func TestManagedSiteFromEnvRejectsUnsupportedKind(t *testing.T) {
+	t.Setenv("NEWAPI_SAMPLE_URL", "https://sample.example.test")
+	t.Setenv("NEWAPI_SAMPLE_TOKEN", "sample-token")
+	t.Setenv("NEWAPI_SAMPLE_KIND", "token")
+
+	if site, ok := managedSiteFromEnv(managedSiteEnvDef{Prefix: "NEWAPI_SAMPLE"}); ok || site != (newapi.Site{}) {
+		t.Fatalf("expected unsupported kind to skip site, got ok=%v site=%#v", ok, site)
+	}
+}
+
+func TestManagedSiteFromEnvAllowsManagedAPIKindAlias(t *testing.T) {
+	t.Setenv("NEWAPI_SAMPLE_URL", "https://sample.example.test")
+	t.Setenv("NEWAPI_SAMPLE_TOKEN", "sample-token")
+	t.Setenv("NEWAPI_SAMPLE_KIND", "managed_api")
+
+	site, ok := managedSiteFromEnv(managedSiteEnvDef{Prefix: "NEWAPI_SAMPLE"})
+	if !ok || site.Kind != "managed_api" {
+		t.Fatalf("expected managed_api kind, got ok=%v site=%#v", ok, site)
+	}
+}

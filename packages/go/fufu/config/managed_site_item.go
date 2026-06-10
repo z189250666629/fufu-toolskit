@@ -16,11 +16,8 @@ func normalizeManagedSiteItem(item map[string]any) (newapi.Site, bool) {
 	if url == "" || token == "" {
 		return newapi.Site{}, false
 	}
-	kind := strings.ToLower(stringValue(item, "kind", "role", "siteType", "site_type"))
-	if kind == "" {
-		kind = "api"
-	}
-	if kind != "api" && kind != "managed-api" && kind != "managed_api" && kind != "admin" {
+	kind, ok := normalizeManagedSiteKind(stringValue(item, "kind", "role", "siteType", "site_type"))
+	if !ok {
 		return newapi.Site{}, false
 	}
 	return newapi.Site{
@@ -36,4 +33,17 @@ func normalizeManagedSiteItem(item map[string]any) (newapi.Site, bool) {
 		ChannelListEndpoint: stringValue(item, "channelListEndpoint", "channel_list_endpoint"),
 		Note:                stringValue(item, "note"),
 	}, true
+}
+
+func normalizeManagedSiteKind(kind string) (string, bool) {
+	kind = strings.ToLower(strings.TrimSpace(kind))
+	if kind == "" {
+		return "api", true
+	}
+	switch kind {
+	case "api", "managed-api", "managed_api", "admin":
+		return kind, true
+	default:
+		return "", false
+	}
 }
