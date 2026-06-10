@@ -57,6 +57,16 @@ func TestCombineAPIRoutes(t *testing.T) {
 	}
 }
 
+func TestWriteJSONErrorUsesStablePayload(t *testing.T) {
+	w := httptest.NewRecorder()
+
+	writeJSONError(w, http.StatusTeapot, "bad request")
+
+	if w.Code != http.StatusTeapot || strings.TrimSpace(w.Body.String()) != `{"error":"bad request"}` {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestParseListCleansSortsAndDedupes(t *testing.T) {
 	got := parseList(`["beta","alpha","beta",""]`)
 	if strings.Join(got, ",") != "alpha,beta" {

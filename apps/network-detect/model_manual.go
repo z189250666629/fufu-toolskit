@@ -18,14 +18,14 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 		Group    string `json:"group"`
 	}
 	if err := readJSON(r, &body); err != nil {
-		writeJSON(w, 400, map[string]string{"error": "请求体无效"})
+		writeJSONError(w, 400, "请求体无效")
 		return
 	}
 	body.SiteName = strings.TrimSpace(body.SiteName)
 	body.Model = strings.TrimSpace(body.Model)
 	body.Group = strings.TrimSpace(body.Group)
 	if body.SiteName == "" || body.Model == "" {
-		writeJSON(w, 400, map[string]string{"error": "siteName 和 model 必填"})
+		writeJSONError(w, 400, "siteName 和 model 必填")
 		return
 	}
 	result, err := testModel(body.SiteName, body.Model, body.Group)
@@ -34,7 +34,7 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 		if errors.As(err, &e) {
 			writeJSON(w, e.Status, map[string]any{"error": e.Message, "nextAllowedAt": e.NextAllowedAt})
 		} else {
-			writeJSON(w, 500, map[string]string{"error": err.Error()})
+			writeJSONError(w, 500, err.Error())
 		}
 		return
 	}

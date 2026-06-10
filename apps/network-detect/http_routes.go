@@ -14,7 +14,7 @@ import (
 func route(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if x := recover(); x != nil {
-			writeJSON(w, 500, map[string]any{"error": "Internal server error"})
+			writeJSONError(w, 500, "Internal server error")
 		}
 	}()
 	path := r.URL.Path
@@ -23,7 +23,7 @@ func route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		writeJSON(w, 405, map[string]string{"error": "Only GET is supported"})
+		writeJSONError(w, 405, "Only GET is supported")
 		return
 	}
 	if path == "/combine" || path == "/combine/" {
@@ -36,7 +36,7 @@ func route(w http.ResponseWriter, r *http.Request) {
 func handleAPI(w http.ResponseWriter, r *http.Request) {
 	if isCombineAPI(r.URL.Path) {
 		if combineApp == nil {
-			writeJSON(w, 503, map[string]string{"error": "combine is not configured: " + errString(combineConfigErr)})
+			writeJSONError(w, 503, "combine is not configured: "+errString(combineConfigErr))
 			return
 		}
 		combineApp.ServeHTTP(w, r)
@@ -96,13 +96,13 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		handleModelTest(w, r)
 	default:
-		writeJSON(w, 404, map[string]string{"error": "API not found"})
+		writeJSONError(w, 404, "API not found")
 	}
 }
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	if r.Method != method {
-		writeJSON(w, 405, map[string]string{"error": "Only " + method + " is supported"})
+		writeJSONError(w, 405, "Only "+method+" is supported")
 		return false
 	}
 	return true
@@ -117,6 +117,10 @@ func errString(err error) string {
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	webutil.WriteJSON(w, status, payload)
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
 }
 
 func readJSON(r *http.Request, out any) error {
