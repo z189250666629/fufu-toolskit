@@ -45,7 +45,7 @@ func extractPurchaseTime(data map[string]any) string {
 	if !ok || purchaseTime == nil {
 		return ""
 	}
-	return fmt.Sprint(purchaseTime)
+	return strings.TrimSpace(fmt.Sprint(purchaseTime))
 }
 
 func mcyConfig() (string, string, string, string) {

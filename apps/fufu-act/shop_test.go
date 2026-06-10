@@ -33,6 +33,15 @@ func TestFindShopPurchaseReturnsBlankWhenPurchaseTimeMissing(t *testing.T) {
 	}
 }
 
+func TestExtractPurchaseTimeTrimsAndDropsBlankValues(t *testing.T) {
+	if got := extractPurchaseTime(map[string]any{"list": []any{map[string]any{"purchase_time": " 2026-06-10 10:00:00 "}}}); got != "2026-06-10 10:00:00" {
+		t.Fatalf("trimmed purchase_time = %q", got)
+	}
+	if got := extractPurchaseTime(map[string]any{"list": []any{map[string]any{"purchase_time": "   "}}}); got != "" {
+		t.Fatalf("blank purchase_time = %q, want blank", got)
+	}
+}
+
 func TestMCYPostReturnsErrorForInvalidRequestURL(t *testing.T) {
 	oldCookie := mcyCookie
 	t.Cleanup(func() { mcyCookie = oldCookie })
