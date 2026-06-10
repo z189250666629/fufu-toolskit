@@ -102,6 +102,24 @@ func TestReadCardKeyRequestTrimsAndRejectsInvalidInput(t *testing.T) {
 	}
 }
 
+func TestReadCardKeyRequestRejectsTrailingJSON(t *testing.T) {
+	var body struct {
+		CardKey string `json:"cardKey"`
+	}
+
+	trailingReq := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"sk-card"} {}`))
+	key, ok := readCardKeyRequest(trailingReq, &body, func() string { return body.CardKey })
+	if ok || key != "" {
+		t.Fatalf("trailing JSON card key = %q/%v", key, ok)
+	}
+
+	whitespaceReq := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader("{\"cardKey\":\"sk-card\"}\n\t "))
+	key, ok = readCardKeyRequest(whitespaceReq, &body, func() string { return body.CardKey })
+	if !ok || key != "sk-card" {
+		t.Fatalf("trailing whitespace card key = %q/%v", key, ok)
+	}
+}
+
 func TestCardKeyWhitespaceRejectedAcrossHandlers(t *testing.T) {
 	cases := []struct {
 		name    string

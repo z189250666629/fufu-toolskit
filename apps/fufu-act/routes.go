@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fufu/webutil"
 	"io"
 	"net/http"
@@ -77,7 +79,18 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 }
 
 func readBody(r *http.Request, out any) error {
-	return webutil.DecodeJSON(io.LimitReader(r.Body, 1<<20), out)
+	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	if err := dec.Decode(out); err != nil {
+		return err
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("request body must contain a single JSON value")
+		}
+		return err
+	}
+	return nil
 }
 
 func readCardKeyRequest(r *http.Request, out any, cardKey func() string) (string, bool) {
