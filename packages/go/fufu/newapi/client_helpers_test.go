@@ -31,3 +31,17 @@ func TestRequestEndpointAndJSONContentTypeHelpers(t *testing.T) {
 		t.Fatalf("nil body should not set json content type")
 	}
 }
+
+func TestNormalizeSiteTrimsStringFieldsBeforeDefaults(t *testing.T) {
+	client := NewClient(Site{URL: " https://api.example.test/// ", Token: " secret ", UserID: "  ", Currency: "  "})
+
+	if client.Site.URL != "https://api.example.test" || client.Site.Token != "secret" || client.Site.UserID != "1" || client.Site.Currency != "$" {
+		t.Fatalf("normalized site = %#v", client.Site)
+	}
+	if got := client.Headers().Get("Authorization"); got != "Bearer secret" {
+		t.Fatalf("Authorization = %q", got)
+	}
+	if got := client.Headers().Get("New-Api-User"); got != "1" {
+		t.Fatalf("New-Api-User = %q", got)
+	}
+}

@@ -6,6 +6,10 @@ import (
 )
 
 func normalizeSite(site Site) Site {
+	site.URL = strings.TrimRight(strings.TrimSpace(site.URL), "/")
+	site.Token = strings.TrimSpace(site.Token)
+	site.UserID = strings.TrimSpace(site.UserID)
+	site.Currency = strings.TrimSpace(site.Currency)
 	if site.UserID == "" {
 		site.UserID = "1"
 	}
@@ -18,7 +22,6 @@ func normalizeSite(site Site) Site {
 	if site.RechargeRatio <= 0 {
 		site.RechargeRatio = 1
 	}
-	site.URL = strings.TrimRight(strings.TrimSpace(site.URL), "/")
 	return site
 }
 
