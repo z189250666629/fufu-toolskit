@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -19,7 +18,7 @@ func setupScratchLockTestDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	db = testDB
-	cardLocks = sync.Map{}
+	cardLocks = &cardLockRegistry{}
 	t.Cleanup(func() {
 		_ = testDB.Close()
 		db = oldDB
@@ -34,16 +33,16 @@ func seedScratchCard(t *testing.T, key string) {
 	}
 }
 
-func lockCardForTest(key string) *sync.Mutex {
-	muIface, _ := cardLocks.LoadOrStore(key, &sync.Mutex{})
-	mu := muIface.(*sync.Mutex)
-	mu.Lock()
-	return mu
+func lockCardForTest(key string) func() {
+	entry := cardLocks.acquire(key)
+	return func() {
+		cardLocks.release(key, entry)
+	}
 }
 
 func assertHandlerWaitsForCardLock(t *testing.T, key string, call func() *httptest.ResponseRecorder) *httptest.ResponseRecorder {
 	t.Helper()
-	mu := lockCardForTest(key)
+	unlock := lockCardForTest(key)
 	done := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
 		done <- call()
@@ -55,7 +54,7 @@ func assertHandlerWaitsForCardLock(t *testing.T, key string, call func() *httpte
 	case <-time.After(80 * time.Millisecond):
 	}
 
-	mu.Unlock()
+	unlock()
 	select {
 	case rec := <-done:
 		return rec
@@ -78,6 +77,19 @@ func TestScratchStartUsesCardLock(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("code=%d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWithCardLockReleasesIdleLockEntry(t *testing.T) {
+	setupScratchLockTestDB(t)
+
+	if _, err := withCardLock("idle-card", func() (any, error) {
+		return "ok", nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if cardLocks.has("idle-card") {
+		t.Fatal("idle card lock entry should be removed after use")
 	}
 }
 

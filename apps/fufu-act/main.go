@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"fufu/activity"
 	"fufu/config"
@@ -28,7 +27,7 @@ var rootDir string
 var db *sql.DB
 var tokenSvc *tokens.Service
 var tokenConfigErr error
-var cardLocks sync.Map
+var cardLocks = &cardLockRegistry{}
 var mcyCookie string
 
 var spinMap = activity.SpinMap

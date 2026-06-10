@@ -105,12 +105,55 @@ func writeHTTPError(w http.ResponseWriter, err error) {
 	}
 }
 
+type cardLockRegistry struct {
+	mu    sync.Mutex
+	locks map[string]*cardLockEntry
+}
+
+type cardLockEntry struct {
+	mu   sync.Mutex
+	refs int
+}
+
 func withCardLock(key string, fn func() (any, error)) (any, error) {
-	muIface, _ := cardLocks.LoadOrStore(key, &sync.Mutex{})
-	mu := muIface.(*sync.Mutex)
-	mu.Lock()
-	defer mu.Unlock()
+	entry := cardLocks.acquire(key)
+	defer cardLocks.release(key, entry)
 	return fn()
+}
+
+func (r *cardLockRegistry) acquire(key string) *cardLockEntry {
+	r.mu.Lock()
+	if r.locks == nil {
+		r.locks = map[string]*cardLockEntry{}
+	}
+	entry := r.locks[key]
+	if entry == nil {
+		entry = &cardLockEntry{}
+		r.locks[key] = entry
+	}
+	entry.refs++
+	r.mu.Unlock()
+
+	entry.mu.Lock()
+	return entry
+}
+
+func (r *cardLockRegistry) release(key string, entry *cardLockEntry) {
+	entry.mu.Unlock()
+
+	r.mu.Lock()
+	entry.refs--
+	if entry.refs == 0 && r.locks[key] == entry {
+		delete(r.locks, key)
+	}
+	r.mu.Unlock()
+}
+
+func (r *cardLockRegistry) has(key string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	_, ok := r.locks[key]
+	return ok
 }
 
 func firstNonEmpty(values ...string) string {
