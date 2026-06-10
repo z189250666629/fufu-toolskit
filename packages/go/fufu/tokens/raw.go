@@ -1,10 +1,9 @@
 package tokens
 
 import (
-	"encoding/json"
 	"fmt"
+	"fufu/internal/rawconv"
 	"fufu/newapi"
-	"strconv"
 	"strings"
 )
 
@@ -33,26 +32,6 @@ func statusOrDefault(v, fallback int) int {
 	return v
 }
 
-func toInt(v any) int { return int(toInt64(v)) }
+func toInt(v any) int { return rawconv.Int(v) }
 
-func toInt64(v any) int64 {
-	switch x := v.(type) {
-	case nil:
-		return 0
-	case int:
-		return int64(x)
-	case int64:
-		return x
-	case float64:
-		return int64(x)
-	case json.Number:
-		n, _ := x.Int64()
-		return n
-	case string:
-		n, _ := strconv.ParseInt(strings.TrimSpace(x), 10, 64)
-		return n
-	default:
-		n, _ := strconv.ParseInt(fmt.Sprint(x), 10, 64)
-		return n
-	}
-}
+func toInt64(v any) int64 { return rawconv.Int64(v) }

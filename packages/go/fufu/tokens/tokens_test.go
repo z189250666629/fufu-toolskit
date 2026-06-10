@@ -75,6 +75,48 @@ func TestFromRawNormalizesKeyStatusAndNumbers(t *testing.T) {
 	}
 }
 
+func TestRawNumberInt64ParsesDecimalJSONNumberConsistently(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  any
+		want int64
+	}{
+		{name: "decimal json number", raw: json.Number("42.9"), want: 42},
+		{name: "decimal string", raw: "8.9", want: 8},
+		{name: "trimmed integer string", raw: "  123  ", want: 123},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toInt64(tt.raw); got != tt.want {
+				t.Fatalf("toInt64(%#v) = %d, want %d", tt.raw, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFromRawStatusDefaultSemantics(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  map[string]any
+		want int
+	}{
+		{name: "missing", raw: map[string]any{}, want: 1},
+		{name: "nil", raw: map[string]any{"status": nil}, want: 1},
+		{name: "zero", raw: map[string]any{"status": json.Number("0")}, want: 1},
+		{name: "invalid", raw: map[string]any{"status": "not-a-number"}, want: 1},
+		{name: "string number", raw: map[string]any{"status": "2"}, want: 2},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FromRaw(tt.raw).Status; got != tt.want {
+				t.Fatalf("FromRaw(%#v).Status = %d, want %d", tt.raw, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataListReadsNestedCandidates(t *testing.T) {
 	data := map[string]any{
 		"data": map[string]any{

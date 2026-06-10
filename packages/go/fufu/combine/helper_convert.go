@@ -3,7 +3,7 @@ package combine
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
+	"fufu/internal/rawconv"
 	"strings"
 )
 
@@ -23,47 +23,11 @@ func getString(obj map[string]any, key string) string {
 	}
 }
 
-func toInt(v any) int { return int(toInt64(v)) }
+func toInt(v any) int { return rawconv.Int(v) }
 
-func toIntDefault(v any, fallback int) int {
-	if v == nil {
-		return fallback
-	}
-	return toInt(v)
-}
+func toIntDefault(v any, fallback int) int { return rawconv.IntDefault(v, fallback) }
 
-func toInt64(v any) int64 {
-	switch x := v.(type) {
-	case nil:
-		return 0
-	case int:
-		return int64(x)
-	case int64:
-		return x
-	case int32:
-		return int64(x)
-	case float64:
-		return int64(x)
-	case float32:
-		return int64(x)
-	case json.Number:
-		if i, err := x.Int64(); err == nil {
-			return i
-		}
-		if f, err := x.Float64(); err == nil {
-			return int64(f)
-		}
-	case string:
-		s := strings.TrimSpace(x)
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			return i
-		}
-		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return int64(f)
-		}
-	}
-	return 0
-}
+func toInt64(v any) int64 { return rawconv.Int64(v) }
 
 func intOrDefault(v, fallback int) int {
 	if v == 0 {

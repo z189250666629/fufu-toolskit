@@ -64,6 +64,12 @@ func TestConversionFallbacks(t *testing.T) {
 	if got := toInt64("8.9"); got != 8 {
 		t.Fatalf("toInt64 float string = %d", got)
 	}
+	if got := toIntDefault(nil, 7); got != 7 {
+		t.Fatalf("toIntDefault nil = %d", got)
+	}
+	if got := toIntDefault("0", 7); got != 0 {
+		t.Fatalf("toIntDefault explicit zero = %d", got)
+	}
 	if got := intOrDefault(0, 7); got != 7 {
 		t.Fatalf("intOrDefault = %d", got)
 	}
