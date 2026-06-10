@@ -61,6 +61,7 @@ func RequireMethodMessage(w http.ResponseWriter, r *http.Request, method, messag
 	if r.Method == method {
 		return true
 	}
+	w.Header().Set("Allow", method)
 	WriteJSONError(w, http.StatusMethodNotAllowed, message)
 	return false
 }

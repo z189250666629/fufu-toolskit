@@ -74,6 +74,9 @@ func TestRequireMethodRejectsUnexpectedVerb(t *testing.T) {
 	if strings.TrimSpace(rec.Body.String()) != `{"error":"Only POST"}` {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
+	if got := rec.Header().Get("Allow"); got != http.MethodPost {
+		t.Fatalf("Allow = %q", got)
+	}
 
 	okRec := httptest.NewRecorder()
 	okReq := httptest.NewRequest(http.MethodPost, "/api/test", nil)
