@@ -1,12 +1,9 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"fufu/config"
 	"fufu/newapi"
 	"fufu/webutil"
-	"io"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -116,19 +113,7 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 }
 
 func readJSON(r *http.Request, out any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
-	dec.UseNumber()
-	if err := dec.Decode(out); err != nil {
-		return err
-	}
-	var extra any
-	if err := dec.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return errors.New("request body must contain a single JSON value")
-		}
-		return err
-	}
-	return nil
+	return webutil.DecodeJSON(http.MaxBytesReader(nil, r.Body, 1<<20), out, webutil.WithUseNumber())
 }
 
 func clientIP(r *http.Request) string {

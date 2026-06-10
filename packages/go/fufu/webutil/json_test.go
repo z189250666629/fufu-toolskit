@@ -37,3 +37,22 @@ func TestDecodeJSONReturnsInvalidJSONError(t *testing.T) {
 		t.Fatalf("expected invalid json error")
 	}
 }
+
+func TestDecodeJSONRejectsTrailingJSONValue(t *testing.T) {
+	var got map[string]any
+
+	if err := DecodeJSON(strings.NewReader(`{"name":"card"} {}`), &got); err == nil {
+		t.Fatal("expected trailing JSON value to be rejected")
+	}
+}
+
+func TestDecodeJSONAllowsTrailingWhitespace(t *testing.T) {
+	var got map[string]any
+
+	if err := DecodeJSON(strings.NewReader("{\"name\":\"card\"}\n\t "), &got); err != nil {
+		t.Fatalf("DecodeJSON: %v", err)
+	}
+	if got["name"] != "card" {
+		t.Fatalf("name = %#v", got["name"])
+	}
+}
