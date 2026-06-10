@@ -32,6 +32,7 @@ func LoadPrimarySite(rootDir string) (newapi.Site, error) {
 	if len(sites) > 0 {
 		return sites[0], nil
 	}
+	var legacyErr error
 	for _, path := range []string{filepath.Join(rootDir, "config.json")} {
 		raw, err := os.ReadFile(path)
 		if err != nil {
@@ -41,15 +42,24 @@ func LoadPrimarySite(rootDir string) (newapi.Site, error) {
 			Name, URL, Token, UserID string
 			QuotaUnit                int64
 		}
-		if json.Unmarshal(raw, &cfg) == nil && NormalizeBaseURL(cfg.URL) != "" && strings.TrimSpace(cfg.Token) != "" {
-			if cfg.UserID == "" {
-				cfg.UserID = "1"
-			}
-			if cfg.QuotaUnit <= 0 {
-				cfg.QuotaUnit = newapi.DefaultQuotaUnit
-			}
-			return newapi.Site{Name: stringOrDefault(cfg.Name, "次数fufu"), URL: NormalizeBaseURL(cfg.URL), Token: strings.TrimSpace(cfg.Token), UserID: cfg.UserID, QuotaUnit: cfg.QuotaUnit, Currency: "$", RechargeRatio: 1}, nil
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			legacyErr = fmt.Errorf("%s 不是有效 JSON: %w", filepath.Base(path), err)
+			continue
 		}
+		if NormalizeBaseURL(cfg.URL) == "" || strings.TrimSpace(cfg.Token) == "" {
+			legacyErr = fmt.Errorf("%s 缺少有效的 URL 或 token", filepath.Base(path))
+			continue
+		}
+		if cfg.UserID == "" {
+			cfg.UserID = "1"
+		}
+		if cfg.QuotaUnit <= 0 {
+			cfg.QuotaUnit = newapi.DefaultQuotaUnit
+		}
+		return newapi.Site{Name: stringOrDefault(cfg.Name, "次数fufu"), URL: NormalizeBaseURL(cfg.URL), Token: strings.TrimSpace(cfg.Token), UserID: cfg.UserID, QuotaUnit: cfg.QuotaUnit, Currency: "$", RechargeRatio: 1}, nil
+	}
+	if legacyErr != nil {
+		return newapi.Site{}, legacyErr
 	}
 	if managedMsg != "" {
 		return newapi.Site{}, fmt.Errorf("%s", managedMsg)

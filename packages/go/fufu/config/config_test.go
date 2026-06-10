@@ -126,6 +126,20 @@ func TestLoadPrimarySiteReportsManagedSiteConfigErrorWhenNoLegacyConfig(t *testi
 	}
 }
 
+func TestLoadPrimarySiteReportsInvalidLegacyConfig(t *testing.T) {
+	clearPrimaryEnv(t)
+	root := t.TempDir()
+	t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(root, "missing-managed-sites.json"))
+	if err := os.WriteFile(filepath.Join(root, "config.json"), []byte(`not-json`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadPrimarySite(root)
+	if err == nil || !strings.Contains(err.Error(), "config.json") || !strings.Contains(err.Error(), "不是有效 JSON") {
+		t.Fatalf("expected invalid legacy config error, got %v", err)
+	}
+}
+
 func clearPrimaryEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
