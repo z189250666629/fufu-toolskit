@@ -19,6 +19,22 @@ test('getCopyUrl only returns fixed allowed URLs', () => {
   assert.equal(getCopyUrl({ ...button, getAttribute: () => 'https://blocked.example.test' }, allowed), '');
 });
 
+test('getCopyUrl trims candidate URL values before allow-list lookup', () => {
+  const allowed = new Set(['https://api.example.test']);
+
+  assert.equal(getCopyUrl({
+    value: '  https://api.example.test  ',
+    getAttribute: () => '',
+    querySelector: () => null
+  }, allowed), 'https://api.example.test');
+
+  assert.equal(getCopyUrl({
+    value: '',
+    getAttribute: (name) => (name === 'data-copy-value' ? '\nhttps://api.example.test\t' : ''),
+    querySelector: () => null
+  }, allowed), 'https://api.example.test');
+});
+
 test('formatNetworkType formats browser network connection details', () => {
   const navigatorLike = {
     connection: {

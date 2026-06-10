@@ -12,9 +12,11 @@ export function getCopyUrl(button, allowedUrls) {
   const candidates = [
     button.value,
     button.getAttribute('data-copy-value'),
-    button.querySelector('.url-text')?.textContent?.trim()
+    button.querySelector('.url-text')?.textContent
   ];
-  return candidates.find((value) => allowedUrls.has(value)) || '';
+  return candidates
+    .map((value) => String(value ?? '').trim())
+    .find((value) => allowedUrls.has(value)) || '';
 }
 
 export async function copyText(value, deps = {}) {
