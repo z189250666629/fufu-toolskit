@@ -39,6 +39,22 @@ func TestWriteJSONEncodeFailureReturnsStableError(t *testing.T) {
 	}
 }
 
+func TestWriteJSONErrorUsesSharedEnvelope(t *testing.T) {
+	rec := httptest.NewRecorder()
+
+	writeJSONError(rec, http.StatusForbidden, "无权操作")
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
+	if strings.TrimSpace(rec.Body.String()) != `{"error":"无权操作"}` {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
 func TestWriteBadJSONRequestUsesConsistentMessage(t *testing.T) {
 	rec := httptest.NewRecorder()
 
