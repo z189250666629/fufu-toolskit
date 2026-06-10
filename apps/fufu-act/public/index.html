@@ -1205,6 +1205,7 @@
     </div>
   </div>
 
+  <script src="activity-render.js"></script>
   <script>
     /* ============================================================
        Constants
@@ -1482,12 +1483,7 @@
       } catch (e) { /* silent */ }
     }
     function renderPrizeTable(rows) {
-      $('prize-table').innerHTML = rows.map(r => `
-        <div class="prize-row ${r.dollars === 1000 ? 'jackpot' : ''}">
-          <div class="symbol">${PRIZE_SYMBOLS[r.dollars] || '🎁'}</div>
-          <div class="amount">$${r.dollars}${r.dollars === 1000 ? ' JP' : ''}</div>
-        </div>
-      `).join('');
+      $('prize-table').innerHTML = activityRender.buildPrizeTableHtml(rows, PRIZE_SYMBOLS);
     }
     $('drawer-toggle').onclick = () => {
       $('drawer-toggle').classList.toggle('open');
@@ -1647,16 +1643,7 @@
        ============================================================ */
     function renderHistory(history) {
       const list = $('history-list');
-      if (!history || history.length === 0) {
-        list.innerHTML = '<div class="history-empty">NO RECORDS</div>';
-        return;
-      }
-      list.innerHTML = history.map(h => `
-        <div class="history-item">
-          <span class="prize">${PRIZE_SYMBOLS[h.prize_dollars] || '🎁'} $${h.prize_dollars}</span>
-          <span class="time">${h.created_at}</span>
-        </div>
-      `).join('');
+      list.innerHTML = activityRender.buildHistoryHtml(history, PRIZE_SYMBOLS);
     }
     async function refreshHistory() {
       try {
