@@ -88,19 +88,7 @@ func buildModelStatus() *ModelStatus {
 	}
 	rows := []ModelRow{}
 	for _, row := range modelRows {
-		cells := []*ModelCell{}
-		for _, c := range row.PerSite {
-			cells = append(cells, c)
-		}
-		row.Status = modelRowStatus(cells)
-		for _, c := range cells {
-			if c.Configured {
-				row.ConfiguredSites++
-				if c.Status == "operational" {
-					row.OperationalSites++
-				}
-			}
-		}
+		recomputeModelRowSummary(row)
 		rows = append(rows, *row)
 		status.Totals[row.Status]++
 	}

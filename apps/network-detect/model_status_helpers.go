@@ -146,6 +146,36 @@ func modelRowStatus(cells []*ModelCell) string {
 	return "unknown"
 }
 
+func recomputeModelRowSummary(row *ModelRow) {
+	row.ConfiguredSites = 0
+	row.OperationalSites = 0
+	cells := []*ModelCell{}
+	for _, c := range row.PerSite {
+		cells = append(cells, c)
+	}
+	row.Status = modelRowStatus(cells)
+	for _, c := range cells {
+		if c.Configured {
+			row.ConfiguredSites++
+			if c.Status == "operational" {
+				row.OperationalSites++
+			}
+		}
+	}
+}
+
+func updateModelStatusTotalsForRowStatus(ms *ModelStatus, oldStatus, newStatus string) {
+	if ms == nil || ms.Totals == nil || oldStatus == newStatus {
+		return
+	}
+	if oldStatus != "" && ms.Totals[oldStatus] > 0 {
+		ms.Totals[oldStatus]--
+	}
+	if newStatus != "" {
+		ms.Totals[newStatus]++
+	}
+}
+
 func maxLogTime(rows []LogRow) int64 {
 	var m int64
 	for _, r := range rows {

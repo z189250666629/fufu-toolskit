@@ -117,6 +117,7 @@ func applyManual(ms *ModelStatus, siteName, model string, rec testRecord, next i
 	for i := range ms.Models {
 		if ms.Models[i].Model == model {
 			if c := ms.Models[i].PerSite[siteName]; c != nil {
+				oldStatus := ms.Models[i].Status
 				c.ManualTest = rec
 				c.NextTestAllowedAt = next
 				if rec.OK {
@@ -129,6 +130,9 @@ func applyManual(ms *ModelStatus, siteName, model string, rec testRecord, next i
 				c.RequestCount = c.SuccessCount + c.FailureCount
 				c.SuccessRate = rate(c.SuccessCount, c.FailureCount)
 				c.Status = statusFromCounts(c.SuccessCount, c.FailureCount)
+				c.LastSeenAt = maxInt64(c.LastSuccessAt, c.LastFailureAt)
+				recomputeModelRowSummary(&ms.Models[i])
+				updateModelStatusTotalsForRowStatus(ms, oldStatus, ms.Models[i].Status)
 			}
 		}
 	}
