@@ -155,8 +155,9 @@ func TestConnectivityTargetsFallsBackWhenInlineJSONUnset(t *testing.T) {
 
 	handleAPI(w, req)
 
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "api.fufuapi.top") {
-		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	body := w.Body.String()
+	if w.Code != http.StatusOK || !strings.Contains(body, "api.fufuapi.top") || !strings.Contains(body, "api.fufuapi.online") || !strings.Contains(body, "token.fufuapi.online") {
+		t.Fatalf("code=%d body=%s", w.Code, body)
 	}
 }
 

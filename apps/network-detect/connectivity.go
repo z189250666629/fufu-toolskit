@@ -43,7 +43,10 @@ func connectivityGroupsWithError() ([]map[string]any, string) {
 	if len(groups) > 0 {
 		return groups, ""
 	}
-	return []map[string]any{{"id": "api", "name": "API 次数站", "urls": []string{"https://api.fufuapi.top", "https://api.fufuflower.top"}}, {"id": "token", "name": "Token 站", "urls": []string{"https://token.fufuapi.top", "https://token.fufuflower.top"}}}, ""
+	return []map[string]any{
+		{"id": "api", "name": "API 次数站", "urls": []string{"https://api.fufuapi.top", "https://api.fufuapi.online", "https://api.fufuflower.top"}},
+		{"id": "token", "name": "Token 站", "urls": []string{"https://token.fufuapi.top", "https://token.fufuapi.online", "https://token.fufuflower.top"}},
+	}, ""
 }
 
 func firstNonEmpty(values ...string) string {
