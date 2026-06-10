@@ -32,6 +32,25 @@ func TestNewAPIGetReportsDecodeErrorWithUpstreamStatus(t *testing.T) {
 	}
 }
 
+func TestNewAPIGetMasksTransportErrors(t *testing.T) {
+	result := newAPIGet(context.Background(), newapi.Site{URL: "http://internal.example.local/%zz", Token: "token", UserID: "1"}, "/api/log/self", time.Second)
+
+	if result.OK {
+		t.Fatalf("result should fail: %#v", result)
+	}
+	if result.Status != 0 {
+		t.Fatalf("status = %d", result.Status)
+	}
+	if result.Error != "NewAPI 请求失败" {
+		t.Fatalf("transport error should use safe public message, got %q", result.Error)
+	}
+	for _, leaked := range []string{"internal.example.local", "%zz", "parse", "invalid URL"} {
+		if strings.Contains(result.Error, leaked) {
+			t.Fatalf("transport error leaked %q in %q", leaked, result.Error)
+		}
+	}
+}
+
 func TestToInt64ParsesDecimalJSONNumber(t *testing.T) {
 	if got := toInt64(json.Number("42.0")); got != 42 {
 		t.Fatalf("decimal json.Number = %d", got)

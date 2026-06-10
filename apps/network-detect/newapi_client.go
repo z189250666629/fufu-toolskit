@@ -21,7 +21,7 @@ func newAPIGet(ctx context.Context, site newapi.Site, endpoint string, timeout t
 		if res.StatusCode > 0 {
 			return apiResult{OK: false, Status: res.StatusCode, Error: newapi.UpstreamStatusMessage(res, "NewAPI 响应不是有效 JSON")}
 		}
-		return apiResult{OK: false, Status: 0, Error: "NewAPI 请求失败: " + err.Error()}
+		return apiResult{OK: false, Status: 0, Error: "NewAPI 请求失败"}
 	}
 	if !res.OK() {
 		return apiResult{OK: false, Status: res.StatusCode, Error: upstreamError(data, res.StatusCode), Data: data}
