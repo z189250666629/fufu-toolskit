@@ -603,6 +603,7 @@
 
 <script>
 const UNIT_NAMES = { 3: '天卡', 8: '周不刷新卡', 9: '月不刷新卡' };
+const tokenSectionsModule = import('/combine_token_sections.js');
 const API_URL = '';  // Empty means same origin
 let foundTokens = [];
 let traceResults = [];
@@ -888,6 +889,16 @@ function formatQuota(q) {
   return '$' + (q / quotaUnit).toFixed(2);
 }
 
+async function renderFoundTokenSections() {
+  const { renderTokenSections, getValidTokens } = await tokenSectionsModule;
+  document.getElementById('token-list').innerHTML = renderTokenSections(foundTokens, {
+    userRole,
+    unitNames: UNIT_NAMES,
+    quotaUnit,
+  });
+  return getValidTokens(foundTokens);
+}
+
 function selectType(el) {
   if (userRole === 'guest') return;
   document.querySelectorAll('#phase-confirm .type-btn').forEach(b => b.classList.remove('active'));
@@ -921,14 +932,6 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function escapeJsStringForAttr(value) {
-  return JSON.stringify(String(value ?? ''))
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 function formatTraceTime(ms) {
@@ -1184,51 +1187,7 @@ async function searchKeys() {
       return;
     }
 
-    // Render token list - separate valid and invalid
-    const validTokens = foundTokens.filter(t => t.status === 1 && t.remain_quota > 0);
-    const invalidTokens = foundTokens.filter(t => t.status !== 1 || t.remain_quota <= 0);
-
-    const list = document.getElementById('token-list');
-    let html = '';
-
-    if (validTokens.length > 0) {
-      html += `<div class="token-section">
-        <div class="token-section-title valid">✓ 可合成 (${validTokens.length})</div>`;
-      html += validTokens.map(t => `
-        <div class="token-item">
-          <div>
-            <div class="token-name">${escapeHtml(t.name || '(unnamed)')}</div>
-            <div class="token-meta">${UNIT_NAMES[t.interval_unit] || '未知类型'} · ${escapeHtml(t.group || '')}</div>
-          </div>
-          <div class="token-quota">${formatQuota(t.remain_quota)}</div>
-        </div>
-      `).join('');
-      html += '</div>';
-    }
-
-    if (invalidTokens.length > 0) {
-      html += `<div class="token-section">
-        <div class="token-section-title invalid">⚠ 不可合成 (${invalidTokens.length})</div>`;
-      html += invalidTokens.map(t => {
-        const reason = t.status !== 1 ? '已禁用' : '无额度';
-        const showDelete = t.status !== 1 && userRole !== 'guest';
-        return `
-        <div class="token-item disabled">
-          <div>
-            <div class="token-name">${escapeHtml(t.name || '(unnamed)')}</div>
-            <div class="token-meta">${UNIT_NAMES[t.interval_unit] || '未知类型'} · ${escapeHtml(t.group || '')} · ${reason}</div>
-          </div>
-          <div class="token-actions">
-            <span class="token-quota" style="color:var(--warn)">${formatQuota(t.remain_quota)}</span>
-            ${showDelete ? `<button class="btn btn-danger btn-small" onclick="deleteDisabledToken(${t.id}, ${escapeJsStringForAttr(t.key)})">删除</button>` : ''}
-          </div>
-        </div>
-      `;
-      }).join('');
-      html += '</div>';
-    }
-
-    list.innerHTML = html;
+    const validTokens = await renderFoundTokenSections();
     renderTraceResults(traceResults);
 
     // Missing keys
@@ -1640,51 +1599,7 @@ async function deleteDisabledToken(tokenId, tokenKey) {
     // Remove from foundTokens and re-render
     foundTokens = foundTokens.filter(t => t.id !== tokenId);
 
-    // Re-render the list
-    const validTokens = foundTokens.filter(t => t.status === 1 && t.remain_quota > 0);
-    const invalidTokens = foundTokens.filter(t => t.status !== 1 || t.remain_quota <= 0);
-
-    const list = document.getElementById('token-list');
-    let html = '';
-
-    if (validTokens.length > 0) {
-      html += `<div class="token-section">
-        <div class="token-section-title valid">✓ 可合成 (${validTokens.length})</div>`;
-      html += validTokens.map(t => `
-        <div class="token-item">
-          <div>
-            <div class="token-name">${escapeHtml(t.name || '(unnamed)')}</div>
-            <div class="token-meta">${UNIT_NAMES[t.interval_unit] || '未知类型'} · ${escapeHtml(t.group || '')}</div>
-          </div>
-          <div class="token-quota">${formatQuota(t.remain_quota)}</div>
-        </div>
-      `).join('');
-      html += '</div>';
-    }
-
-    if (invalidTokens.length > 0) {
-      html += `<div class="token-section">
-        <div class="token-section-title invalid">⚠ 不可合成 (${invalidTokens.length})</div>`;
-      html += invalidTokens.map(t => {
-        const reason = t.status !== 1 ? '已禁用' : '无额度';
-        const showDelete = t.status !== 1 && userRole !== 'guest';
-        return `
-        <div class="token-item disabled">
-          <div>
-            <div class="token-name">${escapeHtml(t.name || '(unnamed)')}</div>
-            <div class="token-meta">${UNIT_NAMES[t.interval_unit] || '未知类型'} · ${escapeHtml(t.group || '')} · ${reason}</div>
-          </div>
-          <div class="token-actions">
-            <span class="token-quota" style="color:var(--warn)">${formatQuota(t.remain_quota)}</span>
-            ${showDelete ? `<button class="btn btn-danger btn-small" onclick="deleteDisabledToken(${t.id}, ${escapeJsStringForAttr(t.key)})">删除</button>` : ''}
-          </div>
-        </div>
-      `;
-      }).join('');
-      html += '</div>';
-    }
-
-    list.innerHTML = html;
+    const validTokens = await renderFoundTokenSections();
 
     // Update total
     const total = validTokens.reduce((s, t) => s + t.remain_quota, 0);
