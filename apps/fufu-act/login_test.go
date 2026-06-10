@@ -89,6 +89,97 @@ func TestHandleLoginRejectsDisabledToken(t *testing.T) {
 	}
 }
 
+func TestHandleLoginDoesNotMapMCYFailuresToOutOfPeriod(t *testing.T) {
+	cases := []struct {
+		name    string
+		cookie  string
+		handler http.HandlerFunc
+	}{
+		{
+			name: "login_failure",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost || r.URL.Path != "/admin/login" {
+					t.Fatalf("unexpected MCY request %s %s", r.Method, r.URL.String())
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`login failed`))
+			},
+		},
+		{
+			name:   "query_http_failure",
+			cookie: "session=ok",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost || r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+					t.Fatalf("unexpected MCY request %s %s", r.Method, r.URL.String())
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": "upstream down"})
+			},
+		},
+		{
+			name:   "query_invalid_json",
+			cookie: "session=ok",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost || r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+					t.Fatalf("unexpected MCY request %s %s", r.Method, r.URL.String())
+				}
+				_, _ = w.Write([]byte(`not-json`))
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setupScratchLockTestDB(t)
+			key := "sk-shop-failure-" + tc.name
+			tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet || r.URL.Path != "/api/token/search" {
+					t.Fatalf("unexpected token request %s %s", r.Method, r.URL.String())
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"success": true,
+					"data": []any{map[string]any{
+						"id":             11,
+						"key":            key,
+						"name":           "100-shop-card",
+						"interval_quota": newapi.DefaultQuotaUnit * 100,
+						"status":         1,
+						"created_time":   actStartTS - 1,
+					}},
+				})
+			}))
+			t.Cleanup(tokenServer.Close)
+			oldTokenSvc := tokenSvc
+			tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenServer.URL, Token: "token", UserID: "1"}))
+			t.Cleanup(func() { tokenSvc = oldTokenSvc })
+
+			oldCookie := mcyCookie
+			mcyCookie = tc.cookie
+			t.Cleanup(func() { mcyCookie = oldCookie })
+
+			shopServer := httptest.NewServer(tc.handler)
+			t.Cleanup(shopServer.Close)
+			t.Setenv("MCY_BASE_URL", shopServer.URL)
+			t.Setenv("MCY_USERNAME", "u")
+			t.Setenv("MCY_PASSWORD", "p")
+
+			req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"cardKey":"`+key+`"}`))
+			w := httptest.NewRecorder()
+			handleLogin(w, req)
+
+			if w.Code != http.StatusBadGateway {
+				t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+			}
+			if strings.Contains(w.Body.String(), "不在活动期间") || !strings.Contains(w.Body.String(), "店铺查询失败") {
+				t.Fatalf("MCY failure should be reported as shop lookup failure, body=%s", w.Body.String())
+			}
+			if _, ok := getCard(key); ok {
+				t.Fatal("card should not be inserted when shop lookup failed")
+			}
+		})
+	}
+}
+
 func TestHandleLoginRequiresExactScratchDollarTier(t *testing.T) {
 	setupScratchLockTestDB(t)
 	t.Setenv("MCY_BASE_URL", "")

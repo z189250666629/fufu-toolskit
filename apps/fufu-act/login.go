@@ -62,14 +62,18 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			createdInRange = true
 		} else {
 			createdInRange = t.CreatedTime >= actStartTS && t.CreatedTime <= actEndTS
-			shop := findShopPurchase(key)
-			purchased := shop != "" && shop >= actStart && shop <= actEnd
+			shop, err := findShopPurchase(r.Context(), key)
+			if err != nil {
+				writeJSONError(w, http.StatusBadGateway, "店铺查询失败，请稍后再试")
+				return
+			}
+			purchased := shop.PurchaseTime != "" && shop.PurchaseTime >= actStart && shop.PurchaseTime <= actEnd
 			if !createdInRange && !purchased {
 				writeJSONError(w, 403, "此卡密不在活动期间内，不参与活动")
 				return
 			}
 			dollars = dollarsTier(t.IntervalQuota)
-			purchaseTime = shop
+			purchaseTime = shop.PurchaseTime
 		}
 		isScratch := isScratchDollarTier(dollars) && (purchaseTime != "" || createdInRange)
 		if dollars == 0 || (spinMap[dollars] == 0 && !isScratch) {

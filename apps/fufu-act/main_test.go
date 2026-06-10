@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fufu/tokens"
 	"net/http"
 	"net/http/httptest"
@@ -277,10 +278,10 @@ func TestMCYLoginSendsAllSetCookieValuesOnPost(t *testing.T) {
 	t.Setenv("MCY_PASSWORD", "p")
 	t.Setenv("MCY_LOGIN_ENDPOINT", "/login")
 
-	if err := mcyLogin(); err != nil {
+	if err := mcyLogin(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := mcyPost("/check", map[string]any{"ok": true}); err != nil {
+	if _, err := mcyPost(context.Background(), "/check", map[string]any{"ok": true}); err != nil {
 		t.Fatal(err)
 	}
 

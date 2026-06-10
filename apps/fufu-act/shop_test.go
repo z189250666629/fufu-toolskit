@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -28,8 +30,78 @@ func TestFindShopPurchaseReturnsBlankWhenPurchaseTimeMissing(t *testing.T) {
 	srv := newJSONServer(t, map[string]any{"data": map[string]any{"list": []any{map[string]any{}}}})
 	t.Setenv("MCY_BASE_URL", srv.URL)
 
-	if got := findShopPurchase("card-1"); got != "" {
-		t.Fatalf("missing purchase_time = %q, want blank", got)
+	if got, err := findShopPurchase(context.Background(), "card-1"); err != nil || got.PurchaseTime != "" {
+		t.Fatalf("missing purchase_time = %#v err=%v, want blank", got, err)
+	}
+}
+
+func TestFindShopPurchaseClassifiesLoginFailure(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = ""
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/admin/login" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`login failed`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "p")
+
+	purchase, err := findShopPurchase(context.Background(), "card-1")
+	if err == nil || !errors.Is(err, ErrShopLoginFailed) {
+		t.Fatalf("purchase=%#v err=%v, want ErrShopLoginFailed", purchase, err)
+	}
+	if purchase.PurchaseTime != "" {
+		t.Fatalf("purchase time = %q, want empty on login failure", purchase.PurchaseTime)
+	}
+}
+
+func TestFindShopPurchaseClassifiesQueryHTTPFailure(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = "session=ok"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "upstream down"})
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	purchase, err := findShopPurchase(context.Background(), "card-1")
+	if err == nil || !errors.Is(err, ErrShopRequestFailed) {
+		t.Fatalf("purchase=%#v err=%v, want ErrShopRequestFailed", purchase, err)
+	}
+	if purchase.PurchaseTime != "" {
+		t.Fatalf("purchase time = %q, want empty on query failure", purchase.PurchaseTime)
+	}
+}
+
+func TestFindShopPurchaseClassifiesInvalidJSONResponse(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = "session=ok"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+		_, _ = w.Write([]byte(`not-json`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	purchase, err := findShopPurchase(context.Background(), "card-1")
+	if err == nil || !errors.Is(err, ErrShopInvalidResponse) {
+		t.Fatalf("purchase=%#v err=%v, want ErrShopInvalidResponse", purchase, err)
+	}
+	if purchase.PurchaseTime != "" {
+		t.Fatalf("purchase time = %q, want empty on invalid JSON", purchase.PurchaseTime)
 	}
 }
 
@@ -72,10 +144,10 @@ func TestFindShopPurchaseRefreshesExpiredCookie(t *testing.T) {
 	t.Setenv("MCY_USERNAME", "u")
 	t.Setenv("MCY_PASSWORD", "p")
 
-	got := findShopPurchase("card-1")
+	got, err := findShopPurchase(context.Background(), "card-1")
 
-	if got != "2026-06-10 12:00:00" {
-		t.Fatalf("purchase time = %q", got)
+	if err != nil || got.PurchaseTime != "2026-06-10 12:00:00" {
+		t.Fatalf("purchase = %#v err=%v", got, err)
 	}
 	if postAttempts != 2 || loginAttempts != 1 {
 		t.Fatalf("postAttempts=%d loginAttempts=%d", postAttempts, loginAttempts)
@@ -93,7 +165,7 @@ func TestMCYPostReturnsErrorForInvalidRequestURL(t *testing.T) {
 			t.Fatalf("mcyPost should return an error, not panic: %v", x)
 		}
 	}()
-	if _, err := mcyPost("/check", map[string]any{"ok": true}); err == nil {
+	if _, err := mcyPost(context.Background(), "/check", map[string]any{"ok": true}); err == nil {
 		t.Fatal("mcyPost should reject invalid request URLs")
 	}
 }
@@ -108,8 +180,8 @@ func TestMCYPostReturnsErrorForInvalidJSONResponse(t *testing.T) {
 	t.Cleanup(srv.Close)
 	t.Setenv("MCY_BASE_URL", srv.URL)
 
-	data, err := mcyPost("/check", map[string]any{"ok": true})
-	if err == nil || !strings.Contains(strings.ToLower(err.Error()), "json") {
+	data, err := mcyPost(context.Background(), "/check", map[string]any{"ok": true})
+	if err == nil || !errors.Is(err, ErrShopInvalidResponse) {
 		t.Fatalf("data=%#v err=%v", data, err)
 	}
 }
@@ -128,7 +200,7 @@ func TestMCYLoginReturnsErrorForHTTPFailure(t *testing.T) {
 	t.Setenv("MCY_USERNAME", "u")
 	t.Setenv("MCY_PASSWORD", "p")
 
-	err := mcyLogin()
+	err := mcyLogin(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "500") {
 		t.Fatalf("expected HTTP 500 login error, got %v", err)
 	}

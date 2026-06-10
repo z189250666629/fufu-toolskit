@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,34 +14,60 @@ import (
 
 var mcyHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
-func findShopPurchase(cardKey string) string {
+var (
+	ErrShopLoginFailed     = errors.New("shop login failed")
+	ErrShopRequestFailed   = errors.New("shop request failed")
+	ErrShopInvalidResponse = errors.New("shop invalid response")
+)
+
+type ShopPurchaseLookup struct {
+	Configured   bool
+	PurchaseTime string
+}
+
+func findShopPurchase(ctx context.Context, cardKey string) (ShopPurchaseLookup, error) {
+	lookup := ShopPurchaseLookup{}
 	if config.Env("MCY_BASE_URL") == "" && config.Env("SHOP_BASE_URL") == "" {
-		return ""
+		return lookup, nil
+	}
+	lookup.Configured = true
+	if mcyCookie == "" {
+		if err := mcyLogin(ctx); err != nil {
+			return lookup, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
+		}
 	}
 	if mcyCookie == "" {
-		_ = mcyLogin()
+		return lookup, ErrShopLoginFailed
 	}
-	if mcyCookie == "" {
-		return ""
-	}
-	data, err := mcyPost("/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
+	data, err := mcyPost(ctx, "/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
 	if err != nil {
 		if !isMCYAuthError(err) {
-			return ""
+			return lookup, classifyShopRequestError(err)
 		}
 		mcyCookie = ""
-		if err := mcyLogin(); err != nil || mcyCookie == "" {
-			return ""
+		if err := mcyLogin(ctx); err != nil {
+			return lookup, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
 		}
-		data, err = mcyPost("/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
+		if mcyCookie == "" {
+			return lookup, ErrShopLoginFailed
+		}
+		data, err = mcyPost(ctx, "/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
 		if err != nil {
-			return ""
+			return lookup, classifyShopRequestError(err)
 		}
 	}
 	if d, ok := data["data"].(map[string]any); ok {
-		return extractPurchaseTime(d)
+		lookup.PurchaseTime = extractPurchaseTime(d)
+		return lookup, nil
 	}
-	return ""
+	return lookup, ErrShopInvalidResponse
+}
+
+func classifyShopRequestError(err error) error {
+	if errors.Is(err, ErrShopInvalidResponse) {
+		return err
+	}
+	return fmt.Errorf("%w: %v", ErrShopRequestFailed, err)
 }
 
 func extractPurchaseTime(data map[string]any) string {
@@ -76,13 +103,13 @@ func isMCYAuthError(err error) bool {
 	return errors.As(err, &httpErr) && (httpErr.status == http.StatusUnauthorized || httpErr.status == http.StatusForbidden)
 }
 
-func mcyLogin() error {
+func mcyLogin(ctx context.Context) error {
 	base, user, pass, login := mcyConfig()
 	if base == "" || user == "" || pass == "" {
 		return fmt.Errorf("missing MCY config")
 	}
 	body, _ := json.Marshal(map[string]string{"username": user, "password": pass})
-	req, err := http.NewRequest(http.MethodPost, base+login, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+login, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -111,13 +138,13 @@ func mcyLogin() error {
 	return nil
 }
 
-func mcyPost(endpoint string, payload any) (map[string]any, error) {
+func mcyPost(ctx context.Context, endpoint string, payload any) (map[string]any, error) {
 	base, _, _, _ := mcyConfig()
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, base+endpoint, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+endpoint, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +157,7 @@ func mcyPost(endpoint string, payload any) (map[string]any, error) {
 	defer resp.Body.Close()
 	var data map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("MCY JSON decode failed: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrShopInvalidResponse, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return data, mcyHTTPError{status: resp.StatusCode}
