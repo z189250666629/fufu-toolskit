@@ -113,10 +113,14 @@ export function formatCooldown(timestamp) {
 }
 
 export function statusFromCounts(successCount, failureCount) {
-  if (successCount > 0 && failureCount === 0) return 'operational';
-  if (successCount > 0 && failureCount > 0) return 'degraded';
-  if (successCount === 0 && failureCount > 0) return 'down';
-  return 'unknown';
+  const successes = Number(successCount) || 0;
+  const failures = Number(failureCount) || 0;
+  const total = successes + failures;
+  if (total === 0) return 'unknown';
+  const rate = successes / total;
+  if (rate >= 0.8) return 'operational';
+  if (rate > 0) return 'degraded';
+  return 'down';
 }
 
 export function statusFromSummary(summary) {

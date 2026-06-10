@@ -42,6 +42,7 @@ test('summary math helpers', () => {
   assert.equal(successRate(3, 1), 0.75);
   assert.equal(successRate(0, 0), null);
   assert.equal(statusFromCounts(1, 0), 'operational');
+  assert.equal(statusFromCounts(4, 1), 'operational');
   assert.equal(statusFromCounts(1, 1), 'degraded');
   assert.equal(statusFromCounts(0, 1), 'down');
   assert.equal(statusFromCounts(0, 0), 'unknown');

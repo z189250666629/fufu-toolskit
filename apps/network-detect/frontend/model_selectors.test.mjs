@@ -88,6 +88,24 @@ test('manual test display does not double count materialized successful manual t
   assert.equal(got.requestCount, 1);
 });
 
+test('manual test display uses backend status threshold after adding success', () => {
+  const got = applyManualTestDisplay({
+    status: 'degraded',
+    requestCount: 5,
+    successCount: 4,
+    failureCount: 1,
+    lastSuccessAt: 100,
+    lastFailureAt: 90,
+    lastSeenAt: 100,
+    manualTest: { ok: true, status: 'operational', testedAt: 120 }
+  });
+
+  assert.equal(got.status, 'operational');
+  assert.equal(got.manualTestTone, 'ok');
+  assert.equal(got.successCount, 5);
+  assert.equal(got.failureCount, 1);
+});
+
 test('groupCellFor does not double count materialized group manual tests', () => {
   const got = groupCellFor({
     model: 'model-a',
