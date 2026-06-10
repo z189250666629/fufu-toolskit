@@ -1435,11 +1435,10 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cardKey: key }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          $('login-error').textContent = data.error || 'INVALID KEY';
-          return;
-        }
+        const data = await activityApi.readApiJson(res, {
+          serverErrorMessage: '登录失败，请稍后重试',
+          clientErrorMessage: 'INVALID KEY',
+        });
         currentCardKey = key;
         if (data.isScratch) {
           showScratch(data);
@@ -1448,7 +1447,7 @@
           showGame(data);
         }
       } catch (e) {
-        $('login-error').textContent = 'NETWORK ERROR';
+        $('login-error').textContent = activityApi.safeErrorMessage(e, '登录失败，请稍后重试');
       } finally {
         btn.disabled = false;
         btn.textContent = 'VERIFY KEY';

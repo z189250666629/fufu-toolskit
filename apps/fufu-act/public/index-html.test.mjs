@@ -20,6 +20,21 @@ test('spin flow uses safe API parsing instead of exposing raw response errors', 
   assert.doesNotMatch(source, /\$\('result'\)\.textContent = err\.message \|\| '网络错误'/);
 });
 
+test('login flow masks server errors instead of rendering raw data.error', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const loginStart = source.indexOf("$('btn-login').onclick = async () =>");
+  const loginEnd = source.indexOf("$('card-input').onkeydown");
+  const loginSource = source.slice(loginStart, loginEnd);
+
+  assert.match(loginSource, /activityApi\.readApiJson\(res,\s*\{/);
+  assert.match(loginSource, /serverErrorMessage: '登录失败，请稍后重试'/);
+  assert.match(loginSource, /clientErrorMessage: 'INVALID KEY'/);
+  assert.match(loginSource, /activityApi\.safeErrorMessage\(e,\s*'登录失败，请稍后重试'\)/);
+  assert.doesNotMatch(loginSource, /const data = await res\.json\(\)/);
+  assert.doesNotMatch(loginSource, /\$\('login-error'\)\.textContent = data\.error/);
+  assert.doesNotMatch(loginSource, /\$\('login-error'\)\.textContent = 'NETWORK ERROR'/);
+});
+
 test('prize drawer reports load failures instead of silently swallowing them', async () => {
   const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const fetchPrizesStart = source.indexOf('async function fetchPrizes()');
