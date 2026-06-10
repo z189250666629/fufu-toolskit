@@ -160,6 +160,54 @@ func TestGetModelStatusDoesNotCacheCanceledBuilds(t *testing.T) {
 	}
 }
 
+func TestGetModelStatusClearsInflightAfterBuildPanic(t *testing.T) {
+	oldRootDir := rootDir
+	oldValue := modelCache.Value
+	oldExpires := modelCache.Expires
+	oldKey := modelCache.Key
+	oldInflight := modelCache.Inflight
+	oldBuild := buildModelStatusForCache
+	t.Cleanup(func() {
+		rootDir = oldRootDir
+		buildModelStatusForCache = oldBuild
+		modelCache.Lock()
+		modelCache.Value = oldValue
+		modelCache.Expires = oldExpires
+		modelCache.Key = oldKey
+		modelCache.Inflight = oldInflight
+		modelCache.Unlock()
+	})
+	rootDir = t.TempDir()
+	modelCache.Lock()
+	modelCache.Value = nil
+	modelCache.Expires = time.Time{}
+	modelCache.Key = ""
+	modelCache.Inflight = nil
+	modelCache.Unlock()
+	clearManagedSiteEnv(t)
+	buildModelStatusForCache = func(ctx context.Context) *ModelStatus {
+		panic("boom")
+	}
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("expected getModelStatus to propagate build panic")
+			}
+		}()
+		_ = getModelStatus(context.Background(), false)
+	}()
+
+	modelCache.Lock()
+	defer modelCache.Unlock()
+	if len(modelCache.Inflight) != 0 {
+		t.Fatalf("panic during build should clear inflight calls, got %#v", modelCache.Inflight)
+	}
+	if modelCache.Value != nil {
+		t.Fatalf("panic during build should not populate cache: %#v", modelCache.Value)
+	}
+}
+
 func managedSiteConfigJSON(name, url string) string {
 	return fmt.Sprintf(`[{"name":%q,"url":%q,"token":"token"}]`, name, strings.TrimRight(url, "/"))
 }

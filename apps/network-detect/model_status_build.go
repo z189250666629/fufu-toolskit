@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+var buildModelStatusForCache = buildModelStatus
+
 func getModelStatus(ctx context.Context, force bool) *ModelStatus {
 	ctx = contextOrBackground(ctx)
 	cacheKey := modelStatusCacheKey(rootDir)
@@ -41,18 +43,20 @@ func getModelStatus(ctx context.Context, force bool) *ModelStatus {
 		modelCache.Inflight[cacheKey] = call
 		modelCache.Unlock()
 
-		status := buildModelStatus(ctx)
-
-		modelCache.Lock()
-		call.status = status
-		delete(modelCache.Inflight, cacheKey)
-		if ctx.Err() == nil {
-			modelCache.Value = status
-			modelCache.Expires = time.Now().Add(modelStatusCacheTTL)
-			modelCache.Key = cacheKey
-		}
-		close(call.done)
-		modelCache.Unlock()
+		var status *ModelStatus
+		defer func() {
+			modelCache.Lock()
+			call.status = status
+			delete(modelCache.Inflight, cacheKey)
+			if status != nil && ctx.Err() == nil {
+				modelCache.Value = status
+				modelCache.Expires = time.Now().Add(modelStatusCacheTTL)
+				modelCache.Key = cacheKey
+			}
+			close(call.done)
+			modelCache.Unlock()
+		}()
+		status = buildModelStatusForCache(ctx)
 		return status
 	}
 }
