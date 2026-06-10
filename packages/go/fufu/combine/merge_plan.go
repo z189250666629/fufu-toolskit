@@ -24,6 +24,9 @@ func buildMergeTargetPlan(verified []ResolvedToken, quota *int64, name string, q
 	if finalQuota <= 0 {
 		return mergeTargetPlan{}, errors.New("合并额度无效")
 	}
+	if quotaUnit <= 0 {
+		return mergeTargetPlan{}, errors.New("额度单位无效")
+	}
 
 	finalName := strings.TrimSpace(name)
 	if finalName == "" {

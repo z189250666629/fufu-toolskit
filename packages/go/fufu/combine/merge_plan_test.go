@@ -47,3 +47,10 @@ func TestBuildMergeTargetPlanRejectsInvalidQuota(t *testing.T) {
 		t.Fatalf("invalid quota err = %v", err)
 	}
 }
+
+func TestBuildMergeTargetPlanRejectsInvalidQuotaUnit(t *testing.T) {
+	_, err := buildMergeTargetPlan([]ResolvedToken{{RemainQuota: 500000}}, nil, "", 0)
+	if err == nil || !strings.Contains(err.Error(), "额度单位无效") {
+		t.Fatalf("invalid quota unit err = %v", err)
+	}
+}
