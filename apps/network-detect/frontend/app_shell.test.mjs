@@ -90,3 +90,19 @@ test('renderEnvironment renders provided browser context without globals', () =>
   assert.match(html, /Asia\/Shanghai/);
   assert.match(html, /4g \/ 10Mbps/);
 });
+
+test('renderEnvironment surfaces client context load errors', () => {
+  const html = renderEnvironment({
+    client: null,
+    clientLoadError: 'client endpoint <html>',
+    browserTime: '2026/06/10 10:00:00',
+    online: true,
+    timezone: 'Asia/Shanghai',
+    networkType: '4g'
+  });
+
+  assert.match(html, /role="alert"/);
+  assert.match(html, /访问环境读取失败/);
+  assert.match(html, /client endpoint &lt;html&gt;/);
+  assert.match(html, /客户端 IP/);
+});

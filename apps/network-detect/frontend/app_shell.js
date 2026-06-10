@@ -7,6 +7,9 @@ import {
   renderUrlStatus
 } from './render_connectivity.js';
 import {
+  renderAlert
+} from './render_components.js';
+import {
   renderModelAvailability
 } from './render_models.js';
 import {
@@ -79,17 +82,22 @@ export function renderMonitorPanel({
 
 export function renderEnvironment({
   client,
+  clientLoadError = '',
   browserTime,
   online,
   timezone,
   networkType
 }) {
+  const clientErrorAlert = clientLoadError
+    ? renderAlert(`访问环境读取失败：${clientLoadError}`, 'danger', 'client-context-alert')
+    : '';
   return `
     <section class="section environment-section">
       <div class="section-head">
         <h2>访问环境</h2>
         <span>客户端与服务端</span>
       </div>
+      ${clientErrorAlert}
       <div class="info-list">
         <div><span>客户端 IP</span><b>${escapeHtml(client?.ip || '-')}</b></div>
         <div><span>服务器时间</span><b>${escapeHtml(formatServerTime(client?.serverTime))}</b></div>

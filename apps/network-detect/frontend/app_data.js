@@ -1,11 +1,19 @@
 export async function loadStaticContextState(state, fetchJsonImpl) {
-  const [client, targetsResult] = await Promise.all([
-    fetchJsonImpl('/api/client').catch(() => null),
+  const [clientResult, targetsResult] = await Promise.all([
+    fetchJsonImpl('/api/client')
+      .then((client) => ({ client }))
+      .catch((error) => ({ error })),
     fetchJsonImpl('/api/connectivity/targets')
       .then((targets) => ({ targets }))
       .catch((error) => ({ error }))
   ]);
-  state.client = client;
+  if (clientResult.error) {
+    state.client = null;
+    state.clientLoadError = clientResult.error.message || '访问环境读取失败';
+  } else {
+    state.client = clientResult.client || null;
+    state.clientLoadError = '';
+  }
   if (targetsResult.error) {
     state.targets = [];
     state.connectivityTargetError = targetsResult.error.message || '连通性目标配置读取失败';

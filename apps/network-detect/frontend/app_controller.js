@@ -106,6 +106,7 @@ export function createDashboardApp(deps = {}) {
     ${state.loading && !state.modelStatus ? '<div class="boot-state">正在读取模型状态</div>' : ''}
     ${renderEnvironment({
       client: state.client,
+      clientLoadError: state.clientLoadError,
       browserTime: now().toLocaleString('zh-CN', { hour12: false }),
       online: navigatorRef.onLine,
       timezone: intlRef.DateTimeFormat().resolvedOptions().timeZone,

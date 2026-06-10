@@ -11,6 +11,7 @@ export function createInitialAppState() {
     modelStatus: null,
     testingCells: new Set(),
     client: null,
+    clientLoadError: '',
     targets: [],
     connectivityTargetError: '',
     connectivity: {
