@@ -9,7 +9,7 @@ func enqueueCredit(key string, prize int) {
 	var id int
 	_ = db.QueryRow(`SELECT id FROM credit_queue WHERE card_key=? AND status IN ('pending','done')`, key).Scan(&id)
 	if id == 0 {
-		_, _ = db.Exec(`INSERT INTO credit_queue (card_key,prize_dollars) VALUES (?,?)`, key, prize)
+		_, _ = db.Exec(`INSERT OR IGNORE INTO credit_queue (card_key,prize_dollars) VALUES (?,?)`, key, prize)
 	}
 }
 

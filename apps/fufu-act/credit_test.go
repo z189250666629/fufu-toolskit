@@ -32,3 +32,20 @@ func TestProcessCreditsReturnsOnQueueQueryError(t *testing.T) {
 	}()
 	processCredits()
 }
+
+func TestCreditQueueRejectsDuplicateActiveCardKeys(t *testing.T) {
+	setupScratchLockTestDB(t)
+
+	if _, err := db.Exec(`INSERT INTO credit_queue (card_key, prize_dollars, status) VALUES (?,?,?)`, "credit-card", 10, "pending"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO credit_queue (card_key, prize_dollars, status) VALUES (?,?,?)`, "credit-card", 20, "pending"); err == nil {
+		t.Fatal("duplicate pending credit queue item should be rejected")
+	}
+	if _, err := db.Exec(`INSERT INTO credit_queue (card_key, prize_dollars, status) VALUES (?,?,?)`, "failed-card", 10, "failed"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO credit_queue (card_key, prize_dollars, status) VALUES (?,?,?)`, "failed-card", 20, "pending"); err != nil {
+		t.Fatalf("failed items should not block a new pending queue item: %v", err)
+	}
+}
