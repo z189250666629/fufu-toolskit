@@ -69,8 +69,8 @@ func TestKeyHelpers(t *testing.T) {
 }
 
 func TestNormalizeKeysDedupesAndSkipsBlankValues(t *testing.T) {
-	got := normalizeKeys([]string{" abc ", "sk-abc", "", "sk-", "def"})
-	if len(got) != 2 || got[0] != "sk-abc" || got[1] != "sk-def" {
+	got := normalizeKeys([]string{" abcdefghijkl ", "sk-abcdefghijkl", "", "sk-", "defghijklmno"})
+	if len(got) != 2 || got[0] != "sk-abcdefghijkl" || got[1] != "sk-defghijklmno" {
 		t.Fatalf("normalizeKeys = %#v", got)
 	}
 }

@@ -3,12 +3,12 @@ package combine
 import "testing"
 
 func TestUniqueTraceKeyHashesNormalizesAndDedupes(t *testing.T) {
-	hashes, set := uniqueTraceKeyHashes([]string{" abc ", "sk-abc", "", "def"})
+	hashes, set := uniqueTraceKeyHashes([]string{" abcdefghijkl ", "sk-abcdefghijkl", "", "defghijklmno"})
 
-	if len(hashes) != 2 || hashes[0] != keyHash("sk-abc") || hashes[1] != keyHash("sk-def") {
+	if len(hashes) != 2 || hashes[0] != keyHash("sk-abcdefghijkl") || hashes[1] != keyHash("sk-defghijklmno") {
 		t.Fatalf("hashes = %#v", hashes)
 	}
-	if !set[keyHash("sk-abc")] || !set[keyHash("sk-def")] || len(set) != 2 {
+	if !set[keyHash("sk-abcdefghijkl")] || !set[keyHash("sk-defghijklmno")] || len(set) != 2 {
 		t.Fatalf("set = %#v", set)
 	}
 }

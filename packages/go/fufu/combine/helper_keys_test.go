@@ -28,3 +28,11 @@ func TestCombineNormalizeKeysAcceptsFullWidthPunctuationAndQuotedJSONPaste(t *te
 		t.Fatalf("normalizeKeys() = %#v, want shared token normalization %#v", got, want)
 	}
 }
+
+func TestCombineNormalizeKeysRejectsShortFragmentsWhenSharedNormalizerFindsNone(t *testing.T) {
+	raw := []string{`{"keys":["a","sk-b","token"]}`}
+	got := normalizeKeys(raw)
+	if len(got) != 0 {
+		t.Fatalf("normalizeKeys() accepted short fragments: %#v", got)
+	}
+}
