@@ -89,6 +89,39 @@ func TestReferencedBrowserAssetPathsFollowsLocalHTMLJSCSSReferences(t *testing.T
 	}
 }
 
+func TestReferencedBrowserAssetPathsFollowsLocalCSSUrlAssets(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"index.html":          `<link rel="stylesheet" href="/styles/main.css">`,
+		"styles/main.css":     `.logo { background: url("./img/logo.svg?v=1"); } .font { src: url('../fonts/app.woff2') format("woff2"); } .remote { background: url("https://example.test/logo.svg"); } .inline { background: url(data:image/svg+xml;base64,aaaa); } .custom { background: url(var(--brand-logo)); }`,
+		"styles/img/logo.svg": `<svg></svg>`,
+		"fonts/app.woff2":     "font bytes",
+		"unlinked.svg":        `<svg></svg>`,
+	}
+	for name, body := range files {
+		file := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(file, []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	allowed := ReferencedBrowserAssetPaths(root, []string{"/index.html"})
+
+	for _, path := range []string{"/styles/main.css", "/styles/img/logo.svg", "/fonts/app.woff2"} {
+		if _, ok := allowed[path]; !ok {
+			t.Fatalf("%s should be included in referenced browser asset allowlist: %#v", path, allowed)
+		}
+	}
+	for _, path := range []string{"/unlinked.svg", "https://example.test/logo.svg", "data:image/svg+xml;base64,aaaa", "/styles/var(--brand-logo"} {
+		if _, ok := allowed[path]; ok {
+			t.Fatalf("%s should not be included in referenced browser asset allowlist: %#v", path, allowed)
+		}
+	}
+}
+
 func TestWriteJSONSetsNoStoreAndContentType(t *testing.T) {
 	rec := httptest.NewRecorder()
 

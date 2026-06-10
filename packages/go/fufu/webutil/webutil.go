@@ -68,6 +68,7 @@ var (
 	browserJSDynamicImportPattern = regexp.MustCompile(`\bimport\s*\(\s*["']([^"']+)["']\s*\)`)
 	browserJSExportPattern        = regexp.MustCompile(`\bexport\s+[^"']*?\s+from\s+["']([^"']+)["']`)
 	browserCSSImportPattern       = regexp.MustCompile(`(?i)@import\s+(?:url\(\s*)?["']?([^"')\s]+)["']?\s*\)?`)
+	browserCSSURLPattern          = regexp.MustCompile(`(?i)\burl\(\s*(?:"([^"]+)"|'([^']+)'|([^"')\s][^)]*?))\s*\)`)
 )
 
 // ReferencedBrowserAssetPaths returns the static browser assets reachable from
@@ -150,7 +151,30 @@ func browserAssetRefs(fromPath, content string) []string {
 			refs = append(refs, ref)
 		}
 	}
+	for _, matches := range browserCSSURLPattern.FindAllStringSubmatch(content, -1) {
+		ref := firstNonEmptySubmatch(matches[1:])
+		if isCSSRuntimeURL(ref) {
+			continue
+		}
+		if ref, ok := resolveBrowserAssetRef(fromPath, ref); ok {
+			refs = append(refs, ref)
+		}
+	}
 	return refs
+}
+
+func firstNonEmptySubmatch(matches []string) string {
+	for _, match := range matches {
+		if match != "" {
+			return match
+		}
+	}
+	return ""
+}
+
+func isCSSRuntimeURL(ref string) bool {
+	ref = strings.TrimSpace(strings.ToLower(ref))
+	return strings.HasPrefix(ref, "var(") || strings.HasPrefix(ref, "env(") || strings.HasPrefix(ref, "attr(")
 }
 
 func resolveBrowserAssetRef(fromPath, ref string) (string, bool) {
