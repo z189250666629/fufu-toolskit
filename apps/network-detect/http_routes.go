@@ -36,7 +36,7 @@ func route(w http.ResponseWriter, r *http.Request) {
 func handleAPI(w http.ResponseWriter, r *http.Request) {
 	if isCombineAPI(r.URL.Path) {
 		if combineApp == nil {
-			writeJSONError(w, 503, "combine is not configured: "+errString(combineConfigErr))
+			writeJSONError(w, 503, "combine is not configured")
 			return
 		}
 		combineApp.ServeHTTP(w, r)
@@ -95,13 +95,6 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	return webutil.RequireMethodMessage(w, r, method, "Only "+method+" is supported")
-}
-
-func errString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

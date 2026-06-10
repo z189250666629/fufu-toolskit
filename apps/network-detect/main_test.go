@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fufu/combine"
 	"net/http"
 	"net/http/httptest"
@@ -90,6 +91,34 @@ func TestCombineAPIRoutes(t *testing.T) {
 	for _, path := range []string{"/api/auth", "/api/session", "/api/search-keys", "/api/merge", "/api/public-merge", "/api/generate", "/api/merge-status/job-1", "/api/token/1", "/api/health"} {
 		if isCombineAPI(path) != combine.IsAPIPath(path) {
 			t.Fatalf("%s route mismatch: network=%v combine=%v", path, isCombineAPI(path), combine.IsAPIPath(path))
+		}
+	}
+}
+
+func TestCombineAPIUnavailableDoesNotExposeConfigError(t *testing.T) {
+	oldApp, oldErr := combineApp, combineConfigErr
+	combineApp = nil
+	combineConfigErr = errors.New(`secret token=sk-test C:\data\combine-trace.db`)
+	t.Cleanup(func() {
+		combineApp = oldApp
+		combineConfigErr = oldErr
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth", strings.NewReader(`{}`))
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := strings.TrimSpace(w.Body.String())
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	if body != `{"error":"combine is not configured"}` {
+		t.Fatalf("unexpected public error body: %s", body)
+	}
+	for _, leaked := range []string{"sk-test", "token=", `C:\`, "combine-trace.db"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("public combine unavailable error leaked %q in %s", leaked, body)
 		}
 	}
 }
