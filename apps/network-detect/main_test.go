@@ -54,6 +54,28 @@ func TestHTTPServerHasTimeouts(t *testing.T) {
 	}
 }
 
+func TestInitRuntimeReturnsDataDirectoryErrors(t *testing.T) {
+	oldRoot, oldFrontend, oldCombine := rootDir, frontendDir, combineDir
+	oldApp, oldErr := combineApp, combineConfigErr
+	t.Cleanup(func() {
+		rootDir, frontendDir, combineDir = oldRoot, oldFrontend, oldCombine
+		combineApp, combineConfigErr = oldApp, oldErr
+	})
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "data"), []byte("not a directory"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	err := initRuntime(tmp)
+
+	if err == nil {
+		t.Fatal("initRuntime should report data directory creation errors")
+	}
+	if !strings.Contains(err.Error(), "create data directory") {
+		t.Fatalf("initRuntime error = %v, want create data directory context", err)
+	}
+}
+
 func TestCombinePageServed(t *testing.T) {
 	tmp := t.TempDir()
 	rootDir = tmp

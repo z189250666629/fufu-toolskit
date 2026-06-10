@@ -138,12 +138,15 @@ type testRecord struct {
 }
 
 func main() {
-	wd, _ := os.Getwd()
-	rootDir = wd
-	frontendDir = filepath.Join(rootDir, "frontend")
-	combineDir = filepath.Join(rootDir, "combine")
-	_ = os.MkdirAll(filepath.Join(rootDir, "data"), 0755)
-	setupCombine()
+	wd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to resolve working directory: %v\n", err)
+		os.Exit(1)
+	}
+	if err := initRuntime(wd); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize runtime: %v\n", err)
+		os.Exit(1)
+	}
 	port := strings.TrimSpace(os.Getenv("PORT"))
 	if port == "" {
 		port = defaultPort
@@ -155,6 +158,19 @@ func main() {
 		fmt.Fprintf(os.Stderr, "server stopped: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func initRuntime(wd string) error {
+	rootDir = wd
+	frontendDir = filepath.Join(rootDir, "frontend")
+	combineDir = filepath.Join(rootDir, "combine")
+	combineApp = nil
+	combineConfigErr = nil
+	if err := os.MkdirAll(filepath.Join(rootDir, "data"), 0755); err != nil {
+		return fmt.Errorf("create data directory: %w", err)
+	}
+	setupCombine()
+	return nil
 }
 
 func serve(port string, handler http.Handler) error {
