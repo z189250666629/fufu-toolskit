@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fufu/combine"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -18,6 +19,27 @@ func TestHealth(t *testing.T) {
 	handleAPI(w, req)
 	if w.Code != 200 || !strings.Contains(w.Body.String(), `"ok":true`) {
 		t.Fatalf("health code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestServeReturnsListenerErrors(t *testing.T) {
+	listener, err := net.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = serve(port, http.NewServeMux())
+
+	if err == nil {
+		t.Fatal("serve should return bind errors instead of panicking")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "bind") && !strings.Contains(strings.ToLower(err.Error()), "address already in use") {
+		t.Fatalf("serve returned unexpected error: %v", err)
 	}
 }
 
