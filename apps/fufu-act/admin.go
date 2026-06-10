@@ -13,7 +13,12 @@ func handleAdminStats(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, 401, "未授权")
 		return
 	}
-	writeJSON(w, 200, map[string]any{"prizeRows": queryRows(`SELECT prize_dollars, COUNT(*) as count, SUM(prize_dollars) as total FROM spin_log WHERE is_retry=0 AND prize_dollars>0 GROUP BY prize_dollars ORDER BY prize_dollars ASC`), "totalSpins": scalarInt(`SELECT COUNT(*) FROM spin_log WHERE is_retry=0`), "totalWon": scalarInt(`SELECT COALESCE(SUM(prize_dollars),0) FROM spin_log WHERE is_retry=0`), "ev": ev(), "tierRows": queryRows(`SELECT dollars, COUNT(*) as cards, SUM(total_spins) as total_spins, SUM(used_spins) as used_spins, SUM(total_won) as total_won FROM cards GROUP BY dollars ORDER BY dollars ASC`), "queueRows": queryRows(`SELECT status, COUNT(*) as count, SUM(prize_dollars) as total FROM credit_queue GROUP BY status`), "scratchRows": queryRows(`SELECT status, COUNT(*) as count, SUM(prize_dollars) as total FROM scratch_games GROUP BY status`)})
+	stats, err := buildAdminStats()
+	if err != nil {
+		writeJSONError(w, 500, "服务器错误")
+		return
+	}
+	writeJSON(w, 200, stats)
 }
 
 func handlePrizes(w http.ResponseWriter, r *http.Request) {
@@ -30,13 +35,48 @@ func handlePrizes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"prizes": prizes, "spinMap": spinMapOut})
 }
 
-func queryRows(q string) []map[string]any {
+func buildAdminStats() (map[string]any, error) {
+	prizeRows, err := queryRows(`SELECT prize_dollars, COUNT(*) as count, SUM(prize_dollars) as total FROM spin_log WHERE is_retry=0 AND prize_dollars>0 GROUP BY prize_dollars ORDER BY prize_dollars ASC`)
+	if err != nil {
+		return nil, err
+	}
+	totalSpins, err := scalarInt(`SELECT COUNT(*) FROM spin_log WHERE is_retry=0`)
+	if err != nil {
+		return nil, err
+	}
+	totalWon, err := scalarInt(`SELECT COALESCE(SUM(prize_dollars),0) FROM spin_log WHERE is_retry=0`)
+	if err != nil {
+		return nil, err
+	}
+	ev, err := ev()
+	if err != nil {
+		return nil, err
+	}
+	tierRows, err := queryRows(`SELECT dollars, COUNT(*) as cards, SUM(total_spins) as total_spins, SUM(used_spins) as used_spins, SUM(total_won) as total_won FROM cards GROUP BY dollars ORDER BY dollars ASC`)
+	if err != nil {
+		return nil, err
+	}
+	queueRows, err := queryRows(`SELECT status, COUNT(*) as count, SUM(prize_dollars) as total FROM credit_queue GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	scratchRows, err := queryRows(`SELECT status, COUNT(*) as count, SUM(prize_dollars) as total FROM scratch_games GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"prizeRows": prizeRows, "totalSpins": totalSpins, "totalWon": totalWon, "ev": ev, "tierRows": tierRows, "queueRows": queueRows, "scratchRows": scratchRows}, nil
+}
+
+func queryRows(q string) ([]map[string]any, error) {
 	rows, err := db.Query(q)
 	if err != nil {
-		return []map[string]any{}
+		return nil, err
 	}
 	defer rows.Close()
-	cols, _ := rows.Columns()
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
 	out := []map[string]any{}
 	for rows.Next() {
 		vals := make([]any, len(cols))
@@ -44,7 +84,9 @@ func queryRows(q string) []map[string]any {
 		for i := range vals {
 			ptr[i] = &vals[i]
 		}
-		_ = rows.Scan(ptr...)
+		if err := rows.Scan(ptr...); err != nil {
+			return nil, err
+		}
 		m := map[string]any{}
 		for i, c := range cols {
 			switch v := vals[i].(type) {
@@ -56,16 +98,31 @@ func queryRows(q string) []map[string]any {
 		}
 		out = append(out, m)
 	}
-	return out
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
-func scalarInt(q string) int { var n int; _ = db.QueryRow(q).Scan(&n); return n }
-
-func ev() string {
-	sp := scalarInt(`SELECT COUNT(*) FROM spin_log WHERE is_retry=0`)
-	won := scalarInt(`SELECT COALESCE(SUM(prize_dollars),0) FROM spin_log WHERE is_retry=0`)
-	if sp == 0 {
-		return "0"
+func scalarInt(q string) (int, error) {
+	var n int
+	if err := db.QueryRow(q).Scan(&n); err != nil {
+		return 0, err
 	}
-	return fmt.Sprintf("%.4f", float64(won)/float64(sp))
+	return n, nil
+}
+
+func ev() (string, error) {
+	sp, err := scalarInt(`SELECT COUNT(*) FROM spin_log WHERE is_retry=0`)
+	if err != nil {
+		return "", err
+	}
+	won, err := scalarInt(`SELECT COALESCE(SUM(prize_dollars),0) FROM spin_log WHERE is_retry=0`)
+	if err != nil {
+		return "", err
+	}
+	if sp == 0 {
+		return "0", nil
+	}
+	return fmt.Sprintf("%.4f", float64(won)/float64(sp)), nil
 }
