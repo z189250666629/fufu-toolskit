@@ -11,11 +11,11 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		CardKey string `json:"cardKey"`
 	}
-	if readBody(r, &b) != nil || b.CardKey == "" {
-		writeJSON(w, 400, map[string]string{"error": "请输入卡密"})
+	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	if !ok {
+		writeMissingCardKey(w)
 		return
 	}
-	key := strings.TrimSpace(b.CardKey)
 	card, ok := getCard(key)
 	if !ok {
 		writeJSON(w, 404, map[string]string{"error": "请先登录"})
@@ -52,15 +52,15 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		CardKey   string `json:"cardKey"`
 		CellIndex int    `json:"cellIndex"`
 	}
-	if readBody(r, &b) != nil || b.CardKey == "" {
-		writeJSON(w, 400, map[string]string{"error": "请输入卡密"})
+	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	if !ok {
+		writeMissingCardKey(w)
 		return
 	}
 	if b.CellIndex < 0 || b.CellIndex > 8 {
 		writeJSON(w, 400, map[string]string{"error": "无效的格子"})
 		return
 	}
-	key := strings.TrimSpace(b.CardKey)
 	res, err := withCardLock(key, func() (any, error) {
 		g, ok := getScratch(key)
 		if !ok {
@@ -111,11 +111,11 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		CardKey string `json:"cardKey"`
 	}
-	if readBody(r, &b) != nil || b.CardKey == "" {
-		writeJSON(w, 400, map[string]string{"error": "请输入卡密"})
+	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	if !ok {
+		writeMissingCardKey(w)
 		return
 	}
-	key := strings.TrimSpace(b.CardKey)
 	res, err := withCardLock(key, func() (any, error) {
 		g, ok := getScratch(key)
 		if !ok {
@@ -153,11 +153,11 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 	var b struct {
 		CardKey string `json:"cardKey"`
 	}
-	if readBody(r, &b) != nil || b.CardKey == "" {
-		writeJSON(w, 400, map[string]string{"error": "请输入卡密"})
+	key, ok := readCardKeyRequest(r, &b, func() string { return b.CardKey })
+	if !ok {
+		writeMissingCardKey(w)
 		return
 	}
-	key := strings.TrimSpace(b.CardKey)
 	card, ok := getCard(key)
 	if !ok {
 		writeJSON(w, 404, map[string]string{"error": "请先登录"})

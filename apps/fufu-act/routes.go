@@ -79,6 +79,18 @@ func readBody(r *http.Request, out any) error {
 	return webutil.DecodeJSON(io.LimitReader(r.Body, 1<<20), out)
 }
 
+func readCardKeyRequest(r *http.Request, out any, cardKey func() string) (string, bool) {
+	if readBody(r, out) != nil {
+		return "", false
+	}
+	key := strings.TrimSpace(cardKey())
+	return key, key != ""
+}
+
+func writeMissingCardKey(w http.ResponseWriter) {
+	writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请输入卡密"})
+}
+
 func (e httpErr) Error() string { return e.Message }
 
 func writeHTTPError(w http.ResponseWriter, err error) {

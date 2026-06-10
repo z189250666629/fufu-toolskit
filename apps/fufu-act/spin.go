@@ -7,18 +7,17 @@ import (
 	"fufu/activity"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 func handleSpin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		CardKey string `json:"cardKey"`
 	}
-	if readBody(r, &body) != nil || body.CardKey == "" {
-		writeJSON(w, 400, map[string]string{"error": "请输入卡密"})
+	key, ok := readCardKeyRequest(r, &body, func() string { return body.CardKey })
+	if !ok {
+		writeMissingCardKey(w)
 		return
 	}
-	key := strings.TrimSpace(body.CardKey)
 	res, err := withCardLock(key, func() (any, error) {
 		card, ok := getCard(key)
 		if !ok {

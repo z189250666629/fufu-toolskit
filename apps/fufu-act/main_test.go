@@ -68,6 +68,58 @@ func TestWriteHTTPErrorMapsKnownError(t *testing.T) {
 	}
 }
 
+func TestReadCardKeyRequestTrimsAndRejectsInvalidInput(t *testing.T) {
+	var body struct {
+		CardKey string `json:"cardKey"`
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"  sk-card  "}`))
+
+	key, ok := readCardKeyRequest(req, &body, func() string { return body.CardKey })
+	if !ok || key != "sk-card" {
+		t.Fatalf("card key = %q/%v", key, ok)
+	}
+
+	blankReq := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"  "}`))
+	key, ok = readCardKeyRequest(blankReq, &body, func() string { return body.CardKey })
+	if ok || key != "" {
+		t.Fatalf("blank card key = %q/%v", key, ok)
+	}
+
+	badReq := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey"`))
+	key, ok = readCardKeyRequest(badReq, &body, func() string { return body.CardKey })
+	if ok || key != "" {
+		t.Fatalf("bad body card key = %q/%v", key, ok)
+	}
+}
+
+func TestCardKeyWhitespaceRejectedAcrossHandlers(t *testing.T) {
+	cases := []struct {
+		name    string
+		handler func(http.ResponseWriter, *http.Request)
+		body    string
+	}{
+		{name: "login", handler: handleLogin, body: `{"cardKey":"   "}`},
+		{name: "spin", handler: handleSpin, body: `{"cardKey":"   "}`},
+		{name: "scratch start", handler: handleScratchStart, body: `{"cardKey":"   "}`},
+		{name: "scratch reveal", handler: handleScratchReveal, body: `{"cardKey":"   ","cellIndex":1}`},
+		{name: "scratch cashout", handler: handleScratchCashout, body: `{"cardKey":"   "}`},
+		{name: "scratch reset", handler: handleScratchReset, body: `{"cardKey":"   "}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/test", strings.NewReader(tc.body))
+			w := httptest.NewRecorder()
+
+			tc.handler(w, req)
+
+			if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "请输入卡密") {
+				t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestMCYLoginSendsAllSetCookieValuesOnPost(t *testing.T) {
 	oldCookie := mcyCookie
 	t.Cleanup(func() { mcyCookie = oldCookie })
