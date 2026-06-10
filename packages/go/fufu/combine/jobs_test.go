@@ -1,6 +1,8 @@
 package combine
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
@@ -66,5 +68,51 @@ func TestActiveMergeJobCountIgnoresTerminalJobs(t *testing.T) {
 
 	if got := app.activeMergeJobCount(); got != 1 {
 		t.Fatalf("active job count = %d, want 1", got)
+	}
+}
+
+func TestRunMergeJobUsesDeadlineContext(t *testing.T) {
+	searchReached := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/token/search" {
+			t.Fatalf("unexpected upstream path: %s", r.URL.String())
+		}
+		select {
+		case <-searchReached:
+		default:
+			close(searchReached)
+		}
+		<-r.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+	app := NewApp(Config{URL: server.URL, Token: "token", UserID: "1", QuotaUnit: 500000}, nil)
+	app.mergeJobTimeout = 30 * time.Millisecond
+	jobID := "deadline-job"
+	if !app.tryQueueMergeJob(jobID, buildQueuedMergeJobPatch(1, RoleUser, "准备合并...")) {
+		t.Fatal("failed to queue merge job")
+	}
+
+	done := make(chan struct{})
+	go func() {
+		app.runMergeJob(jobID, MergePayload{Keys: []string{"sk-deadline-source-key"}, IntervalUnit: publicTargetUnit}, RoleUser)
+		close(done)
+	}()
+
+	select {
+	case <-searchReached:
+	case <-time.After(time.Second):
+		t.Fatal("merge job never reached upstream token search")
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("merge job did not stop after its deadline")
+	}
+	job, ok := app.getMergeJob(jobID)
+	if !ok {
+		t.Fatal("merge job disappeared")
+	}
+	if job.Status != "error" || job.Error == "" {
+		t.Fatalf("deadline should mark job as error with safe message: %#v", job)
 	}
 }

@@ -158,7 +158,13 @@ func (a *App) runMergeJob(jobID string, p MergePayload, role Role) {
 			a.setMergeJob(jobID, MergeJobPatch{Status: strp("error"), StepText: strp("合并失败"), Error: strp(redactTraceDiagnostic(fmt.Sprint(x)))})
 		}
 	}()
-	_, err := a.executeMerge(context.Background(), buildRunMergeJobParams(jobID, p, role))
+	timeout := a.mergeJobTimeout
+	if timeout <= 0 {
+		timeout = mergeJobExecutionTimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	_, err := a.executeMerge(ctx, buildRunMergeJobParams(jobID, p, role))
 	if err != nil {
 		a.setMergeJob(jobID, MergeJobPatch{Status: strp("error"), StepText: strp("合并失败"), Error: strp(redactError(err))})
 	}

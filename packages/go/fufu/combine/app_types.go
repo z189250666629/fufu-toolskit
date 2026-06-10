@@ -25,6 +25,7 @@ type App struct {
 	authFailures     map[string]authFailureRecord
 	authFailureDelay time.Duration
 	activeSearches   map[string]struct{}
+	mergeJobTimeout  time.Duration
 	mergeJobs        map[string]MergeJob
 	mergeLocks       map[int]struct{}
 	static           http.Handler

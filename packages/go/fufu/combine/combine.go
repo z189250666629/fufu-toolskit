@@ -11,6 +11,7 @@ const (
 	searchConcurrency                 = 6
 	sessionTTL                        = 4 * time.Hour
 	mergeJobTTL                       = 30 * time.Minute
+	mergeJobExecutionTimeout          = 5 * time.Minute
 	traceRetention                    = 30 * 24 * time.Hour
 	maxJSONBodyBytes                  = int64(1 << 20)
 	maxKeysPerRequest                 = 200
