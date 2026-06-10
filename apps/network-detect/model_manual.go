@@ -18,6 +18,10 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 		Group    string `json:"group"`
 	}
 	if err := readJSON(r, &body); err != nil {
+		if errors.Is(err, errRequestBodyTooLarge) {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, "请求体过大")
+			return
+		}
 		writeJSONError(w, 400, "请求体无效")
 		return
 	}

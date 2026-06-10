@@ -36,6 +36,27 @@ func TestHandleModelTestMasksUnexpectedErrors(t *testing.T) {
 	}
 }
 
+func TestHandleModelTestRejectsOversizedJSONBody(t *testing.T) {
+	oldRunModelTest := runModelTest
+	t.Cleanup(func() { runModelTest = oldRunModelTest })
+	runModelTest = func(ctx context.Context, siteName, model, group string) (map[string]any, error) {
+		t.Fatal("oversized request body must be rejected before model test starts")
+		return nil, nil
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/newapi/model-status/test", strings.NewReader(`{"siteName":"site-a","model":"gpt-test"}`+strings.Repeat(" ", (1<<20)+1)))
+	w := httptest.NewRecorder()
+
+	handleModelTest(w, req)
+
+	body := strings.TrimSpace(w.Body.String())
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	if body != `{"error":"请求体过大"}` {
+		t.Fatalf("unexpected body: %s", body)
+	}
+}
+
 func TestHandleModelTestPassesRequestContext(t *testing.T) {
 	oldRunModelTest := runModelTest
 	t.Cleanup(func() { runModelTest = oldRunModelTest })

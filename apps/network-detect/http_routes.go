@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fufu/config"
 	"fufu/newapi"
 	"fufu/webutil"
@@ -10,6 +11,10 @@ import (
 	"strings"
 	"time"
 )
+
+const maxNetworkJSONBodyBytes int64 = 1 << 20
+
+var errRequestBodyTooLarge = errors.New("request body too large")
 
 func route(w http.ResponseWriter, r *http.Request) {
 	defer func() {
@@ -107,7 +112,15 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 }
 
 func readJSON(r *http.Request, out any) error {
-	return webutil.DecodeJSON(http.MaxBytesReader(nil, r.Body, 1<<20), out, webutil.WithUseNumber())
+	err := webutil.DecodeJSON(http.MaxBytesReader(nil, r.Body, maxNetworkJSONBodyBytes), out, webutil.WithUseNumber())
+	if err == nil {
+		return nil
+	}
+	var maxErr *http.MaxBytesError
+	if errors.As(err, &maxErr) {
+		return errRequestBodyTooLarge
+	}
+	return err
 }
 
 func clientIP(r *http.Request) string {
