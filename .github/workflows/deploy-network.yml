@@ -28,7 +28,7 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           if [[ "$TAG" == *-* ]]; then echo "should_deploy=false" >> "$GITHUB_OUTPUT"; exit 0; fi
           MSG=$(git log -1 --format=%B "${{ github.sha }}")
-          if echo "$MSG" | grep -qiE '\[(deploy all|deploy network|deploy network-detect|deploy network_detect|deploy combine|deploy fufu-combine)\]'; then echo "should_deploy=true" >> "$GITHUB_OUTPUT"; else echo "should_deploy=false" >> "$GITHUB_OUTPUT"; fi
+          if echo "$MSG" | grep -qiE '\[(deploy all|deploy network|deploy network-detect|deploy network_detect|deploy combine)\]'; then echo "should_deploy=true" >> "$GITHUB_OUTPUT"; else echo "should_deploy=false" >> "$GITHUB_OUTPUT"; fi
   verify:
     needs: check
     if: needs.check.outputs.should_deploy == 'true'
