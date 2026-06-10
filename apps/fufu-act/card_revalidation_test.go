@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -78,6 +79,43 @@ func TestHandleSpinRejectsCachedDisabledToken(t *testing.T) {
 	}
 	if usedSpins != 0 || logs != 0 {
 		t.Fatalf("disabled token should not mutate spin state, used_spins=%d logs=%d", usedSpins, logs)
+	}
+}
+
+func TestHandleSpinRejectsCachedCardWhenTokenServiceUnavailable(t *testing.T) {
+	setupScratchLockTestDB(t)
+	key := "sk-cached-service-down-spin"
+	seedSpinCard(t, key)
+	oldTokenSvc := tokenSvc
+	oldTokenConfigErr := tokenConfigErr
+	tokenSvc = nil
+	tokenConfigErr = errors.New("NEWAPI_MANAGED_API_SITES 不是有效 JSON: secret-dsn")
+	t.Cleanup(func() {
+		tokenSvc = oldTokenSvc
+		tokenConfigErr = oldTokenConfigErr
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/spin", strings.NewReader(`{"cardKey":"`+key+`"}`))
+	w := httptest.NewRecorder()
+
+	handleSpin(w, req)
+
+	body := w.Body.String()
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(body, "NewAPI 未配置") {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	if strings.Contains(body, "secret-dsn") || strings.Contains(body, "NEWAPI_MANAGED_API_SITES") {
+		t.Fatalf("token config internals leaked in response: %s", body)
+	}
+	var usedSpins, logs int
+	if err := db.QueryRow(`SELECT used_spins FROM cards WHERE card_key=?`, key).Scan(&usedSpins); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM spin_log WHERE card_key=?`, key).Scan(&logs); err != nil {
+		t.Fatal(err)
+	}
+	if usedSpins != 0 || logs != 0 {
+		t.Fatalf("unavailable token service should not mutate spin state, used_spins=%d logs=%d", usedSpins, logs)
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 
 func requireCurrentTokenActive(ctx context.Context, key string) error {
 	if tokenSvc == nil {
-		return nil
+		return httpErr{http.StatusServiceUnavailable, "NewAPI 未配置"}
 	}
 	token, err := tokenSvc.SearchTokenByKey(ctx, key)
 	if err != nil {

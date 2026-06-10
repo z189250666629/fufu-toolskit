@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"fufu/newapi"
+	"fufu/tokens"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -13,16 +16,38 @@ func setupScratchLockTestDB(t *testing.T) {
 	t.Helper()
 	oldDB := db
 	oldLocks := cardLocks
+	oldTokenSvc := tokenSvc
+	oldTokenConfigErr := tokenConfigErr
 	testDB, err := initDB(filepath.Join(t.TempDir(), "slot.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := "sk-" + r.URL.Query().Get("token")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data": []any{map[string]any{
+				"id":             30,
+				"key":            key,
+				"name":           "100-act-test",
+				"interval_quota": newapi.DefaultQuotaUnit * 100,
+				"remain_quota":   newapi.DefaultQuotaUnit * 100,
+				"status":         1,
+				"created_time":   actStartTS + 1,
+			}},
+		})
+	}))
 	db = testDB
 	cardLocks = &cardLockRegistry{}
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "token", UserID: "1"}))
+	tokenConfigErr = nil
 	t.Cleanup(func() {
+		server.Close()
 		_ = testDB.Close()
 		db = oldDB
 		cardLocks = oldLocks
+		tokenSvc = oldTokenSvc
+		tokenConfigErr = oldTokenConfigErr
 	})
 }
 
