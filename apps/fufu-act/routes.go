@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fufu/webutil"
 	"io"
 	"net/http"
@@ -77,7 +76,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func readBody(r *http.Request, out any) error {
-	return json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(out)
+	return webutil.DecodeJSON(io.LimitReader(r.Body, 1<<20), out)
 }
 
 func (e httpErr) Error() string { return e.Message }

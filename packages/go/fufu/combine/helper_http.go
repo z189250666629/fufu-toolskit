@@ -1,7 +1,6 @@
 package combine
 
 import (
-	"encoding/json"
 	"fmt"
 	"fufu/webutil"
 	"io"
@@ -24,7 +23,5 @@ func writeBadJSONRequest(w http.ResponseWriter) {
 }
 
 func decodeJSON(r io.Reader, out any) error {
-	dec := json.NewDecoder(r)
-	dec.UseNumber()
-	return dec.Decode(out)
+	return webutil.DecodeJSON(r, out, webutil.WithUseNumber())
 }

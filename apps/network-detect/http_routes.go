@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fufu/config"
 	"fufu/newapi"
 	"fufu/webutil"
@@ -121,9 +120,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func readJSON(r *http.Request, out any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
-	dec.UseNumber()
-	return dec.Decode(out)
+	return webutil.DecodeJSON(http.MaxBytesReader(nil, r.Body, 1<<20), out, webutil.WithUseNumber())
 }
 
 func clientIP(r *http.Request) string {
