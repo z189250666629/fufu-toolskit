@@ -34,7 +34,12 @@ func processCredits() {
 	for rows.Next() {
 		var id, prize, retries int
 		var key string
-		_ = rows.Scan(&id, &key, &prize, &retries)
+		if err := rows.Scan(&id, &key, &prize, &retries); err != nil {
+			if id > 0 {
+				_, _ = db.Exec(`UPDATE credit_queue SET status='failed', error=? WHERE id=?`, err.Error(), id)
+			}
+			continue
+		}
 		if err := tokenSvc.AddQuota(context.Background(), key, int64(prize)); err != nil {
 			nr := retries + 1
 			status := "pending"
@@ -45,5 +50,8 @@ func processCredits() {
 		} else {
 			_, _ = db.Exec(`UPDATE credit_queue SET status='done', processed_at=datetime('now') WHERE id=?`, id)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return
 	}
 }
