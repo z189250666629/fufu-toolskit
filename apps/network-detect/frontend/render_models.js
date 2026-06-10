@@ -36,6 +36,7 @@ export {
 
 function renderSiteStatusCard(site, group, summary, windowLabel) {
   const meta = modelStatusMeta(summary.status, true);
+  const siteError = site.logError || site.channelsError || site.pricingError || '';
   return `
     <article class="model-site-card" data-slot="card">
       <div class="model-site-head" data-slot="card-header">
@@ -51,7 +52,7 @@ function renderSiteStatusCard(site, group, summary, windowLabel) {
         ${renderMetric('失败数', compactNumber(summary.failureCount), `最近 ${windowLabel}`, summary.failureCount ? 'danger' : '')}
         ${renderMetric('未知模型', compactNumber(summary.unknown), '无调用记录', '')}
       </div>
-      ${site.logError || site.channelsError ? `<p class="site-error" data-slot="card-footer">${escapeHtml(site.logError || site.channelsError)}</p>` : ''}
+      ${siteError ? `<p class="site-error" data-slot="card-footer">${escapeHtml(siteError)}</p>` : ''}
     </article>
   `;
 }

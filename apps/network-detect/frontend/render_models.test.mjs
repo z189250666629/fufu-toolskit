@@ -49,3 +49,46 @@ test('renderModelAvailability handles empty configured state', () => {
   assert.match(html, /暂无模型状态数据/);
   assert.match(html, /missing config/);
 });
+
+test('renderModelAvailability surfaces pricing errors on site card', () => {
+  const html = renderModelAvailability({
+    state: {
+      loading: false,
+      error: '',
+      modelFilter: '',
+      testingCells: new Set(),
+      groupSelectOpen: false,
+      modelStatus: {
+        configured: true,
+        windowSeconds: 3600,
+        expiresAt: 0,
+        sites: [{
+          site: { name: 'token-fufu', url: 'https://token.example.test' },
+          groups: ['vip'],
+          pricingError: 'pricing failed <script>'
+        }],
+        models: [{
+          model: 'model-a',
+          perSite: {
+            'token-fufu': {
+              configured: true,
+              groupStats: {
+                vip: {
+                  configured: true,
+                  status: 'operational',
+                  requestCount: 1,
+                  successCount: 1,
+                  failureCount: 0,
+                  enabledChannelCount: 1
+                }
+              }
+            }
+          }
+        }]
+      }
+    }
+  });
+
+  assert.match(html, /pricing failed &lt;script&gt;/);
+  assert.doesNotMatch(html, /pricing failed <script>/);
+});
