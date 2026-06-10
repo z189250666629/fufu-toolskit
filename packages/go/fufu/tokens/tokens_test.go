@@ -271,3 +271,19 @@ func TestAddQuotaUsesDefaultQuotaUnitWhenServiceQuotaUnitUnset(t *testing.T) {
 		t.Fatalf("remain_quota=%d, want %d; body=%#v", got, want, updated)
 	}
 }
+
+func TestGetTokenReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/token/9" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "token disabled"})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	got, err := svc.GetToken(context.Background(), 9)
+	if err == nil || !strings.Contains(err.Error(), "token disabled") || got.ID != 0 || got.Key != "" {
+		t.Fatalf("token=%#v err=%v", got, err)
+	}
+}

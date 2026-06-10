@@ -18,6 +18,9 @@ func (s *Service) GetToken(ctx context.Context, id int) (Token, error) {
 	if !res.OK() {
 		return Token{}, fmt.Errorf("Token %d 不存在或无法访问", id)
 	}
+	if !newapi.IsSuccess(data) {
+		return Token{}, fmt.Errorf("%s", newapi.ErrorMessage(data, res.StatusCode, fmt.Sprintf("Token %d 数据异常", id)))
+	}
 	if raw, ok := data["data"].(map[string]any); ok {
 		return FromRaw(raw), nil
 	}
