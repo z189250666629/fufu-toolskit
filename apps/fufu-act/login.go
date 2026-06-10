@@ -95,7 +95,12 @@ func respondCard(w http.ResponseWriter, card Card) {
 	isScratch := isScratchDollarTier(card.Dollars)
 	var sg any
 	if isScratch {
-		if g, ok := getScratch(card.CardKey); ok {
+		g, ok, err := lookupScratch(card.CardKey)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "服务器错误")
+			return
+		}
+		if ok {
 			sg = scratchGameResponse(g)
 		}
 	}

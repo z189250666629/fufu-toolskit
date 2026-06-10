@@ -93,3 +93,35 @@ func TestScratchCashoutRejectsCorruptRevealedCountWithoutPanic(t *testing.T) {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
 }
+
+func TestScratchRevealReturnsServerErrorWhenScratchLookupFails(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/reveal", strings.NewReader(`{"cardKey":"scratch-card","cellIndex":0}`))
+	w := httptest.NewRecorder()
+
+	handleScratchReveal(w, req)
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestScratchCashoutReturnsServerErrorWhenScratchLookupFails(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/scratch/cashout", strings.NewReader(`{"cardKey":"scratch-card"}`))
+	w := httptest.NewRecorder()
+
+	handleScratchCashout(w, req)
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}

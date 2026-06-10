@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -84,5 +85,19 @@ func TestRespondCardRequiresExactScratchDollarTier(t *testing.T) {
 	}
 	if body.IsScratch {
 		t.Fatalf("near-55 card should not be marked scratch: body=%s", w.Body.String())
+	}
+}
+
+func TestRespondCardReturns500WhenScratchLookupFails(t *testing.T) {
+	setupScratchLockTestDB(t)
+	if _, err := db.Exec(`DROP TABLE scratch_games`); err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	respondCard(w, Card{CardKey: "scratch-card", CardName: "Scratch Card", Dollars: 55, TotalSpins: 0})
+
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "服务器错误") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
 }

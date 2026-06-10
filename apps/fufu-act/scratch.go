@@ -1,7 +1,9 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 )
 
@@ -29,7 +31,9 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 		if !isScratchDollarTier(card.Dollars) {
 			return nil, httpErr{403, "此卡密不参与刮刮乐活动"}
 		}
-		if g, ok := getScratch(key); ok {
+		if g, ok, lookupErr := lookupScratch(key); lookupErr != nil {
+			return nil, lookupErr
+		} else if ok {
 			return scratchStartResponse(g), nil
 		}
 		mines := []int{}
@@ -47,7 +51,9 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 		}
 		mb, _ := json.Marshal(mines)
 		if _, err := db.Exec(`INSERT INTO scratch_games (card_key,mine_pos) VALUES (?,?)`, key, string(mb)); err != nil {
-			if g, ok := getScratch(key); ok {
+			if g, ok, lookupErr := lookupScratch(key); lookupErr != nil {
+				return nil, lookupErr
+			} else if ok {
 				return scratchStartResponse(g), nil
 			}
 			return nil, err
@@ -81,7 +87,10 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 	}
 	cellIndex := *b.CellIndex
 	res, err := withCardLock(key, func() (any, error) {
-		g, ok := getScratch(key)
+		g, ok, lookupErr := lookupScratch(key)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
 		if !ok {
 			return nil, httpErr{404, "请先开始刮刮乐"}
 		}
@@ -151,7 +160,10 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := withCardLock(key, func() (any, error) {
-		g, ok := getScratch(key)
+		g, ok, lookupErr := lookupScratch(key)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
 		if !ok {
 			return nil, httpErr{404, "请先开始刮刮乐"}
 		}
@@ -212,7 +224,9 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 		if !isTestCardName(card.CardName) {
 			return nil, httpErr{403, "仅测试卡可重开"}
 		}
-		if g, ok := getScratch(key); ok && g.Status == "playing" {
+		if g, ok, lookupErr := lookupScratch(key); lookupErr != nil {
+			return nil, lookupErr
+		} else if ok && g.Status == "playing" {
 			return nil, httpErr{400, "当前游戏尚未结束"}
 		}
 		if _, err := db.Exec(`DELETE FROM scratch_games WHERE card_key=?`, key); err != nil {
@@ -228,9 +242,20 @@ func handleScratchReset(w http.ResponseWriter, r *http.Request) {
 }
 
 func getScratch(key string) (ScratchGame, bool) {
+	g, ok, _ := lookupScratch(key)
+	return g, ok
+}
+
+func lookupScratch(key string) (ScratchGame, bool, error) {
 	var g ScratchGame
 	err := db.QueryRow(`SELECT id,card_key,mine_pos,revealed,prize_dollars,status FROM scratch_games WHERE card_key=?`, key).Scan(&g.ID, &g.CardKey, &g.MinePos, &g.Revealed, &g.PrizeDollars, &g.Status)
-	return g, err == nil
+	if err == nil {
+		return g, true, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return ScratchGame{}, false, nil
+	}
+	return ScratchGame{}, false, err
 }
 
 func scratchGameResponse(g ScratchGame) map[string]any {
