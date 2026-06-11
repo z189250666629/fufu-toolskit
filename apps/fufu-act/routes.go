@@ -41,6 +41,8 @@ func apiRoute(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		handleAdminStats(w, r)
+	case "/api/admin/sale-cards/run":
+		post(w, r, handleAdminSaleCardsRun)
 	case "/api/prizes":
 		if !webutil.RequireMethod(w, r, http.MethodGet) {
 			return
