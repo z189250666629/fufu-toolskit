@@ -1,28 +1,27 @@
-# 合并记录
+# Merge Notes
 
-本次合并把工具集合整理为 3 个对外应用：`network-detect`、`fufu-act`、`y2k-nav`。`fufu-combine` 不再独立部署，页面与 API 都由 `network-detect` 承载。
+本次合并后的生产形态是一个对外应用：`fufu-tool-site`。它把导航页、API/模型状态、合卡、活动前台和活动后台合并到同一个服务中。
 
-## 来源
+## 来源与模块边界
 
-- `apps/fufu-combine`：已迁移至 `apps/network-detect` 与 `packages/go/fufu/combine`。
-- `apps/network-detect`：来自 GitHub 仓库 `z189250666629/network-detect`。
-- `apps/fufu-act`：来自本机目录 `C:\Users\z1892\project\fufu_act`，即用户所说的 `activity`。
+- `apps/fufu-tool-site`：统一生产服务，复用原 `network-detect` 的状态面板和合卡后端能力。
+- `apps/y2k-nav`：保留为首页导航静态资源模块，被 `fufu-tool-site` 的 `/` 嵌入。
+- `apps/fufu-act`：保留为 activity 后端与 `public/` 静态资源模块，被 `fufu-tool-site` 的 `/activity`、`/admin` 和 `/api/admin/*` 等路由嵌入。
+- `apps/network-detect`：历史模块源码保留，生产部署不再单独指向它。
+- `apps/fufu-combine`：已迁移至统一服务与 `packages/go/fufu/combine`，不再独立部署。
 
-## 处理过的内容
+## 未迁移/未提交内容
 
-- 未复制 `.git/`、`node_modules/`。
-- 未复制 `apps/fufu-act/data/*.db*` 运行数据库。
-- 未复制 `apps/fufu-act/.claude/` 和 `apps/fufu-act/backups/`。
-- 给 `fufu-act` 添加了空的 `data/.gitkeep`。
-- 根目录新增统一 `package.json`、`.gitignore`、`.env.example`、`README.md`、`go.work`。
-- 后端统一迁移到 Go；前端继续复用现有静态 HTML/CSS/JS。
-- `fufu-act` 查卡和发奖通过共享 `tokens` 服务，不再直接拼 NewAPI 请求。
+- 未复制运行数据库，如 `apps/**/data/*.db*`。
+- 不提交 `.env*`、`config.json`、cookie、token 或商城账号密码。
+- `apps/mcy-card-upload/` 若存在本地硬编码凭据，不进入统一前端；集成前必须先改为服务端/env 配置。
 
-## 当前边界
+## 当前生产入口
 
-这次没有把前端改成 React，也没有把三个对外应用强行合成一个 HTTP 进程。后续如果需要，可以再做：
+- `/`：fufu 工具站导航页。
+- `/status`：API/模型状态。
+- `/combine`：合卡。
+- `/activity`：活动前台。
+- `/admin`：活动后台。
 
-1. 根目录统一反向代理或网关。
-2. 统一 Docker Compose，一键部署三个服务。
-3. 前端 React/Vite/TypeScript 重构。
-4. 统一配置中心和密钥管理。
+旧 `33148/y2k-nav` 与 `18820/fufu-act` 独立生产入口已退休，统一外部端口继续使用 `38473`。

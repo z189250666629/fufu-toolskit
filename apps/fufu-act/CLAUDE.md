@@ -2,7 +2,7 @@
 
 ## Commands
 
-- Start server: `npm start` or `go run .` (port `SLOT_PORT`, default `18820`)
+- Start standalone module server for local debugging: `npm start` or `go run ./cmd/fufu-act` (port `SLOT_PORT`, default `18820`; production is served by `apps/fufu-tool-site`)
 - Test: `npm test` or `go test -count=1 ./...`
 
 ## Architecture

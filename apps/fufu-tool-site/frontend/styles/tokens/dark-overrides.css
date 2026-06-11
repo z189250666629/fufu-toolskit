@@ -1,0 +1,7 @@
+.dark .card:not(.card--transparent),
+.dark [data-slot="card"]:not(.card--transparent),
+.dark .alert,
+.dark [data-slot="input"],
+.dark [data-slot="select-trigger"] {
+  border: 1px solid var(--border);
+}

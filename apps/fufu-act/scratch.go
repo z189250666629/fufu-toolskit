@@ -1,4 +1,4 @@
-package main
+package activityapp
 
 import (
 	"database/sql"
@@ -333,10 +333,11 @@ func isScratchGameOver(status string) bool {
 }
 
 func scratchPrizeForSafeCount(safe int) (int, bool) {
-	if safe <= 0 || safe > len(scratchRewards) {
+	rewards := SnapshotRuntimeConfig().ScratchRewards
+	if safe <= 0 || safe > len(rewards) {
 		return 0, false
 	}
-	return scratchRewards[safe-1], true
+	return rewards[safe-1], true
 }
 
 func parseScratchIntArray(s string) ([]int, error) {

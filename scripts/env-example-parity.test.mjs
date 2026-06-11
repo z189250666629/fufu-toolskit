@@ -17,17 +17,17 @@ function envExampleNames(source) {
   );
 }
 
-test('.env.example includes existing config variables passed by deploy', async () => {
+test('.env.example includes existing config variables passed by unified deploy', async () => {
   const requiredVariables = [
     {
       name: 'NEWAPI_MANAGED_API_CONFIG',
       docs: ['README.md', 'docs/CI_CD.md'],
-      deploy: ['.github/workflows/deploy-network.yml', 'infra/deploy/network-detect/docker-compose.yml']
+      deploy: ['.github/workflows/deploy-fufu-tool-site.yml', 'infra/deploy/fufu-tool-site/docker-compose.yml']
     },
     {
       name: 'ADMIN_TOKEN',
-      docs: ['docs/CI_CD.md'],
-      deploy: ['.github/workflows/deploy-act.yml', 'infra/deploy/fufu-act/docker-compose.yml']
+      docs: ['README.md', 'docs/CI_CD.md'],
+      deploy: ['.github/workflows/deploy-fufu-tool-site.yml', 'infra/deploy/fufu-tool-site/docker-compose.yml']
     }
   ];
   const envExample = await readRepoFile('.env.example');
@@ -52,14 +52,14 @@ test('CONNECTIVITY overrides are documented as optional fallbacks to NewAPI site
   const [envExample, readme, workflow, compose] = await Promise.all([
     readRepoFile('.env.example'),
     readRepoFile('README.md'),
-    readRepoFile('.github/workflows/deploy-network.yml'),
-    readRepoFile('infra/deploy/network-detect/docker-compose.yml')
+    readRepoFile('.github/workflows/deploy-fufu-tool-site.yml'),
+    readRepoFile('infra/deploy/fufu-tool-site/docker-compose.yml')
   ]);
   const ciDocs = await readRepoFile('docs/CI_CD.md');
 
   for (const variable of ['CONNECTIVITY_API_URLS', 'CONNECTIVITY_TOKEN_URLS']) {
-    assert.match(workflow, new RegExp(`\\b${variable}\\b`), `${variable} is passed by deploy-network.yml`);
-    assert.match(compose, new RegExp(`\\b${variable}\\b`), `${variable} is passed by network-detect compose`);
+    assert.match(workflow, new RegExp(`\\b${variable}\\b`), `${variable} is passed by deploy-fufu-tool-site.yml`);
+    assert.match(compose, new RegExp(`\\b${variable}\\b`), `${variable} is passed by fufu-tool-site compose`);
     assert.match(envExample, new RegExp(`\\b${variable}=`), `${variable} remains listed for local optional overrides`);
   }
 
@@ -76,13 +76,14 @@ test('CONNECTIVITY overrides are documented as optional fallbacks to NewAPI site
   }
 });
 
-test('README documents fufu-act env variables passed by deploy', async () => {
+test('README documents activity and MCY env variables passed by unified deploy', async () => {
   const readme = await readRepoFile('README.md');
   for (const variable of [
     'FUFU_QUOTA_UNIT',
     'MCY_LOGIN_ENDPOINT',
-    'MCY_UPLOAD_ENDPOINT'
+    'MCY_UPLOAD_ENDPOINT',
+    'ADMIN_TOKEN'
   ]) {
-    assert.match(readme, new RegExp(`\\b${variable}\\b`), `README.md should document ${variable} for fufu-act local setup parity`);
+    assert.match(readme, new RegExp(`\\b${variable}\\b`), `README.md should document ${variable} for fufu-tool-site local setup parity`);
   }
 });

@@ -1,0 +1,122 @@
+name: deploy-fufu-tool-site
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: deploy-fufu-tool-site
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.gate.outputs.should_deploy }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ "$TAG" == *-* ]]; then echo "should_deploy=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          MSG=$(git log -1 --format=%B "${{ github.sha }}")
+          if echo "$MSG" | grep -qiE '\[(deploy all|deploy fufu-tool-site|deploy tool-site|deploy tools|deploy network|deploy network-detect|deploy network_detect|deploy combine|deploy act|deploy activity|deploy fufu-act|deploy y2k|deploy y2k-nav|deploy nav|deploy navigation)\]'; then echo "should_deploy=true" >> "$GITHUB_OUTPUT"; else echo "should_deploy=false" >> "$GITHUB_OUTPUT"; fi
+  verify:
+    needs: check
+    if: needs.check.outputs.should_deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/fufu-tool-site/go.mod
+          cache-dependency-path: |
+            apps/fufu-tool-site/go.sum
+            apps/fufu-act/go.sum
+            packages/go/fufu/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: go test -count=1 .
+      - run: npm run test:scripts
+      - run: npm --prefix apps/fufu-tool-site run test:frontend
+  docker:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-fufu-tool-site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/fufu-tool-site/Dockerfile
+          push: true
+          build-args: |
+            GO_IMAGE=${{ vars.NETWORK_DETECT_GO_IMAGE || 'golang:1.25-alpine' }}
+            RUNTIME_IMAGE=${{ vars.NETWORK_DETECT_RUNTIME_IMAGE || 'alpine:3.22' }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha,scope=fufu-tool-site
+          cache-to: type=gha,mode=max,scope=fufu-tool-site
+  deploy:
+    needs: docker
+    runs-on: ubuntu-latest
+    environment: toolskit
+    env:
+      APP_NAME: fufu-tool-site
+      APP_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}-fufu-tool-site
+      APP_TAG: ${{ github.ref_name }}
+      REGISTRY: ghcr.io
+      REGISTRY_USER: ${{ vars.REGISTRY_USER || secrets.GHCR_USERNAME || github.actor }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD || secrets.GHCR_TOKEN || github.token }}
+      SSH_HOST: ${{ vars.SSH_HOST || vars.DEPLOY_HOST }}
+      SSH_USER: ${{ vars.SSH_USER || vars.DEPLOY_USER }}
+      SSH_PORT: ${{ vars.SSH_PORT || vars.DEPLOY_PORT || '22' }}
+      SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.DEPLOY_SSH_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS || vars.SSH_KNOWN_HOSTS }}
+      DEPLOY_PATH: ${{ vars.NETWORK_DETECT_DEPLOY_PATH || vars.DETECT_DEPLOY_PATH || vars.DEPLOY_PATH && format('{0}/fufu-tool-site', vars.DEPLOY_PATH) || '/data/docker/fufu-tool-site' }}
+      COMPOSE_FILE: infra/deploy/fufu-tool-site/docker-compose.yml
+      COMPOSE_SERVICE_NAME: fufu-tool-site
+      CONTAINER_NAME: ${{ vars.NETWORK_DETECT_CONTAINER_NAME || 'fufu-tool-site' }}
+      HOST_BIND: ${{ vars.NETWORK_DETECT_HOST_BIND || vars.HOST_BIND || '0.0.0.0' }}
+      HOST_PORT: ${{ vars.NETWORK_DETECT_HOST_PORT || vars.DETECT_PORT || '38473' }}
+      NEWAPI_MANAGED_API_SITES: ${{ secrets.NEWAPI_MANAGED_API_SITES || vars.NEWAPI_MANAGED_API_SITES }}
+      NEWAPI_MANAGED_API_CONFIG: ${{ vars.NEWAPI_MANAGED_API_CONFIG }}
+      NEWAPI_API_SITE_URL: ${{ vars.NEWAPI_API_SITE_URL }}
+      NEWAPI_API_SITE_TOKEN: ${{ secrets.NEWAPI_API_SITE_TOKEN }}
+      NEWAPI_TOKEN_SITE_URL: ${{ vars.NEWAPI_TOKEN_SITE_URL }}
+      NEWAPI_TOKEN_SITE_TOKEN: ${{ secrets.NEWAPI_TOKEN_SITE_TOKEN }}
+      CONNECTIVITY_API_URLS: ${{ vars.CONNECTIVITY_API_URLS }}
+      CONNECTIVITY_TOKEN_URLS: ${{ vars.CONNECTIVITY_TOKEN_URLS }}
+      FUFU_API_BASE_URL: ${{ vars.FUFU_API_BASE_URL || vars.NEWAPI_API_SITE_URL }}
+      FUFU_API_TOKEN: ${{ secrets.FUFU_API_TOKEN || secrets.NEWAPI_API_SITE_TOKEN }}
+      FUFU_API_USER_ID: ${{ vars.FUFU_API_USER_ID || '1' }}
+      FUFU_QUOTA_UNIT: ${{ vars.FUFU_QUOTA_UNIT || '500000' }}
+      MCY_BASE_URL: ${{ vars.MCY_BASE_URL }}
+      MCY_COOKIE: ${{ secrets.MCY_COOKIE }}
+      MCY_USERNAME: ${{ secrets.MCY_USERNAME || vars.MCY_USERNAME }}
+      MCY_PASSWORD: ${{ secrets.MCY_PASSWORD }}
+      MCY_LOGIN_ENDPOINT: ${{ vars.MCY_LOGIN_ENDPOINT || '/admin/login' }}
+      MCY_UPLOAD_ENDPOINT: ${{ vars.MCY_UPLOAD_ENDPOINT || '/plugin/virtual-card-ship/card/add' }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN || vars.ADMIN_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: bash scripts/deploy-docker-app.sh

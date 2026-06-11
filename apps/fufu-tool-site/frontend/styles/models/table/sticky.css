@@ -1,0 +1,18 @@
+.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  box-shadow: 1px 0 0 var(--line);
+}
+
+.data-table thead th.sticky-col {
+  top: 0;
+  left: 0;
+  z-index: 6;
+  background: var(--surface-soft);
+}
+
+td.sticky-col {
+  z-index: 1;
+  background: var(--sage-surface);
+}

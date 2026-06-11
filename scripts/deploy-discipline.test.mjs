@@ -59,16 +59,6 @@ async function deployWorkflowPaths() {
   return (await listRepoFiles('.github/workflows', (path) => /\/deploy-.*\.ya?ml$/i.test(path))).sort();
 }
 
-function deployDirectivesFromWorkflow(source, path) {
-  const gateLine = source
-    .split(/\r?\n/)
-    .find((line) => line.includes('grep -qiE') && line.includes('deploy'));
-  assert.ok(gateLine, `${path} should contain a deploy directive gate`);
-  const group = gateLine.match(/\(([^)]+)\)/)?.[1];
-  assert.ok(group, `${path} should keep deploy directives in a regex group`);
-  return group.split('|').map((directive) => `[${directive.trim()}]`);
-}
-
 test('deploy docs and workflows do not reintroduce dashboard-key auth', async () => {
   const forbidden = [
     /NEWAPI[_-]?DASHBOARD[\w-]*KEY/i,
@@ -87,7 +77,7 @@ test('deploy docs and workflows do not reintroduce dashboard-key auth', async ()
   }
 });
 
-test('dashboard-key discipline scans deploy docs env and agent files', async () => {
+test('dashboard-key discipline scans unified deploy docs env and agent files', async () => {
   const paths = await deployDisciplinePaths();
   for (const expected of [
     '.env.example',
@@ -96,39 +86,39 @@ test('dashboard-key discipline scans deploy docs env and agent files', async () 
     'docs/merge-notes.md',
     'apps/fufu-act/AGENTS.md',
     'apps/network-detect/README.md',
-    '.github/workflows/deploy-y2k-nav.yml',
-    'infra/deploy/y2k-nav/docker-compose.yml',
+    '.github/workflows/deploy-fufu-tool-site.yml',
+    'infra/deploy/fufu-tool-site/docker-compose.yml',
     'scripts/deploy-docker-app.sh'
   ]) {
     assert.equal(paths.includes(expected), true, `${expected} should be covered by deploy discipline scans`);
   }
 });
 
-test('combine deploy remains a network-detect alias, not stale fufu-combine deploy vocabulary', async () => {
-  const workflowFiles = await readdir(new URL('../.github/workflows/', import.meta.url));
-  assert.equal(workflowFiles.includes('deploy-combine.yml'), false, 'standalone combine workflow should not exist');
-
-  const networkWorkflow = await readRepoFile('.github/workflows/deploy-network.yml');
-  assert.match(networkWorkflow, /\[.*deploy combine.*\]/i, 'deploy-network keeps [deploy combine] compatibility alias');
-  assert.doesNotMatch(networkWorkflow, /deploy fufu-combine/i, 'deploy-network should not accept stale [deploy fufu-combine] directive');
-  assert.doesNotMatch(networkWorkflow, /apps\/fufu-combine/i, 'deploy-network should not reference the removed standalone app path');
-});
-
-test('deploy workflow gates cover every deploy workflow', async () => {
+test('only the unified fufu-tool-site deploy workflow remains production deployable', async () => {
   assert.deepEqual(await deployWorkflowPaths(), [
-    '.github/workflows/deploy-act.yml',
-    '.github/workflows/deploy-network.yml',
-    '.github/workflows/deploy-y2k-nav.yml'
+    '.github/workflows/deploy-fufu-tool-site.yml'
   ]);
+
+  const workflowFiles = await readdir(new URL('../.github/workflows/', import.meta.url));
+  for (const retired of ['deploy-network.yml', 'deploy-act.yml', 'deploy-y2k-nav.yml', 'deploy-combine.yml']) {
+    assert.equal(workflowFiles.includes(retired), false, `${retired} should be retired as an independent production entry`);
+  }
 });
 
-test('deploy directive aliases match the CI/CD runbook', async () => {
+test('legacy deploy directives now target the unified fufu-tool-site workflow and are documented', async () => {
   const ciDocs = await readRepoFile('docs/CI_CD.md');
-  for (const path of await deployWorkflowPaths()) {
-    const source = await readRepoFile(path);
-    for (const directive of deployDirectivesFromWorkflow(source, path)) {
-      assert.match(ciDocs, new RegExp(directive.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${path} accepts ${directive}, so docs/CI_CD.md should document it`);
-    }
+  const workflow = await readRepoFile('.github/workflows/deploy-fufu-tool-site.yml');
+  for (const directive of [
+    '[deploy all]',
+    '[deploy fufu-tool-site]',
+    '[deploy tool-site]',
+    '[deploy network]',
+    '[deploy combine]',
+    '[deploy activity]',
+    '[deploy nav]'
+  ]) {
+    assert.match(workflow, new RegExp(directive.slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), `workflow should accept ${directive}`);
+    assert.match(ciDocs, new RegExp(directive.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), `docs/CI_CD.md should document ${directive}`);
   }
 });
 
@@ -140,42 +130,16 @@ test('deploy workflows use the canonical toolskit GitHub environment', async () 
   }
 });
 
-test('deploy workflow verify jobs run uncached Go tests', async () => {
-  for (const path of await deployWorkflowPaths()) {
-    const source = await readRepoFile(path);
-    assert.doesNotMatch(source, /^\s*-\s*run:\s*go test \.\/\.\.\.\s*$/m, `${path} must not use cache-prone go test ./...`);
-    assert.match(source, /^\s*-\s*run:\s*go test -count=1 \.\/\.\.\.\s*$/m, `${path} should disable Go test cache in deploy verification`);
-  }
+test('unified deploy workflow verify job runs uncached backend and frontend checks before packaging', async () => {
+  const source = await readRepoFile('.github/workflows/deploy-fufu-tool-site.yml');
+  assert.doesNotMatch(source, /^\s*-\s*run:\s*go test \.\/\.\.\.\s*$/m, 'workflow must not use cache-prone go test ./...');
+  assert.match(source, /^\s*-\s*run:\s*go test -count=1 \.\s*$/m, 'workflow should run the workspace Go guard test uncached');
+  assert.match(source, /actions\/setup-node@v4/, 'workflow should install Node in deploy verification');
+  assert.match(source, /^\s*-\s*run:\s*npm run test:scripts\s*$/m, 'workflow should run root script discipline tests');
+  assert.match(source, /^\s*-\s*run:\s*npm --prefix apps\/fufu-tool-site run test:frontend\s*$/m, 'workflow should run unified frontend/module tests');
 });
 
-test('deploy workflow verify jobs run frontend tests before packaging images', async () => {
-  const expectations = new Map([
-    ['.github/workflows/deploy-act.yml', 'npm --prefix apps/fufu-act run test:frontend'],
-    ['.github/workflows/deploy-network.yml', 'npm --prefix apps/network-detect run test:frontend'],
-    ['.github/workflows/deploy-y2k-nav.yml', 'npm --prefix apps/y2k-nav run test:frontend']
-  ]);
-
-  for (const path of await deployWorkflowPaths()) {
-    const frontendTestCommand = expectations.get(path);
-    assert.ok(frontendTestCommand, `${path} should be assigned an app frontend test command`);
-    const source = await readRepoFile(path);
-    assert.match(source, /actions\/setup-node@v4/, `${path} should install Node in deploy verification`);
-    assert.match(source, new RegExp(`^\\s*-\\s*run:\\s*${frontendTestCommand.replaceAll('/', '\\/')}\\s*$`, 'm'), `${path} should run app frontend tests in deploy verification`);
-  }
-});
-
-test('deploy workflow verify jobs run root script discipline tests', async () => {
-  for (const path of await deployWorkflowPaths()) {
-    const source = await readRepoFile(path);
-    assert.match(
-      source,
-      /^\s*-\s*run:\s*npm run test:scripts\s*$/m,
-      `${path} should run root script discipline tests before packaging images`
-    );
-  }
-});
-
-test('docker context excludes non-production static assets from runtime app roots', async () => {
+test('docker context excludes non-production static assets from unified runtime app roots', async () => {
   const dockerignore = await readRepoFile('.dockerignore');
   const patterns = dockerignore
     .split(/\r?\n/)
@@ -183,8 +147,9 @@ test('docker context excludes non-production static assets from runtime app root
     .filter((line) => line && !line.startsWith('#'));
 
   for (const staticRoot of [
-    'apps/network-detect/frontend',
-    'apps/network-detect/combine',
+    'apps/fufu-tool-site/frontend',
+    'apps/fufu-tool-site/combine',
+    'apps/y2k-nav',
     'apps/fufu-act/public'
   ]) {
     for (const suffix of ['*.test.*', '**/*.test.*', '.*', '**/.*']) {
@@ -209,36 +174,46 @@ test('repo docs and agent instructions do not recommend cache-prone Go tests', a
   ]) {
     const source = await readRepoFile(path);
     assert.doesNotMatch(source, /(^|`|\s)go test \.\/\.\.\.(`|\s|$)/, `${path} must not recommend cache-prone go test ./...`);
-    assert.match(source, /go test -count=1 \.\/\.\.\./, `${path} should recommend uncached Go tests when showing direct Go commands`);
+    assert.match(source, /go test -count=1 \.\/\.\.\.|go test -count=1 \./, `${path} should recommend uncached Go tests when showing direct Go commands`);
   }
 });
 
-test('network-detect compose files use the canonical deployed host port', async () => {
-  for (const path of [
-    'infra/deploy/network-detect/docker-compose.yml',
-    'apps/network-detect/docker-compose.yml'
-  ]) {
-    const source = await readRepoFile(path);
-    assert.match(
-      source,
-      /\$\{HOST_PORT:-38473\}:8080/,
-      `${path} should default the network-detect external host port to 38473`
-    );
-  }
+test('fufu-tool-site compose uses the canonical deployed host port and unified service name', async () => {
+  const source = await readRepoFile('infra/deploy/fufu-tool-site/docker-compose.yml');
+  assert.match(source, /fufu-tool-site:/, 'compose should define the unified service');
+  assert.match(source, /\$\{HOST_PORT:-38473\}:8080/, 'compose should default the external host port to 38473');
+  assert.doesNotMatch(source, /18820|33148/, 'unified compose should not expose retired activity/nav host ports');
 });
 
-test('fufu-act deploy only forwards activity-consumed NewAPI site variables', async () => {
-  const actSources = [
-    '.github/workflows/deploy-act.yml',
-    'infra/deploy/fufu-act/docker-compose.yml'
-  ];
-  for (const path of actSources) {
-    const source = await readRepoFile(path);
-    assert.doesNotMatch(source, /\bNEWAPI_TOKEN_SITE_(URL|TOKEN|ACCESS_TOKEN)\b/, `${path} should not make token-site config look required for fufu-act`);
-  }
-
+test('fufu-tool-site deploy reuses existing NewAPI, activity and MCY variables', async () => {
+  const workflow = await readRepoFile('.github/workflows/deploy-fufu-tool-site.yml');
+  const compose = await readRepoFile('infra/deploy/fufu-tool-site/docker-compose.yml');
   const deployScript = await readRepoFile('scripts/deploy-docker-app.sh');
-  const actCase = deployScript.match(/fufu-act\)([\s\S]*?);;\n\s*y2k-nav\)/)?.[1] ?? '';
-  assert.notEqual(actCase, '', 'deploy script should contain a fufu-act case block');
-  assert.doesNotMatch(actCase, /\bNEWAPI_TOKEN_SITE_(URL|TOKEN|ACCESS_TOKEN)\b/, 'deploy script fufu-act block should not forward token-site config');
+  const unifiedCase = deployScript.match(/fufu-tool-site\)([\s\S]*?);;\n\s*\*\)/)?.[1] ?? '';
+  assert.notEqual(unifiedCase, '', 'deploy script should contain a fufu-tool-site case block');
+
+  for (const variable of [
+    'NEWAPI_MANAGED_API_CONFIG',
+    'NEWAPI_API_SITE_URL',
+    'NEWAPI_API_SITE_TOKEN',
+    'NEWAPI_TOKEN_SITE_URL',
+    'NEWAPI_TOKEN_SITE_TOKEN',
+    'CONNECTIVITY_API_URLS',
+    'CONNECTIVITY_TOKEN_URLS',
+    'FUFU_API_BASE_URL',
+    'FUFU_API_TOKEN',
+    'FUFU_API_USER_ID',
+    'FUFU_QUOTA_UNIT',
+    'MCY_BASE_URL',
+    'MCY_USERNAME',
+    'MCY_PASSWORD',
+    'MCY_LOGIN_ENDPOINT',
+    'MCY_UPLOAD_ENDPOINT',
+    'ADMIN_TOKEN'
+  ]) {
+    assert.match(workflow, new RegExp(`\\b${variable}\\b`), `${variable} should be passed by unified workflow`);
+    assert.match(compose, new RegExp(`\\b${variable}\\b`), `${variable} should be passed by unified compose`);
+    assert.match(unifiedCase, new RegExp(`\\b${variable}\\b`), `${variable} should be written by deploy script`);
+  }
+  assert.doesNotMatch(workflow + compose + unifiedCase, /NEWAPI_TOKEN_SITE_ACCESS_TOKEN/, 'do not invent alternate token-site secret names');
 });

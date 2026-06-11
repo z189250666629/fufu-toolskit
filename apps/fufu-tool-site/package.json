@@ -1,0 +1,32 @@
+{
+  "name": "fufu-tool-site",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "go run .",
+    "dev:ui": "vite --config ui/vite.config.ts",
+    "start": "go run .",
+    "build": "npm run build:ui && go build -o fufu-tool-site .",
+    "build:ui": "vite build --config ui/vite.config.ts",
+    "typecheck:ui": "tsc -p ui/tsconfig.json --noEmit",
+    "test": "npm run test:go && npm run test:frontend",
+    "test:go": "go test -count=1 ./...",
+    "test:frontend": "node --test *.test.mjs frontend/*.test.mjs ../y2k-nav/*.test.mjs ../fufu-act/public/*.test.mjs"
+  },
+  "dependencies": {
+    "@heroui/react": "^3.1.0",
+    "@heroui/styles": "^3.1.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}

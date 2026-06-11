@@ -1,0 +1,23 @@
+.group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.group-head h3 {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.group-head span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.result-list {
+  display: grid;
+  gap: 8px;
+}

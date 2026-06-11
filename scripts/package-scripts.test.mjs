@@ -18,16 +18,33 @@ test('root npm test includes workspace Go checks', () => {
   assert.match(scripts.test || '', /npm run test:workspace/);
 });
 
-test('root build scripts cover all deployable apps', () => {
+test('root scripts promote fufu-tool-site as the only runnable deploy app', () => {
   const scripts = packageJson.scripts || {};
 
-  assert.equal(scripts['build:network'], 'npm --prefix apps/network-detect run build');
-  assert.equal(scripts['build:act'], 'npm --prefix apps/fufu-act run build');
-  assert.equal(scripts['build:y2k'], 'npm --prefix apps/y2k-nav run build');
-  assert.equal(scripts['build:all'], 'npm run build:network && npm run build:act && npm run build:y2k');
+  assert.equal(scripts['start:tool-site'], 'npm --prefix apps/fufu-tool-site start');
+  assert.equal(scripts['dev:tool-site'], 'npm --prefix apps/fufu-tool-site run dev');
+  assert.equal(scripts['build:tool-site'], 'npm --prefix apps/fufu-tool-site run build');
+  assert.equal(scripts['test:tool-site'], 'npm --prefix apps/fufu-tool-site test');
+  assert.equal(scripts['build:all'], 'npm run build:tool-site');
+  for (const retired of ['start:network', 'start:act', 'start:y2k', 'build:network', 'build:act', 'build:y2k']) {
+    assert.equal(scripts[retired], undefined, `${retired} should not remain a root production entry`);
+  }
 });
 
-test('app npm test Go checks are uncached', async () => {
+test('tool-site npm test covers embedded module frontend assets', async () => {
+  const appPackage = await readPackageJson('../apps/fufu-tool-site/package.json');
+
+  assert.equal(appPackage.scripts?.build, 'npm run build:ui && go build -o fufu-tool-site .');
+  assert.equal(appPackage.scripts?.['build:ui'], 'vite build --config ui/vite.config.ts');
+  assert.equal(appPackage.scripts?.['typecheck:ui'], 'tsc -p ui/tsconfig.json --noEmit');
+  assert.equal(appPackage.scripts?.['test:go'], 'go test -count=1 ./...');
+  assert.match(appPackage.scripts?.['test:frontend'] || '', /\*\.test\.mjs/);
+  assert.match(appPackage.scripts?.['test:frontend'] || '', /frontend\/\*\.test\.mjs/);
+  assert.match(appPackage.scripts?.['test:frontend'] || '', /\.\.\/y2k-nav\/\*\.test\.mjs/);
+  assert.match(appPackage.scripts?.['test:frontend'] || '', /\.\.\/fufu-act\/public\/\*\.test\.mjs/);
+});
+
+test('embedded modules keep uncached Go test scripts but are not root-started', async () => {
   for (const path of [
     '../apps/network-detect/package.json',
     '../apps/fufu-act/package.json',

@@ -1,0 +1,37 @@
+services:
+  fufu-tool-site:
+    image: ${APP_IMAGE:?APP_IMAGE is required}:${APP_TAG:?APP_TAG is required}
+    container_name: ${CONTAINER_NAME:-fufu-tool-site}
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND:-0.0.0.0}:${HOST_PORT:-38473}:8080"
+    environment:
+      PORT: 8080
+      NEWAPI_MANAGED_API_SITES: ${NEWAPI_MANAGED_API_SITES:-}
+      NEWAPI_MANAGED_API_CONFIG: ${NEWAPI_MANAGED_API_CONFIG:-}
+      NEWAPI_API_SITE_URL: ${NEWAPI_API_SITE_URL:-}
+      NEWAPI_API_SITE_TOKEN: ${NEWAPI_API_SITE_TOKEN:-}
+      NEWAPI_TOKEN_SITE_URL: ${NEWAPI_TOKEN_SITE_URL:-}
+      NEWAPI_TOKEN_SITE_TOKEN: ${NEWAPI_TOKEN_SITE_TOKEN:-}
+      CONNECTIVITY_API_URLS: ${CONNECTIVITY_API_URLS:-}
+      CONNECTIVITY_TOKEN_URLS: ${CONNECTIVITY_TOKEN_URLS:-}
+      FUFU_API_BASE_URL: ${FUFU_API_BASE_URL:-}
+      FUFU_API_TOKEN: ${FUFU_API_TOKEN:-}
+      FUFU_API_USER_ID: ${FUFU_API_USER_ID:-1}
+      FUFU_QUOTA_UNIT: ${FUFU_QUOTA_UNIT:-500000}
+      MCY_BASE_URL: ${MCY_BASE_URL:-}
+      MCY_COOKIE: ${MCY_COOKIE:-}
+      MCY_USERNAME: ${MCY_USERNAME:-}
+      MCY_PASSWORD: ${MCY_PASSWORD:-}
+      MCY_LOGIN_ENDPOINT: ${MCY_LOGIN_ENDPOINT:-/admin/login}
+      MCY_UPLOAD_ENDPOINT: ${MCY_UPLOAD_ENDPOINT:-/plugin/virtual-card-ship/card/add}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    volumes:
+      - ./data:/app/data
+      - ./activity-data:/app/activity/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

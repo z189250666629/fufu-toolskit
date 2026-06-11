@@ -1,0 +1,68 @@
+.url-cell {
+  min-width: 0;
+}
+
+.url-copy {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0 8px;
+  color: var(--accent-strong);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.url-copy:hover,
+.url-copy:focus-visible {
+  background: var(--surface-soft);
+  outline: none;
+}
+
+.url-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.url-star {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  margin-left: 8px;
+  align-items: center;
+  color: var(--sage-warning-fg);
+  background: transparent;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", var(--font-ui);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.copy-tip {
+  display: none;
+  position: absolute;
+  right: 4px;
+  bottom: calc(100% + 4px);
+  border-radius: 9999px;
+  padding: 4px 8px;
+  color: var(--surface);
+  background: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.url-copy.copied .copy-tip,
+.url-copy.copy-failed .copy-tip {
+  display: inline-flex;
+}
+
+.url-copy.copy-failed .copy-tip {
+  background: var(--warn);
+}

@@ -14,7 +14,7 @@ RUN go mod download
 WORKDIR /src
 COPY apps/fufu-act ./apps/fufu-act
 WORKDIR /src/apps/fufu-act
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/fufu-act .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/fufu-act ./cmd/fufu-act
 
 FROM ${RUNTIME_IMAGE}
 WORKDIR /app

@@ -13,6 +13,12 @@ function localModuleImports(html) {
     .filter((specifier) => !specifier.includes('/'));
 }
 
+function localStylesheets(html) {
+  return [...html.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*href=["'](\.[^"']+)["'][^>]*>/gi)]
+    .map(([, specifier]) => specifier.replace(/^\.\//, ''))
+    .filter((specifier) => !specifier.includes('/'));
+}
+
 function runtimeCopySources(file) {
   return runtimeCopyInstructions(file).flatMap(({ sources }) => sources);
 }
@@ -38,8 +44,8 @@ function normalizeDockerPath(value) {
 }
 
 test('dockerfile copies all y2k module assets referenced by index', () => {
-  const imports = localModuleImports(indexHtml);
-  assert.ok(imports.length > 0, 'expected index.html to reference local module assets');
+  const imports = [...localModuleImports(indexHtml), ...localStylesheets(indexHtml)];
+  assert.ok(imports.length > 0, 'expected index.html to reference local browser assets');
 
   const sources = runtimeCopySources(dockerfile);
   for (const asset of imports) {

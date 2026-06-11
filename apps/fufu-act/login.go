@@ -1,4 +1,4 @@
-package main
+package activityapp
 
 import (
 	"database/sql"
@@ -65,18 +65,19 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		purchaseTime := ""
 		createdInRange := false
 		actTestDollars, isActTest := parseActTestTokenName(t.Name)
+		window := activityWindow()
 		if isActTest {
 			dollars = actTestDollars
 			source = "act"
 			createdInRange = true
 		} else {
-			createdInRange = t.CreatedTime >= actStartTS && t.CreatedTime <= actEndTS
+			createdInRange = t.CreatedTime >= window.StartTS && t.CreatedTime <= window.EndTS
 			shop, err := findShopPurchase(r.Context(), key)
 			if err != nil {
 				writeJSONError(w, http.StatusBadGateway, "店铺查询失败，请稍后再试")
 				return
 			}
-			purchased := shop.PurchaseTime != "" && shop.PurchaseTime >= actStart && shop.PurchaseTime <= actEnd
+			purchased := shop.PurchaseTime != "" && shop.PurchaseTime >= window.StartText && shop.PurchaseTime <= window.EndText
 			if !createdInRange && !purchased {
 				writeJSONError(w, 403, "此卡密不在活动期间内，不参与活动")
 				return
@@ -84,12 +85,13 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			dollars = dollarsTier(t.IntervalQuota)
 			purchaseTime = shop.PurchaseTime
 		}
+		cfg := SnapshotRuntimeConfig()
 		isScratch := isScratchDollarTier(dollars) && (purchaseTime != "" || createdInRange)
-		if dollars == 0 || (spinMap[dollars] == 0 && !isScratch) {
+		if dollars == 0 || (cfg.SpinMap[dollars] == 0 && !isScratch) {
 			writeJSONError(w, 403, "此卡密额度不参与活动")
 			return
 		}
-		total := spinMap[dollars]
+		total := cfg.SpinMap[dollars]
 		_, err = db.Exec(`INSERT INTO cards (card_key,card_name,dollars,total_spins,source,purchase_time) VALUES (?,?,?,?,?,?)`, key, t.Name, dollars, total, source, nullString(purchaseTime))
 		if err != nil {
 			writeJSONError(w, 500, "服务器错误")

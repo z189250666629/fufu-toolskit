@@ -1,4 +1,4 @@
-package main
+package activityapp
 
 import (
 	"crypto/rand"
@@ -120,12 +120,12 @@ func handleSpin(w http.ResponseWriter, r *http.Request) {
 }
 
 func spin(dollars float64, hasJackpot bool, used, total, maxWon, force int) spinResult {
-	got := activity.Spin(dollars, hasJackpot, used, total, maxWon, force, secureRandomInt)
+	got := activity.SpinWithConfig(SnapshotRuntimeConfig(), dollars, hasJackpot, used, total, maxWon, force, secureRandomInt)
 	return spinResult{got.Type, got.Dollars}
 }
 
 func isSpinDollarTier(dollars float64) bool {
-	return spinMap[dollars] > 0
+	return SnapshotRuntimeConfig().SpinMap[dollars] > 0
 }
 
 func secureRandomInt(max int) int {

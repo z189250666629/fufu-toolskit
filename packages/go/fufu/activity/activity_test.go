@@ -46,3 +46,37 @@ func TestDefaultConfigReturnsIndependentCopies(t *testing.T) {
 		t.Fatalf("DefaultScratchRewards should return an independent slice copy")
 	}
 }
+
+func TestSpinWithConfigUsesRuntimePrizeWeights(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.SpinMap = map[float64]int{42: 3}
+	cfg.TierPools = map[int][]Prize{}
+	cfg.PostJackpotPool = []Prize{{Type: "miss", Weight: 1}}
+	cfg.PrizePool = []Prize{
+		{Type: "miss", Weight: 1},
+		{Type: "win", Dollars: 7, Weight: 1},
+	}
+
+	got := SpinWithConfig(cfg, 42, false, 0, 3, 0, 0, func(max int) int {
+		if max != 2 {
+			t.Fatalf("roll total = %d, want 2", max)
+		}
+		return 1
+	})
+
+	if got.Type != "win" || got.Dollars != 7 {
+		t.Fatalf("SpinWithConfig = %#v, want $7 win", got)
+	}
+}
+
+func TestExpectedValueUsesWinningWeightsOnly(t *testing.T) {
+	got := ExpectedValue([]Prize{
+		{Type: "miss", Weight: 2},
+		{Type: "retry", Weight: 1},
+		{Type: "win", Dollars: 9, Weight: 3},
+	})
+
+	if got != 4.5 {
+		t.Fatalf("ExpectedValue = %v, want 4.5", got)
+	}
+}

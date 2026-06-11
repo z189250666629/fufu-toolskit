@@ -1,0 +1,45 @@
+.section,
+.empty-panel {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.empty-panel {
+  min-height: 160px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.empty-panel h2 {
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.empty-panel p {
+  max-width: 640px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-head h2 {
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.section-head span {
+  font-size: 12px;
+  white-space: nowrap;
+}

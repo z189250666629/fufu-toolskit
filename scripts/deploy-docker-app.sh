@@ -117,18 +117,7 @@ write_env_var HOST_PORT
 
 CONFIG_JSON_FILE=""
 case "$APP_NAME" in
-  fufu-act)
-    for name in \
-      FUFU_API_BASE_URL FUFU_API_TOKEN FUFU_API_USER_ID FUFU_QUOTA_UNIT \
-      NEWAPI_API_SITE_URL NEWAPI_API_SITE_TOKEN \
-      MCY_BASE_URL MCY_COOKIE MCY_USERNAME MCY_PASSWORD MCY_LOGIN_ENDPOINT MCY_UPLOAD_ENDPOINT ADMIN_TOKEN
-    do
-      write_env_var "$name"
-    done
-    ;;
-  y2k-nav)
-    ;;
-  network-detect)
+  fufu-tool-site)
     if [ -n "${NEWAPI_MANAGED_API_CONFIG:-}" ]; then
       if [ ! -f "$NEWAPI_MANAGED_API_CONFIG" ]; then
         printf '[deploy] NEWAPI_MANAGED_API_CONFIG must point to a local JSON file for upload: %s\n' "$NEWAPI_MANAGED_API_CONFIG" >&2
@@ -139,8 +128,10 @@ case "$APP_NAME" in
     fi
     for name in \
       NEWAPI_MANAGED_API_SITES NEWAPI_MANAGED_API_CONFIG \
-      NEWAPI_API_SITE_TOKEN NEWAPI_TOKEN_SITE_TOKEN NEWAPI_API_SITE_URL NEWAPI_TOKEN_SITE_URL \
-      CONNECTIVITY_API_URLS CONNECTIVITY_TOKEN_URLS
+      NEWAPI_API_SITE_URL NEWAPI_API_SITE_TOKEN NEWAPI_TOKEN_SITE_URL NEWAPI_TOKEN_SITE_TOKEN \
+      CONNECTIVITY_API_URLS CONNECTIVITY_TOKEN_URLS \
+      FUFU_API_BASE_URL FUFU_API_TOKEN FUFU_API_USER_ID FUFU_QUOTA_UNIT \
+      MCY_BASE_URL MCY_COOKIE MCY_USERNAME MCY_PASSWORD MCY_LOGIN_ENDPOINT MCY_UPLOAD_ENDPOINT ADMIN_TOKEN
     do
       write_env_var "$name"
     done
@@ -182,7 +173,7 @@ ssh "${SSH_OPTS[@]}" -p "$SSH_PORT" "$SSH_TARGET" "
   cd $Q_DEPLOY_PATH
   docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE config --quiet
   docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE pull
-  docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE up -d
+  docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE up -d --remove-orphans
   docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE ps
 
   CID=\$(docker compose --env-file .env -f $Q_REMOTE_COMPOSE_FILE ps -q $Q_COMPOSE_SERVICE_NAME)

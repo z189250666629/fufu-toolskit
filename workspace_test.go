@@ -12,9 +12,10 @@ import (
 func TestWorkspaceModules(t *testing.T) {
 	for _, dir := range []string{
 		"packages/go/fufu",
-		"apps/network-detect",
+		"apps/fufu-tool-site",
 		"apps/fufu-act",
 		"apps/y2k-nav",
+		"apps/network-detect",
 	} {
 		t.Run(dir, func(t *testing.T) {
 			fingerprintModule(t, dir)
@@ -28,8 +29,8 @@ func TestWorkspaceModules(t *testing.T) {
 	}
 }
 
-func TestY2KDockerfileCopiesSharedFufuModule(t *testing.T) {
-	raw, err := os.ReadFile(filepath.FromSlash("apps/y2k-nav/Dockerfile"))
+func TestFufuToolSiteDockerfileCopiesEmbeddedModules(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("apps/fufu-tool-site/Dockerfile"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,31 +38,44 @@ func TestY2KDockerfileCopiesSharedFufuModule(t *testing.T) {
 	for _, want := range []string{
 		"WORKDIR /src",
 		"COPY packages/go/fufu ./packages/go/fufu",
-		"COPY apps/y2k-nav/go.mod ./apps/y2k-nav/go.mod",
-		"COPY apps/y2k-nav/main.go ./apps/y2k-nav/main.go",
-		"WORKDIR /src/apps/y2k-nav",
+		"COPY apps/fufu-act/go.mod ./apps/fufu-act/go.mod",
+		"COPY apps/fufu-tool-site/go.mod ./apps/fufu-tool-site/go.mod",
+		"WORKDIR /src/apps/fufu-tool-site",
+		"COPY --from=build /out/fufu-tool-site /app/fufu-tool-site",
+		"COPY apps/fufu-tool-site/frontend ./frontend",
+		"COPY apps/fufu-tool-site/combine ./combine",
+		"COPY apps/y2k-nav/index.html ./nav/index.html",
+		"COPY apps/y2k-nav/theme.mjs ./nav/theme.mjs",
+		"COPY apps/y2k-nav/latency.mjs ./nav/latency.mjs",
+		"COPY apps/fufu-act/public ./activity/public",
+		`CMD ["/app/fufu-tool-site"]`,
 	} {
 		if !strings.Contains(dockerfile, want) {
 			t.Fatalf("Dockerfile missing %q\n%s", want, dockerfile)
 		}
 	}
+	for _, stale := range []string{"apps/network-detect", "/out/network-detect", "/app/network-detect"} {
+		if strings.Contains(dockerfile, stale) {
+			t.Fatalf("fufu-tool-site Dockerfile should not reference stale %q\n%s", stale, dockerfile)
+		}
+	}
 }
 
-func TestNetworkDetectUsesSharedRawConversions(t *testing.T) {
-	raw, err := os.ReadFile(filepath.FromSlash("apps/network-detect/newapi_client.go"))
+func TestToolSiteUsesSharedRawConversions(t *testing.T) {
+	raw, err := os.ReadFile(filepath.FromSlash("apps/fufu-tool-site/newapi_client.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	source := string(raw)
 	if !strings.Contains(source, `"fufu/rawconv"`) {
-		t.Fatal("network-detect should use the shared public rawconv package")
+		t.Fatal("fufu-tool-site should use the shared public rawconv package")
 	}
 	for _, duplicate := range []string{
 		"func parseInt64String",
 		"func jsonNumberToInt64",
 	} {
 		if strings.Contains(source, duplicate) {
-			t.Fatalf("network-detect should not keep duplicate numeric conversion helper %q", duplicate)
+			t.Fatalf("fufu-tool-site should not keep duplicate numeric conversion helper %q", duplicate)
 		}
 	}
 }

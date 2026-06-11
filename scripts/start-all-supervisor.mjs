@@ -1,9 +1,7 @@
 import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_COMMANDS = [
-  { name: 'network', command: 'npm', args: ['--prefix', 'apps/network-detect', 'start'] },
-  { name: 'act', command: 'npm', args: ['--prefix', 'apps/fufu-act', 'start'] },
-  { name: 'y2k', command: 'npm', args: ['--prefix', 'apps/y2k-nav', 'start'] }
+  { name: 'tool-site', command: 'npm', args: ['--prefix', 'apps/fufu-tool-site', 'start'] }
 ];
 
 const DEFAULT_CWD = fileURLToPath(new URL('../', import.meta.url));

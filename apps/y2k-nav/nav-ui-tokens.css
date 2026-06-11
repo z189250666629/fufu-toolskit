@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,100..900,0..100,0..1&family=Inter:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+
+/* fufu-navigation-ui-tokens
+   Source: y2k navigation page visual language.
+   Mapping: original ink / paper / moss / clay / stone language -> fufu wabi tokens.
+   This file deliberately does not adopt Sage Design tokens. */
+:root, .light {
+  --fufu-paper: #f2f4ed;
+  --fufu-paper-warm: #ecefe5;
+  --fufu-paper-raised: rgba(253, 254, 248, 0.82);
+  --fufu-paper-deep: #d8ddcf;
+  --fufu-ink: #2e312a;
+  --fufu-ink-soft: #686d5f;
+  --fufu-ink-faint: #9aa08f;
+  --fufu-moss: #6b7b55;
+  --fufu-clay: #b89578;
+  --fufu-stone: #8e9484;
+  --fufu-border: rgba(46, 49, 42, 0.16);
+  --fufu-border-strong: rgba(46, 49, 42, 0.36);
+  --fufu-card-hover-bg: rgba(236, 239, 229, 0.58);
+  --fufu-radius: 2px;
+
+  --background: var(--fufu-paper);
+  --foreground: var(--fufu-ink);
+  --surface: var(--fufu-paper-raised);
+  --surface-secondary: var(--fufu-paper-warm);
+  --border: var(--fufu-border);
+  --separator: var(--fufu-border);
+  --accent: var(--fufu-moss);
+  --focus: var(--fufu-moss);
+  --radius: var(--fufu-radius);
+
+  --font-family-display: 'Fraunces', Georgia, 'Times New Roman', 'Noto Serif SC', serif;
+  --font-family-body: 'Fraunces', Georgia, 'Noto Serif SC', serif;
+  --font-family-ui: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  --fufu-nav-bg: var(--background);
+  --fufu-nav-fg: var(--foreground);
+  --fufu-nav-fg-soft: var(--fufu-ink-soft);
+  --fufu-nav-fg-muted: var(--fufu-ink-faint);
+  --fufu-nav-surface: var(--surface);
+  --fufu-nav-surface-muted: var(--surface-secondary);
+  --fufu-nav-border: var(--border);
+  --fufu-nav-divider: var(--separator);
+  --fufu-nav-accent-moss: var(--fufu-moss);
+  --fufu-nav-accent-clay: var(--fufu-clay);
+  --fufu-nav-accent-stone: var(--accent);
+  --fufu-nav-card-hover-bg: var(--fufu-card-hover-bg);
+  --fufu-nav-ink-line-color: var(--fufu-ink);
+
+  --ink: var(--fufu-ink);
+  --ink-light: var(--fufu-ink-soft);
+  --ink-faint: var(--fufu-ink-faint);
+  --paper: var(--fufu-paper);
+  --paper-warm: var(--fufu-paper-warm);
+  --paper-dark: var(--fufu-paper-deep);
+  --moss: var(--fufu-moss);
+  --clay: var(--fufu-clay);
+  --stone: var(--fufu-stone);
+  --card-hover-bg: var(--fufu-card-hover-bg);
+  --ink-line-color: var(--fufu-ink);
+  --ok: var(--fufu-moss);
+}
+
+[data-theme="dark"], .dark {
+  --fufu-paper: #151711;
+  --fufu-paper-warm: #1d2018;
+  --fufu-paper-raised: rgba(33, 36, 27, 0.86);
+  --fufu-paper-deep: #303528;
+  --fufu-ink: #f1f2e8;
+  --fufu-ink-soft: #c0c6b0;
+  --fufu-ink-faint: #858d78;
+  --fufu-moss: #9daa76;
+  --fufu-clay: #c49a7a;
+  --fufu-stone: #a2a891;
+  --fufu-border: rgba(241, 242, 232, 0.16);
+  --fufu-border-strong: rgba(241, 242, 232, 0.34);
+  --fufu-card-hover-bg: rgba(48, 53, 40, 0.62);
+}

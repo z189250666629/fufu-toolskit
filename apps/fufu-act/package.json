@@ -3,9 +3,9 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "dev": "go run .",
-    "start": "go run .",
-    "build": "go build -o fufu-act .",
+    "dev": "go run ./cmd/fufu-act",
+    "start": "go run ./cmd/fufu-act",
+    "build": "go build -o fufu-act ./cmd/fufu-act",
     "test:go": "go test -count=1 ./...",
     "test:frontend": "node --test public/*.test.mjs",
     "test": "npm run test:go && npm run test:frontend"

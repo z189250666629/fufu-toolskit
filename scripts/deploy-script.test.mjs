@@ -69,8 +69,8 @@ async function runDeployPortValidationCase(t, { hostPort }) {
   }
 
   const envAssignments = {
-    APP_NAME: 'y2k-nav',
-    APP_IMAGE: 'example/y2k',
+    APP_NAME: 'fufu-tool-site',
+    APP_IMAGE: 'example/tool-site',
     APP_TAG: 'test',
     SSH_HOST: 'example.test',
     SSH_USER: 'deploy',
@@ -101,7 +101,7 @@ async function runDeployPortValidationCase(t, { hostPort }) {
   return { result, sshWasCalled };
 }
 
-test('deploy script fails before ssh when y2k-nav HOST_PORT is missing or invalid', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
+test('deploy script fails before ssh when fufu-tool-site HOST_PORT is missing or invalid', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
   for (const tc of [
     { name: 'missing', hostPort: undefined },
     { name: 'non numeric', hostPort: 'abc' },
@@ -152,8 +152,8 @@ test('deploy script cleans compose env file when deployment fails', { skip: bash
   }
 
   const envAssignments = {
-    APP_NAME: 'fufu-act',
-    APP_IMAGE: 'example/app',
+    APP_NAME: 'fufu-tool-site',
+    APP_IMAGE: 'example/tool-site',
     APP_TAG: 'test',
     SSH_HOST: 'example.test',
     SSH_USER: 'deploy',
@@ -162,7 +162,7 @@ test('deploy script cleans compose env file when deployment fails', { skip: bash
     COMPOSE_FILE: composeRel,
     COMPOSE_SERVICE_NAME: 'app',
     COMPOSE_ENV_FILE: composeEnvRel,
-    HOST_PORT: '18820',
+    HOST_PORT: '38473',
     EXPECTED_COMPOSE_ENV_FILE: composeEnvRel,
     DEPLOY_ENV_SNAPSHOT: composeEnvSnapshotRel,
     HOME: `${tmpName}/home`,
@@ -187,7 +187,7 @@ test('deploy script cleans compose env file when deployment fails', { skip: bash
   );
 });
 
-test('deploy script uploads managed-site config file for network-detect', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
+test('deploy script uploads managed-site config file for fufu-tool-site', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
   const tmpName = `.tmp/deploy-script-managed-config-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
   const fakeBinRel = `${tmpName}/bin`;
@@ -200,7 +200,7 @@ test('deploy script uploads managed-site config file for network-detect', { skip
   t.after(() => rm(tmpUrl, { recursive: true, force: true }));
   await mkdir(new URL('bin/', tmpUrl), { recursive: true });
   await mkdir(new URL('home/', tmpUrl), { recursive: true });
-  await writeFile(new URL('docker-compose.yml', tmpUrl), 'services:\n  network-detect:\n    image: ${APP_IMAGE}:${APP_TAG}\n');
+  await writeFile(new URL('docker-compose.yml', tmpUrl), 'services:\n  fufu-tool-site:\n    image: ${APP_IMAGE}:${APP_TAG}\n');
   await writeFile(new URL('managed-sites.json', tmpUrl), '[{"name":"api","url":"https://api.example.test","tokenEnv":"NEWAPI_API_SITE_TOKEN"}]\n');
 
   for (const [name, body] of Object.entries({
@@ -225,15 +225,15 @@ test('deploy script uploads managed-site config file for network-detect', { skip
   }
 
   const envAssignments = {
-    APP_NAME: 'network-detect',
-    APP_IMAGE: 'example/network',
+    APP_NAME: 'fufu-tool-site',
+    APP_IMAGE: 'example/tool-site',
     APP_TAG: 'test',
     SSH_HOST: 'example.test',
     SSH_USER: 'deploy',
     SSH_PRIVATE_KEY: 'fake-key',
-    DEPLOY_PATH: '/srv/fufu/network-detect',
+    DEPLOY_PATH: '/srv/fufu/fufu-tool-site',
     COMPOSE_FILE: composeRel,
-    COMPOSE_SERVICE_NAME: 'network-detect',
+    COMPOSE_SERVICE_NAME: 'fufu-tool-site',
     COMPOSE_ENV_FILE: composeEnvRel,
     HOST_PORT: '38473',
     HOME: `${tmpName}/home`,
@@ -256,7 +256,7 @@ test('deploy script uploads managed-site config file for network-detect', { skip
   assert.doesNotMatch(envSnapshot, new RegExp(managedConfigRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'container env must not keep the runner-local config path');
 
   const scpLog = await readFile(new URL('scp.log', tmpUrl), 'utf8');
-  assert.match(scpLog, new RegExp(`${managedConfigRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} .*:/srv/fufu/network-detect/config\\.json`), 'managed-site config JSON should be uploaded beside compose .env');
+  assert.match(scpLog, new RegExp(`${managedConfigRel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} .*:/srv/fufu/fufu-tool-site/config\\.json`), 'managed-site config JSON should be uploaded beside compose .env');
 });
 
 test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
@@ -300,8 +300,8 @@ test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error
   }
 
   const envAssignments = {
-    APP_NAME: 'y2k-nav',
-    APP_IMAGE: 'example/y2k',
+    APP_NAME: 'fufu-tool-site',
+    APP_IMAGE: 'example/tool-site',
     APP_TAG: 'test',
     SSH_HOST: 'example.test',
     SSH_USER: 'deploy',
@@ -312,7 +312,7 @@ test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error
     COMPOSE_FILE: composeRel,
     COMPOSE_SERVICE_NAME: 'app',
     COMPOSE_ENV_FILE: composeEnvRel,
-    HOST_PORT: '33148',
+    HOST_PORT: '38473',
     HOME: `${tmpName}/home`
   };
   const command = [
@@ -357,8 +357,8 @@ test('deploy script quotes deploy path inside remote ssh commands', { skip: bash
   }
 
   const envAssignments = {
-    APP_NAME: 'y2k-nav',
-    APP_IMAGE: 'example/y2k',
+    APP_NAME: 'fufu-tool-site',
+    APP_IMAGE: 'example/tool-site',
     APP_TAG: 'test',
     SSH_HOST: 'example.test',
     SSH_USER: 'deploy',
@@ -367,7 +367,7 @@ test('deploy script quotes deploy path inside remote ssh commands', { skip: bash
     COMPOSE_FILE: composeRel,
     COMPOSE_SERVICE_NAME: 'app',
     COMPOSE_ENV_FILE: composeEnvRel,
-    HOST_PORT: '33148',
+    HOST_PORT: '38473',
     HOME: `${tmpName}/home`
   };
   const command = [
@@ -441,8 +441,8 @@ test('deploy script prints diagnostics when health inspect fails', { skip: bashP
   }
 
   const envAssignments = {
-    APP_NAME: 'y2k-nav',
-    APP_IMAGE: 'example/y2k',
+    APP_NAME: 'fufu-tool-site',
+    APP_IMAGE: 'example/tool-site',
     APP_TAG: 'test',
     SSH_HOST: 'example.test',
     SSH_USER: 'deploy',
@@ -451,7 +451,7 @@ test('deploy script prints diagnostics when health inspect fails', { skip: bashP
     COMPOSE_FILE: composeRel,
     COMPOSE_SERVICE_NAME: 'app',
     COMPOSE_ENV_FILE: composeEnvRel,
-    HOST_PORT: '33148',
+    HOST_PORT: '38473',
     HOME: `${tmpName}/home`,
     HEALTH_LOG_MARKER: markerRel
   };

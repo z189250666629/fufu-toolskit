@@ -20,6 +20,15 @@ func InitTraceDB(path string) (*sql.DB, error) { return initTraceDB(path) }
 
 func NewApp(cfg Config, db *sql.DB) *App { return newApp(cfg, db) }
 
+func (a *App) Close() error {
+	if a == nil || a.db == nil {
+		return nil
+	}
+	err := a.db.Close()
+	a.db = nil
+	return err
+}
+
 func loadConfig(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

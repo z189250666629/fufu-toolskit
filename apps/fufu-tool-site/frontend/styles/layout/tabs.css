@@ -1,0 +1,113 @@
+.monitor-panel {
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.monitor-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.monitor-head > :first-child {
+  min-width: 0;
+}
+
+.monitor-head h2 {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.monitor-head p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.panel-toggle {
+  --tab-count: 2;
+  --active-tab-index: 0;
+  --tab-list-padding: 4px;
+  --tab-min: 96px;
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(var(--tab-count), minmax(var(--tab-min), 1fr));
+  justify-self: end;
+  width: max-content;
+  max-width: 100%;
+  isolation: isolate;
+  overflow: hidden;
+  border: 0;
+  border-radius: calc(var(--radius) + 0.25rem);
+  padding: var(--tab-list-padding);
+  background: var(--default);
+}
+
+.toggle-button {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 0;
+  border-radius: 9999px;
+  padding: 0 16px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  outline: none;
+  white-space: nowrap;
+  transition: color 160ms var(--ease-smooth), opacity 160ms var(--ease-smooth), box-shadow 160ms var(--ease-smooth);
+}
+
+.toggle-button:hover:not(.active),
+.scope-button:hover:not(.active) {
+  color: var(--sage-text-secondary);
+  opacity: 0.78;
+}
+
+.toggle-button:focus-visible,
+.scope-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--default), 0 0 0 4px oklch(0.69 0.12 115 / 0.30);
+}
+
+.toggle-button.active {
+  color: var(--segment-foreground);
+  background: transparent;
+  box-shadow: none;
+}
+
+.tab-label {
+  position: relative;
+  z-index: 1;
+}
+
+.tab-indicator {
+  --indicator-x: calc(var(--active-tab-index) * 100%);
+  --indicator-y: 0px;
+  position: absolute;
+  top: var(--tab-list-padding);
+  bottom: var(--tab-list-padding);
+  left: var(--tab-list-padding);
+  z-index: 0;
+  width: calc((100% - (var(--tab-list-padding) * 2)) / var(--tab-count));
+  border-radius: 9999px;
+  background: var(--segment);
+  box-shadow: var(--shadow-surface);
+  pointer-events: none;
+  transform: translate(var(--indicator-x), var(--indicator-y));
+  transition-property: transform, width, height;
+  transition-duration: 250ms;
+  transition-timing-function: var(--ease-out-fluid);
+  will-change: transform;
+}

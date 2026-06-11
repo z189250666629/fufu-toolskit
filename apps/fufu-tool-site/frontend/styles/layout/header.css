@@ -1,0 +1,87 @@
+.app-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid var(--sage-accent-muted-bg);
+  border-radius: var(--radius);
+  color: #ffffff;
+  background: var(--accent);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0;
+  box-shadow: 0 12px 28px oklch(0.38 0.07 115 / 0.18);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-family: var(--font-family-display);
+  font-size: 42px;
+  line-height: 1.02;
+  font-weight: 520;
+  font-variation-settings: "opsz" 72, "WONK" 1, "SOFT" 30;
+  letter-spacing: 0;
+}
+
+.brand-block p,
+.section-head span,
+.header-meta span,
+.metric [data-slot="card-title"],
+.field span,
+.site-head p,
+.site-foot,
+.site-error,
+small {
+  color: var(--muted);
+}
+
+.brand-block p {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.header-meta {
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--sage-surface);
+  text-align: right;
+}
+
+.header-meta span,
+.metric [data-slot="card-title"],
+.field span {
+  display: block;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.header-meta b {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.3;
+}

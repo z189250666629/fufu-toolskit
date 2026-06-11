@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
-import { createStartAllSupervisor, installSignalShutdownHandlers } from './start-all-supervisor.mjs';
+import { DEFAULT_COMMANDS, createStartAllSupervisor, installSignalShutdownHandlers } from './start-all-supervisor.mjs';
 
 class FakeChild extends EventEmitter {
   constructor() {
@@ -20,7 +20,13 @@ class FakeChild extends EventEmitter {
   }
 }
 
-test('startAll stops remaining children when a service exits non-zero', () => {
+test('startAll defaults to the unified fufu tool site only', () => {
+  assert.deepEqual(DEFAULT_COMMANDS, [
+    { name: 'tool-site', command: 'npm', args: ['--prefix', 'apps/fufu-tool-site', 'start'] }
+  ]);
+});
+
+test('startAll reports a tool-site non-zero exit', () => {
   const spawned = [];
   const logs = [];
   const fatalExits = [];
@@ -40,46 +46,18 @@ test('startAll stops remaining children when a service exits non-zero', () => {
 
   supervisor.start();
 
-  assert.deepEqual(spawned.map((entry) => entry.command), ['npm.cmd', 'npm.cmd', 'npm.cmd']);
+  assert.deepEqual(spawned.map((entry) => entry.command), ['npm.cmd']);
   assert.equal(spawned[0].options.env.NODE_ENV, 'test');
 
   spawned[0].child.emit('exit', 1, null);
 
   assert.equal(spawned[0].child.killed, false);
-  assert.deepEqual(spawned[1].child.killSignals, ['SIGTERM']);
-  assert.deepEqual(spawned[2].child.killSignals, ['SIGTERM']);
-  assert.deepEqual(fatalExits, [[1, 'network']]);
+  assert.deepEqual(fatalExits, [[1, 'tool-site']]);
   assert.equal(supervisor.exitCode, 1);
-  assert.match(logs.at(-1), /\[network\] exited with code 1/);
+  assert.match(logs.at(-1), /\[tool-site\] exited with code 1/);
 });
 
-test('startAll stops remaining children when a service exits zero unexpectedly', () => {
-  const spawned = [];
-  const fatalExits = [];
-  const supervisor = createStartAllSupervisor({
-    logger: { log: () => {} },
-    stdout: { write: () => {} },
-    stderr: { write: () => {} },
-    onFatalExit: (code, item) => fatalExits.push([code, item.name]),
-    spawn: () => {
-      const child = new FakeChild();
-      spawned.push(child);
-      return child;
-    }
-  });
-
-  supervisor.start();
-
-  spawned[0].emit('exit', 0, null);
-
-  assert.equal(spawned[0].killed, false);
-  assert.deepEqual(spawned[1].killSignals, ['SIGTERM']);
-  assert.deepEqual(spawned[2].killSignals, ['SIGTERM']);
-  assert.deepEqual(fatalExits, [[1, 'network']]);
-  assert.equal(supervisor.exitCode, 1);
-});
-
-test('startAll stops remaining children when a service emits spawn error', () => {
+test('startAll reports a tool-site spawn error', () => {
   const spawned = [];
   const logs = [];
   const fatalExits = [];
@@ -100,11 +78,9 @@ test('startAll stops remaining children when a service emits spawn error', () =>
   spawned[0].emit('error', new Error('spawn ENOENT'));
 
   assert.equal(spawned[0].killed, false);
-  assert.deepEqual(spawned[1].killSignals, ['SIGTERM']);
-  assert.deepEqual(spawned[2].killSignals, ['SIGTERM']);
-  assert.deepEqual(fatalExits, [[1, 'network', null]]);
+  assert.deepEqual(fatalExits, [[1, 'tool-site', null]]);
   assert.equal(supervisor.exitCode, 1);
-  assert.match(logs.at(-1), /\[network\] failed to start: spawn ENOENT/);
+  assert.match(logs.at(-1), /\[tool-site\] failed to start: spawn ENOENT/);
 });
 
 test('startAll prefixes every line from multiline stdout chunks', () => {
@@ -124,7 +100,7 @@ test('startAll prefixes every line from multiline stdout chunks', () => {
   supervisor.start();
   spawned[0].stdout.emit('data', 'ready\nlistening\n');
 
-  assert.equal(writes.join(''), '[network] ready\n[network] listening\n');
+  assert.equal(writes.join(''), '[tool-site] ready\n[tool-site] listening\n');
 });
 
 test('startAll runs workspace commands from the configured repo root', () => {
@@ -143,10 +119,8 @@ test('startAll runs workspace commands from the configured repo root', () => {
 
   supervisor.start();
 
-  assert.equal(spawned.length, 3);
+  assert.equal(spawned.length, 1);
   assert.deepEqual(spawned.map((entry) => entry.options.cwd), [
-    'C:\\repo\\fufu-toolskit',
-    'C:\\repo\\fufu-toolskit',
     'C:\\repo\\fufu-toolskit'
   ]);
 });
@@ -175,11 +149,6 @@ test('stopAll waits until every child exits', async () => {
   assert.equal(resolved, false);
 
   spawned[0].emit('exit', null, 'SIGTERM');
-  await Promise.resolve();
-  assert.equal(resolved, false);
-
-  spawned[1].emit('exit', null, 'SIGTERM');
-  spawned[2].emit('exit', null, 'SIGTERM');
   await stopped;
 
   assert.equal(resolved, true);

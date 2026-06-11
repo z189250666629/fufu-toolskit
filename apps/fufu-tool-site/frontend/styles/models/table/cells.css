@@ -1,0 +1,36 @@
+.model-action {
+  display: grid;
+  min-width: 180px;
+  gap: 8px;
+}
+
+.price-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 116px;
+  font-family: var(--font-mono);
+  line-height: 1.25;
+}
+
+.price-cell b {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.price-cell small,
+.price-empty {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.model-name,
+.mono {
+  font-family: var(--font-mono);
+}
+
+.model-name {
+  max-width: 320px;
+  font-weight: 750;
+}

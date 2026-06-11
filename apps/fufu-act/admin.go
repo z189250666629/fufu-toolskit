@@ -1,4 +1,4 @@
-package main
+package activityapp
 
 import (
 	"fmt"
@@ -36,18 +36,19 @@ func adminBearerToken(r *http.Request) string {
 }
 
 func handlePrizes(w http.ResponseWriter, r *http.Request) {
+	cfg := SnapshotRuntimeConfig()
 	tierPoolsOut := map[string][]prizeWeightResponse{}
-	for dollars, pool := range activity.DefaultTierPools() {
+	for dollars, pool := range cfg.TierPools {
 		tierPoolsOut[strconv.Itoa(dollars)] = buildPrizeWeightRows(pool)
 	}
 	spinMapOut := map[string]int{}
-	for dollars, spins := range spinMap {
+	for dollars, spins := range cfg.SpinMap {
 		spinMapOut[strconv.FormatFloat(dollars, 'f', -1, 64)] = spins
 	}
 	writeJSON(w, 200, map[string]any{
-		"prizes":            buildPrizeWeightRows(prizePool),
+		"prizes":            buildPrizeWeightRows(cfg.PrizePool),
 		"tierPools":         tierPoolsOut,
-		"postJackpotPrizes": buildPrizeWeightRows(activity.DefaultPostJackpotPool()),
+		"postJackpotPrizes": buildPrizeWeightRows(cfg.PostJackpotPool),
 		"spinMap":           spinMapOut,
 	})
 }

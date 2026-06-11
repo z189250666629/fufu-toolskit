@@ -1,0 +1,42 @@
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.metric-head {
+  display: grid;
+  gap: 4px;
+}
+
+.metric b {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.metric small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.metric-danger b {
+  color: var(--sage-danger-fg);
+}
+
+.metric-success b {
+  color: var(--sage-success-fg);
+}

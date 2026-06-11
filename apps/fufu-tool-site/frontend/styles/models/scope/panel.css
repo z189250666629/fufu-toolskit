@@ -1,0 +1,29 @@
+.model-status-panel {
+  min-width: 0;
+}
+
+.model-status-head {
+  margin-bottom: 12px;
+}
+
+.model-scope-bar {
+  display: grid;
+  grid-template-columns: max-content minmax(240px, 320px);
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 60px;
+  margin-bottom: 12px;
+}
+
+.model-scope-group-slot {
+  display: grid;
+  align-items: end;
+  width: min(320px, 100%);
+  min-height: 60px;
+}
+
+.model-scope-group-slot.is-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}

@@ -1,6 +1,12 @@
 package activity
 
-import "math"
+import (
+	"encoding/json"
+	"math"
+	"sort"
+	"strconv"
+	"strings"
+)
 
 const (
 	StartText               = "2026-05-01 00:00:00"
@@ -20,6 +26,32 @@ type Prize struct {
 type SpinResult struct {
 	Type    string
 	Dollars int
+}
+
+type Config struct {
+	StartText           string          `json:"startText"`
+	EndText             string          `json:"endText"`
+	StartTS             int64           `json:"startTS"`
+	EndTS               int64           `json:"endTS"`
+	TargetExpectedValue float64         `json:"targetExpectedValue,omitempty"`
+	SpinMap             map[float64]int `json:"spinMap"`
+	PrizePool           []Prize         `json:"prizePool"`
+	TierPools           map[int][]Prize `json:"tierPools"`
+	PostJackpotPool     []Prize         `json:"postJackpotPrizes"`
+	ScratchRewards      []int           `json:"scratchRewards"`
+}
+
+type configJSON struct {
+	StartText           string             `json:"startText"`
+	EndText             string             `json:"endText"`
+	StartTS             int64              `json:"startTS"`
+	EndTS               int64              `json:"endTS"`
+	TargetExpectedValue float64            `json:"targetExpectedValue,omitempty"`
+	SpinMap             map[string]int     `json:"spinMap"`
+	PrizePool           []Prize            `json:"prizePool"`
+	TierPools           map[string][]Prize `json:"tierPools"`
+	PostJackpotPool     []Prize            `json:"postJackpotPrizes"`
+	ScratchRewards      []int              `json:"scratchRewards"`
 }
 
 var defaultSpinMap = map[float64]int{0.1: 100, 100: 1, 150: 1, 300: 3, 500: 4, 1000: 10}
@@ -65,8 +97,275 @@ func DefaultScratchRewards() []int {
 	return append([]int(nil), defaultScratchRewards...)
 }
 
+func DefaultConfig() Config {
+	return Config{
+		StartText:           StartText,
+		EndText:             EndText,
+		StartTS:             StartTS,
+		EndTS:               EndTS,
+		TargetExpectedValue: ExpectedValue(defaultPrizePool),
+		SpinMap:             DefaultSpinMap(),
+		PrizePool:           DefaultPrizePool(),
+		TierPools:           DefaultTierPools(),
+		PostJackpotPool:     DefaultPostJackpotPool(),
+		ScratchRewards:      DefaultScratchRewards(),
+	}
+}
+
+func CloneConfig(cfg Config) Config {
+	cfg = NormalizeConfig(cfg)
+	out := cfg
+	out.SpinMap = cloneSpinMap(cfg.SpinMap)
+	out.PrizePool = clonePrizePool(cfg.PrizePool)
+	out.TierPools = cloneTierPools(cfg.TierPools)
+	out.PostJackpotPool = clonePrizePool(cfg.PostJackpotPool)
+	out.ScratchRewards = append([]int(nil), cfg.ScratchRewards...)
+	return out
+}
+
+func NormalizeConfig(cfg Config) Config {
+	defaults := Config{
+		StartText:           StartText,
+		EndText:             EndText,
+		StartTS:             StartTS,
+		EndTS:               EndTS,
+		TargetExpectedValue: ExpectedValue(defaultPrizePool),
+		SpinMap:             DefaultSpinMap(),
+		PrizePool:           DefaultPrizePool(),
+		TierPools:           DefaultTierPools(),
+		PostJackpotPool:     DefaultPostJackpotPool(),
+		ScratchRewards:      DefaultScratchRewards(),
+	}
+	if strings.TrimSpace(cfg.StartText) == "" {
+		cfg.StartText = defaults.StartText
+	}
+	if strings.TrimSpace(cfg.EndText) == "" {
+		cfg.EndText = defaults.EndText
+	}
+	if cfg.StartTS <= 0 {
+		cfg.StartTS = defaults.StartTS
+	}
+	if cfg.EndTS <= 0 {
+		cfg.EndTS = defaults.EndTS
+	}
+	if cfg.TargetExpectedValue < 0 {
+		cfg.TargetExpectedValue = 0
+	}
+	if cfg.TargetExpectedValue == 0 {
+		cfg.TargetExpectedValue = defaults.TargetExpectedValue
+	}
+	if cfg.SpinMap == nil {
+		cfg.SpinMap = defaults.SpinMap
+	} else {
+		cfg.SpinMap = normalizeSpinMap(cfg.SpinMap)
+	}
+	if cfg.PrizePool == nil {
+		cfg.PrizePool = defaults.PrizePool
+	} else {
+		cfg.PrizePool = normalizePrizePool(cfg.PrizePool)
+	}
+	if cfg.TierPools == nil {
+		cfg.TierPools = defaults.TierPools
+	} else {
+		cfg.TierPools = normalizeTierPools(cfg.TierPools)
+	}
+	if cfg.PostJackpotPool == nil {
+		cfg.PostJackpotPool = defaults.PostJackpotPool
+	} else {
+		cfg.PostJackpotPool = normalizePrizePool(cfg.PostJackpotPool)
+	}
+	if cfg.ScratchRewards == nil {
+		cfg.ScratchRewards = defaults.ScratchRewards
+	} else {
+		cfg.ScratchRewards = normalizeScratchRewards(cfg.ScratchRewards)
+	}
+	return cfg
+}
+
+func (cfg Config) MarshalJSON() ([]byte, error) {
+	cfg = NormalizeConfig(cfg)
+	return json.Marshal(configJSON{
+		StartText:           cfg.StartText,
+		EndText:             cfg.EndText,
+		StartTS:             cfg.StartTS,
+		EndTS:               cfg.EndTS,
+		TargetExpectedValue: cfg.TargetExpectedValue,
+		SpinMap:             spinMapToJSON(cfg.SpinMap),
+		PrizePool:           cfg.PrizePool,
+		TierPools:           tierPoolsToJSON(cfg.TierPools),
+		PostJackpotPool:     cfg.PostJackpotPool,
+		ScratchRewards:      cfg.ScratchRewards,
+	})
+}
+
+func (cfg *Config) UnmarshalJSON(data []byte) error {
+	var raw configJSON
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*cfg = NormalizeConfig(Config{
+		StartText:           raw.StartText,
+		EndText:             raw.EndText,
+		StartTS:             raw.StartTS,
+		EndTS:               raw.EndTS,
+		TargetExpectedValue: raw.TargetExpectedValue,
+		SpinMap:             spinMapFromJSON(raw.SpinMap),
+		PrizePool:           raw.PrizePool,
+		TierPools:           tierPoolsFromJSON(raw.TierPools),
+		PostJackpotPool:     raw.PostJackpotPool,
+		ScratchRewards:      raw.ScratchRewards,
+	})
+	return nil
+}
+
+func ActualExpectedValue(cfg Config) float64 {
+	cfg = NormalizeConfig(cfg)
+	return ExpectedValue(cfg.PrizePool)
+}
+
+func ExpectedValue(pool []Prize) float64 {
+	total := 0
+	won := 0
+	for _, p := range pool {
+		if p.Weight <= 0 {
+			continue
+		}
+		total += p.Weight
+		if p.Type == "win" && p.Dollars > 0 {
+			won += p.Dollars * p.Weight
+		}
+	}
+	if total <= 0 {
+		return 0
+	}
+	return float64(won) / float64(total)
+}
+
 func clonePrizePool(pool []Prize) []Prize {
 	return append([]Prize(nil), pool...)
+}
+
+func cloneSpinMap(in map[float64]int) map[float64]int {
+	out := make(map[float64]int, len(in))
+	for dollars, spins := range in {
+		out[dollars] = spins
+	}
+	return out
+}
+
+func cloneTierPools(in map[int][]Prize) map[int][]Prize {
+	out := make(map[int][]Prize, len(in))
+	for dollars, pool := range in {
+		out[dollars] = clonePrizePool(pool)
+	}
+	return out
+}
+
+func normalizeSpinMap(in map[float64]int) map[float64]int {
+	out := map[float64]int{}
+	for dollars, spins := range in {
+		if dollars > 0 && spins > 0 {
+			out[dollars] = spins
+		}
+	}
+	return out
+}
+
+func normalizePrizePool(in []Prize) []Prize {
+	out := []Prize{}
+	for _, p := range in {
+		p.Type = strings.TrimSpace(p.Type)
+		if p.Type == "" {
+			if p.Dollars > 0 {
+				p.Type = "win"
+			} else {
+				p.Type = "miss"
+			}
+		}
+		if p.Weight <= 0 {
+			continue
+		}
+		if p.Type != "win" {
+			p.Dollars = 0
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+func normalizeTierPools(in map[int][]Prize) map[int][]Prize {
+	out := map[int][]Prize{}
+	for dollars, pool := range in {
+		if dollars <= 0 {
+			continue
+		}
+		out[dollars] = normalizePrizePool(pool)
+	}
+	return out
+}
+
+func normalizeScratchRewards(in []int) []int {
+	out := []int{}
+	for _, reward := range in {
+		if reward > 0 {
+			out = append(out, reward)
+		}
+	}
+	return out
+}
+
+func spinMapToJSON(in map[float64]int) map[string]int {
+	out := map[string]int{}
+	keys := make([]float64, 0, len(in))
+	for dollars := range in {
+		keys = append(keys, dollars)
+	}
+	sort.Float64s(keys)
+	for _, dollars := range keys {
+		out[strconv.FormatFloat(dollars, 'f', -1, 64)] = in[dollars]
+	}
+	return out
+}
+
+func spinMapFromJSON(in map[string]int) map[float64]int {
+	if in == nil {
+		return nil
+	}
+	out := map[float64]int{}
+	for key, spins := range in {
+		dollars, err := strconv.ParseFloat(strings.TrimSpace(key), 64)
+		if err == nil && dollars > 0 && spins > 0 {
+			out[dollars] = spins
+		}
+	}
+	return out
+}
+
+func tierPoolsToJSON(in map[int][]Prize) map[string][]Prize {
+	out := map[string][]Prize{}
+	keys := make([]int, 0, len(in))
+	for dollars := range in {
+		keys = append(keys, dollars)
+	}
+	sort.Ints(keys)
+	for _, dollars := range keys {
+		out[strconv.Itoa(dollars)] = clonePrizePool(in[dollars])
+	}
+	return out
+}
+
+func tierPoolsFromJSON(in map[string][]Prize) map[int][]Prize {
+	if in == nil {
+		return nil
+	}
+	out := map[int][]Prize{}
+	for key, pool := range in {
+		dollars, err := strconv.Atoi(strings.TrimSpace(key))
+		if err == nil && dollars > 0 {
+			out[dollars] = normalizePrizePool(pool)
+		}
+	}
+	return out
 }
 
 func DollarsTier(quota, quotaUnit int64) float64 {
@@ -77,6 +376,11 @@ func DollarsTier(quota, quotaUnit int64) float64 {
 }
 
 func Spin(dollars float64, hasJackpot bool, used, total, maxWon, force int, randomInt func(max int) int) SpinResult {
+	return SpinWithConfig(DefaultConfig(), dollars, hasJackpot, used, total, maxWon, force, randomInt)
+}
+
+func SpinWithConfig(cfg Config, dollars float64, hasJackpot bool, used, total, maxWon, force int, randomInt func(max int) int) SpinResult {
+	cfg = NormalizeConfig(cfg)
 	remaining := total - used
 	if force > 0 {
 		return SpinResult{"win", force}
@@ -87,10 +391,10 @@ func Spin(dollars float64, hasJackpot bool, used, total, maxWon, force int, rand
 	if int(dollars) == 500 && remaining == 1 && maxWon < 50 {
 		return SpinResult{"win", 20}
 	}
-	pool := defaultPrizePool
+	pool := cfg.PrizePool
 	if hasJackpot || (dollars >= 100 && float64(maxWon) >= dollars*0.5) {
-		pool = defaultPostJackpotPool
-	} else if p, ok := defaultTierPools[int(dollars)]; ok {
+		pool = cfg.PostJackpotPool
+	} else if p, ok := cfg.TierPools[int(dollars)]; ok {
 		pool = p
 	}
 	p := Roll(pool, randomInt)

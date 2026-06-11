@@ -1,4 +1,4 @@
-package main
+package activityapp
 
 import (
 	"database/sql"
@@ -65,10 +65,15 @@ type ScratchGame struct {
 
 func main() {
 	wd, _ := os.Getwd()
-	if err := run(wd, os.Getenv("SLOT_PORT")); err != nil {
+	if err := Run(wd, os.Getenv("SLOT_PORT")); err != nil {
 		fmt.Fprintf(os.Stderr, "server stopped: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// Run starts the activity module as a standalone local development service.
+func Run(wd, portValue string) error {
+	return run(wd, portValue)
 }
 
 func run(wd, portValue string) error {

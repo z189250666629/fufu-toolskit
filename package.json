@@ -1,27 +1,23 @@
 {
   "name": "fufu-toolskit",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Monorepo for y2k-nav, network-detect (with combine), and fufu-act/activity.",
+  "description": "Monorepo for the unified fufu-tool-site and embedded tool modules.",
   "scripts": {
     "deps": "npm run deps:go",
     "deps:go": "go work sync",
     "start:all": "node scripts/start-all.mjs",
-    "start:network": "npm --prefix apps/network-detect start",
-    "dev:network": "npm --prefix apps/network-detect run dev",
-    "build:network": "npm --prefix apps/network-detect run build",
-    "build:act": "npm --prefix apps/fufu-act run build",
-    "build:y2k": "npm --prefix apps/y2k-nav run build",
-    "build:all": "npm run build:network && npm run build:act && npm run build:y2k",
-    "test:network": "npm --prefix apps/network-detect test",
-    "start:act": "npm --prefix apps/fufu-act start",
+    "start:tool-site": "npm --prefix apps/fufu-tool-site start",
+    "dev:tool-site": "npm --prefix apps/fufu-tool-site run dev",
+    "build:tool-site": "npm --prefix apps/fufu-tool-site run build",
+    "build:all": "npm run build:tool-site",
+    "test:tool-site": "npm --prefix apps/fufu-tool-site test",
     "test:act": "npm --prefix apps/fufu-act test",
-    "start:y2k": "npm --prefix apps/y2k-nav start",
     "test:y2k": "npm --prefix apps/y2k-nav test",
     "test:scripts": "node --test scripts/*.test.mjs",
     "test:workspace": "go test -count=1 .",
     "test:shared": "go test -count=1 ./packages/go/fufu/...",
-    "test": "npm run test:workspace && npm run test:shared && npm run test:network && npm run test:act && npm run test:y2k && npm run test:scripts"
+    "test": "npm run test:workspace && npm run test:shared && npm run test:tool-site && npm run test:act && npm run test:y2k && npm run test:scripts"
   },
   "engines": {
     "node": ">=20"

@@ -28,3 +28,15 @@ apps/fufu-act/public/*.test.*
 apps/fufu-act/public/**/*.test.*
 apps/fufu-act/public/.*
 apps/fufu-act/public/**/.*
+apps/fufu-tool-site/frontend/*.test.*
+apps/fufu-tool-site/frontend/**/*.test.*
+apps/fufu-tool-site/frontend/.*
+apps/fufu-tool-site/frontend/**/.*
+apps/fufu-tool-site/combine/*.test.*
+apps/fufu-tool-site/combine/**/*.test.*
+apps/fufu-tool-site/combine/.*
+apps/fufu-tool-site/combine/**/.*
+apps/y2k-nav/*.test.*
+apps/y2k-nav/**/*.test.*
+apps/y2k-nav/.*
+apps/y2k-nav/**/.*

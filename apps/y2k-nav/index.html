@@ -3,47 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>导航</title>
+<title>fufu 工具站</title>
+<link rel="stylesheet" href="./nav-ui-tokens.css">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@200;400;600&family=Noto+Sans+SC:wght@300;400&display=swap');
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-  --ink: #2e312a;
-  --ink-light: #4d5245;
-  --ink-faint: #7b8570;
-  --paper: #f2f4ed;
-  --paper-warm: #e9ece3;
-  --paper-dark: #dde0d7;
-  --accent-mute: #93a07e;
-  --moss: #7b8570;
-  --clay: #a8a48e;
-  --stone: #93a07e;
-  --card-hover-bg: rgba(255,255,255,.35);
-  --ink-line-color: #4d5245;
-}
-
-[data-theme="dark"] {
-  --ink: #e2e5dc;
-  --ink-light: #c0c5b6;
-  --ink-faint: #8a9180;
-  --paper: #1a1d17;
-  --paper-warm: #22261e;
-  --paper-dark: #2e332a;
-  --accent-mute: #93a07e;
-  --moss: #8a9180;
-  --clay: #7a7868;
-  --stone: #93a07e;
-  --card-hover-bg: rgba(255,255,255,.05);
-  --ink-line-color: #8a9180;
-}
 
 body {
   min-height: 100vh;
-  background: var(--paper);
-  font-family: 'Noto Sans SC', sans-serif;
-  color: var(--ink);
+  background: var(--fufu-nav-bg);
+  font-family: var(--font-family-ui);
+  color: var(--fufu-nav-fg);
   line-height: 1.8;
   letter-spacing: .03em;
   overflow-x: hidden;
@@ -71,10 +40,10 @@ body::before {
 }
 
 .header-title {
-  font-family: 'Noto Serif SC', serif;
+  font-family: var(--font-family-display);
   font-weight: 200;
   font-size: clamp(1.8rem, 5vw, 3rem);
-  color: var(--ink);
+  color: var(--fufu-nav-fg);
   letter-spacing: .15em;
   margin-bottom: 20px;
 }
@@ -86,13 +55,13 @@ body::before {
   height: 12px;
   opacity: .18;
 }
-.ink-line path { stroke: var(--ink-line-color); }
+.ink-line path { stroke: var(--fufu-nav-ink-line-color); }
 
 .header-sub {
-  font-family: 'Noto Serif SC', serif;
+  font-family: var(--font-family-display);
   font-weight: 200;
   font-size: clamp(.8rem, 2vw, .95rem);
-  color: var(--ink-faint);
+  color: var(--fufu-nav-fg-muted);
   letter-spacing: .3em;
 }
 
@@ -105,7 +74,7 @@ body::before {
 .nav-card {
   position: relative;
   background: transparent;
-  border: 1px solid var(--paper-dark);
+  border: 1px solid var(--fufu-nav-border);
   border-radius: 2px;
   padding: 32px 28px;
   display: flex; flex-direction: column; gap: 10px;
@@ -113,8 +82,8 @@ body::before {
   cursor: pointer;
 }
 .nav-card:hover {
-  border-color: var(--ink-faint);
-  background: var(--card-hover-bg);
+  border-color: var(--fufu-nav-fg-muted);
+  background: var(--fufu-nav-card-hover-bg);
 }
 
 .card-stamp {
@@ -123,7 +92,7 @@ body::before {
   padding: 3px 10px;
   border: 1.5px solid var(--accent, var(--stone));
   border-radius: 1px;
-  font-family: 'Noto Serif SC', serif;
+  font-family: var(--font-family-display);
   font-size: .65rem;
   font-weight: 600;
   color: var(--accent, var(--stone));
@@ -133,10 +102,10 @@ body::before {
 }
 
 .card-title {
-  font-family: 'Noto Serif SC', serif;
+  font-family: var(--font-family-display);
   font-weight: 400;
   font-size: 1.15rem;
-  color: var(--ink);
+  color: var(--fufu-nav-fg);
   letter-spacing: .08em;
   margin-top: 4px;
 }
@@ -144,7 +113,7 @@ body::before {
 .card-desc {
   font-size: .82rem;
   font-weight: 300;
-  color: var(--ink-faint);
+  color: var(--fufu-nav-fg-muted);
   line-height: 1.7;
 }
 
@@ -155,8 +124,8 @@ body::before {
 .card-links a {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 12px;
-  border-bottom: 1px solid var(--paper-dark);
-  color: var(--ink-light);
+  border-bottom: 1px solid var(--fufu-nav-border);
+  color: var(--fufu-nav-fg-soft);
   text-decoration: none;
   font-size: .8rem;
   font-weight: 300;
@@ -164,13 +133,13 @@ body::before {
   transition: color .25s, border-color .25s;
 }
 .card-links a:hover {
-  color: var(--ink);
-  border-color: var(--ink-faint);
+  color: var(--fufu-nav-fg);
+  border-color: var(--fufu-nav-fg-muted);
 }
 .card-links a .latency {
   margin-left: auto;
   font-size: .7rem;
-  color: var(--ink-faint);
+  color: var(--fufu-nav-fg-muted);
   opacity: .6;
   min-width: 42px;
   text-align: right;
@@ -188,26 +157,56 @@ body::before {
 .card-enter {
   display: inline-flex; align-items: center; gap: 6px;
   margin-top: auto; padding-top: 10px;
-  color: var(--ink-faint);
+  color: var(--fufu-nav-fg-muted);
   text-decoration: none;
-  font-family: 'Noto Serif SC', serif;
+  font-family: var(--font-family-display);
   font-size: .78rem;
   font-weight: 400;
   letter-spacing: .15em;
   transition: color .25s;
 }
-.card-enter:hover { color: var(--ink); }
+.card-enter:hover { color: var(--fufu-nav-fg); }
 
-/* 主题切换按钮 */
-.theme-toggle {
+.top-actions {
   position: fixed;
   top: 24px; right: 24px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--fufu-nav-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fufu-nav-surface-muted) 86%, transparent);
+  color: var(--fufu-nav-fg-soft);
+  text-decoration: none;
+  font-family: var(--font-family-display);
+  font-size: .76rem;
+  font-weight: 400;
+  letter-spacing: .12em;
+  backdrop-filter: blur(8px);
+  transition: border-color .25s, background .25s, color .25s, transform .25s;
+}
+.admin-entry:hover {
+  border-color: var(--fufu-nav-fg-muted);
+  background: var(--fufu-nav-surface-muted);
+  color: var(--fufu-nav-fg);
+  transform: translateY(-1px);
+}
+
+.theme-toggle {
   width: 36px; height: 36px;
-  border: 1px solid var(--paper-dark);
+  border: 1px solid var(--fufu-nav-border);
   border-radius: 50%;
-  background: var(--paper-warm);
-  color: var(--ink-faint);
+  background: var(--fufu-nav-surface-muted);
+  color: var(--fufu-nav-fg-muted);
   font-size: .9rem;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
@@ -215,8 +214,14 @@ body::before {
   line-height: 1;
 }
 .theme-toggle:hover {
-  border-color: var(--ink-faint);
-  color: var(--ink);
+  border-color: var(--fufu-nav-fg-muted);
+  color: var(--fufu-nav-fg);
+}
+
+@media (max-width: 520px) {
+  .top-actions { top: 16px; right: 16px; gap: 8px; }
+  .admin-entry { min-height: 34px; padding: 0 11px; font-size: .7rem; }
+  .theme-toggle { width: 34px; height: 34px; }
 }
 
 .fade-in {
@@ -231,9 +236,12 @@ body::before {
 </head>
 <body>
 
-<button class="theme-toggle" id="themeToggle" aria-label="切换深色模式">
-  <span id="themeIcon">☽</span>
-</button>
+<div class="top-actions" aria-label="快捷入口">
+  <button class="theme-toggle" id="themeToggle" data-slot="button" aria-label="切换深色模式">
+    <span id="themeIcon">☽</span>
+  </button>
+  <a href="/admin" class="admin-entry" data-slot="button" aria-label="进入管理后台">管理后台</a>
+</div>
 
 <div class="page">
 
@@ -242,16 +250,16 @@ body::before {
       <path d="M0 7 Q30 3, 70 6 T140 5 T210 7 T280 4" stroke-width="1.5" stroke-linecap="round" fill="none"/>
       <path d="M20 9 Q80 4, 140 8 T260 5" stroke-width=".6" stroke-linecap="round" fill="none" opacity=".5"/>
     </svg>
-    <h1 class="header-title">fufu 导 航</h1>
+    <h1 class="header-title">fufu 工 具 站</h1>
     <svg class="ink-line" viewBox="0 0 280 12" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M0 5 Q40 8, 90 4 T180 7 T280 5" stroke-width="1.2" stroke-linecap="round" fill="none"/>
     </svg>
-    <p class="header-sub">择 路 而 往</p>
+    <p class="header-sub">导 航 · 状 态 · 合 卡 · 活 动</p>
   </header>
 
   <div class="nav-grid">
 
-    <div class="nav-card fade-in" style="animation-delay:.1s; --accent: var(--clay);">
+    <div class="nav-card card fade-in" data-slot="card" style="animation-delay:.1s; --accent: var(--clay);">
       <span class="card-stamp">次数</span>
       <div class="card-title">API 次数站</div>
       <div class="card-links">
@@ -261,7 +269,7 @@ body::before {
       </div>
     </div>
 
-    <div class="nav-card fade-in" style="animation-delay:.15s; --accent: var(--moss);">
+    <div class="nav-card card fade-in" data-slot="card" style="animation-delay:.15s; --accent: var(--moss);">
       <span class="card-stamp">额度</span>
       <div class="card-title">Token 站</div>
       <div class="card-links">
@@ -271,42 +279,35 @@ body::before {
       </div>
     </div>
 
-    <div class="nav-card fade-in" style="animation-delay:.2s; --accent: var(--stone);" data-href="https://build.fufuapi.online">
+    <div class="nav-card card fade-in" data-slot="card" style="animation-delay:.2s; --accent: var(--stone);" data-href="https://build.fufuapi.online">
       <span class="card-stamp">造物</span>
       <div class="card-title">Build</div>
       <div class="card-desc">AI 画图生成</div>
       <a href="https://build.fufuapi.online" class="card-enter">进入 ›</a>
     </div>
 
-    <div class="nav-card fade-in" style="animation-delay:.25s; --accent: var(--clay);" data-href="https://compact.if.tc">
+    <div class="nav-card card fade-in" data-slot="card" style="animation-delay:.25s; --accent: var(--moss);" data-href="/status">
+      <span class="card-stamp">状态</span>
+      <div class="card-title">API / 模型状态</div>
+      <div class="card-desc">连通性检测、模型可用性与手动测试</div>
+      <a href="/status" class="card-enter">进入 ›</a>
+    </div>
+
+    <div class="nav-card card fade-in" data-slot="card" style="animation-delay:.3s; --accent: var(--clay);" data-href="/combine">
       <span class="card-stamp">合卡</span>
-      <div class="card-title">Compact</div>
-      <div class="card-desc">自助合卡工具</div>
-      <a href="https://compact.if.tc" class="card-enter">进入 ›</a>
+      <div class="card-title">合卡工具</div>
+      <div class="card-desc">自助合并额度卡，复用统一 NewAPI 配置</div>
+      <a href="/combine" class="card-enter">进入 ›</a>
     </div>
 
-    <div class="nav-card fade-in" style="animation-delay:.3s; --accent: var(--moss);" data-href="https://nd.if.tc">
-      <span class="card-stamp">测速</span>
-      <div class="card-title">网络测试</div>
-      <div class="card-desc">连通性检测与模型测试</div>
-      <a href="https://nd.if.tc" class="card-enter">进入 ›</a>
-    </div>
-
-    <div class="nav-card fade-in" style="animation-delay:.35s; --accent: var(--stone);" data-href="https://activity.if.tc">
+    <div class="nav-card card fade-in" data-slot="card" style="animation-delay:.35s; --accent: var(--stone);" data-href="/activity">
       <span class="card-stamp">活动</span>
-      <div class="card-title">活动中心</div>
-      <div class="card-desc">最新活动与福利</div>
-      <a href="https://activity.if.tc" class="card-enter">进入 ›</a>
+      <div class="card-title">活动前台</div>
+      <div class="card-desc">抽奖、刮刮卡与福利入口</div>
+      <a href="/activity" class="card-enter">进入 ›</a>
     </div>
 
-    <div class="nav-card fade-in" style="animation-delay:.4s; --accent: var(--clay);" data-href="https://idc.fufuapi.top">
-      <span class="card-stamp">服务器</span>
-      <div class="card-title">FufuIDC</div>
-      <div class="card-desc">IDC 服务器管理</div>
-      <a href="https://idc.fufuapi.top" class="card-enter">进入 ›</a>
-    </div>
-
-    <div class="nav-card fade-in" style="animation-delay:.45s; --accent: var(--moss);">
+    <div class="nav-card card fade-in" data-slot="card" style="animation-delay:.4s; --accent: var(--moss);">
       <span class="card-stamp">终端</span>
       <div class="card-title">Web Terminal</div>
       <div class="card-desc">服务器网页管理终端</div>
