@@ -28,6 +28,23 @@
     return numberValue(value).toLocaleString();
   }
 
+  function safePlans(plans) {
+    return Array.isArray(plans) ? plans : [];
+  }
+
+  function scheduleJobs(schedule) {
+    const jobs = schedule && Array.isArray(schedule.jobs) ? schedule.jobs : [];
+    const byPlan = new Map();
+    for (const job of jobs) {
+      byPlan.set(String(job.plan ?? ''), job);
+    }
+    return byPlan;
+  }
+
+  function checked(value) {
+    return value ? ' checked' : '';
+  }
+
   function statusClass(status) {
     const value = String(status ?? '').trim().toLowerCase();
     return ALLOWED_STATUS_CLASSES.has(value) ? value : 'unknown';
@@ -149,9 +166,60 @@
     return `<div class="stats-grid">${summary}${prizes}${tiers}${queue}${scratch}</div>`;
   }
 
+  function buildSaleCardManagerHtml(config = {}, result = {}) {
+    const plans = safePlans(config.plans);
+    const schedule = config.schedule || {};
+    const jobs = scheduleJobs(schedule);
+    const selectedPlan = plans[0]?.id || '';
+    const options = plans.length ? plans.map((plan) => `
+      <option value="${escapeHtml(plan.id)}">${escapeHtml(plan.name || plan.id)} · $${escapeHtml(plan.quota ?? '')}</option>`).join('') : '<option value="">NO PLANS</option>';
+    const rows = plans.length ? plans.map((plan) => {
+      const job = jobs.get(String(plan.id)) || {};
+      const enabled = Boolean(job.enabled);
+      const count = numberValue(job.count);
+      return `
+        <tr data-sale-card-plan="${escapeHtml(plan.id)}">
+          <td>
+            <div class="sale-card-name">${escapeHtml(plan.name || plan.id)}</div>
+            <div class="sale-card-meta">ITEM ${escapeHtml(plan.itemId)} / SKU ${escapeHtml(plan.skuId)} / ${escapeHtml(plan.group || 'mix')}</div>
+          </td>
+          <td>$${escapeHtml(plan.quota ?? '')}</td>
+          <td>${escapeHtml(plan.intervalUnit ?? '')}</td>
+          <td><input class="sale-card-job-count px-input mini-input" type="number" min="1" max="100" value="${count > 0 ? escapeHtml(count) : ''}" data-plan="${escapeHtml(plan.id)}"></td>
+          <td><input class="sale-card-job-enabled" type="checkbox" data-plan="${escapeHtml(plan.id)}"${checked(enabled)}></td>
+        </tr>`;
+    }).join('') : emptyRow(5);
+    const uploaded = numberValue(result.uploaded);
+    const resultHtml = uploaded > 0 ? `<div class="sale-card-result ok">上架成功：${n(uploaded)} 张</div>` : '';
+
+    return `
+      <div class="px-panel sale-card-panel">
+        <div class="panel-title">SALE CARD</div>
+        <div class="sale-card-note">每日自动任务：在这里维护启用状态、执行时间和每个计划的上架数量；后续定时器会读取这份配置执行。</div>
+        <div class="sale-card-form">
+          <label class="sale-card-check"><input id="sale-card-enabled" type="checkbox"${checked(schedule.enabled)}> 启用每日自动上架</label>
+          <label>时间 <input id="sale-card-time" class="px-input mini-input" value="${escapeHtml(schedule.time || '09:00')}" placeholder="09:00"></label>
+          <label>时区 <input id="sale-card-timezone" class="px-input mini-input" value="${escapeHtml(schedule.timezone || 'Asia/Shanghai')}" placeholder="Asia/Shanghai"></label>
+          <button class="px-btn btn-cyan" id="sale-card-save" type="button">SAVE</button>
+        </div>
+        <div class="table-wrap"><table>
+          <tr><th>计划</th><th>额度</th><th>周期</th><th>每日数量</th><th>启用</th></tr>
+          ${rows}
+        </table></div>
+        <div class="sale-card-actions">
+          <select id="sale-card-plan" class="px-input">${options}</select>
+          <input id="sale-card-run-count" class="px-input mini-input" type="number" min="1" max="100" value="1">
+          <button class="px-btn" id="sale-card-run" type="button" data-default-plan="${escapeHtml(selectedPlan)}">RUN NOW</button>
+        </div>
+        ${resultHtml}
+        <div class="sale-card-message" id="sale-card-message"></div>
+      </div>`;
+  }
+
   root.adminRender = {
     escapeHtml,
     statusClass,
-    buildStatsGridHtml
+    buildStatsGridHtml,
+    buildSaleCardManagerHtml
   };
 })(globalThis);

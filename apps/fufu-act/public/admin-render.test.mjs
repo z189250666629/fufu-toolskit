@@ -49,3 +49,38 @@ test('admin render preserves backend status badge classes', async () => {
     assert.match(html, new RegExp(`badge-${status}`));
   }
 });
+
+test('admin render builds sale card manager without leaking generated keys', async () => {
+  const render = await loadAdminRender();
+  const html = render.buildSaleCardManagerHtml({
+    plans: [{
+      id: 'fufu<special>',
+      name: '<img src=x onerror=alert(1)>',
+      quota: 55,
+      group: 'mix',
+      intervalUnit: 9,
+      itemId: 29,
+      skuId: 66
+    }],
+    schedule: {
+      enabled: true,
+      time: '08:30',
+      timezone: 'Asia/Shanghai',
+      jobs: [{ plan: 'fufu<special>', count: 2, enabled: true }]
+    }
+  }, {
+    uploaded: 1,
+    keys: ['sk-secret-generated-card']
+  });
+
+  assert.match(html, /SALE CARD/);
+  assert.match(html, /每日自动任务/);
+  assert.match(html, /id="sale-card-plan"/);
+  assert.match(html, /id="sale-card-save"/);
+  assert.match(html, /id="sale-card-run"/);
+  assert.match(html, /data-sale-card-plan="fufu&lt;special&gt;"/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(html, /上架成功：1 张/);
+  assert.doesNotMatch(html, /<img/);
+  assert.doesNotMatch(html, /sk-secret-generated-card/);
+});

@@ -29,6 +29,23 @@ test('admin stats uses Authorization header instead of query token', async () =>
   assert.doesNotMatch(loadSource, /\/api\/admin\/stats\?token=/);
 });
 
+test('admin sale card panel uses protected config, save and run endpoints', async () => {
+  const source = await readFile(new URL('./admin.html', import.meta.url), 'utf8');
+
+  assert.match(source, /id="sale-card-panel"/);
+  assert.match(source, /async function loadSaleCards\(/);
+  assert.match(source, /async function saveSaleCardSchedule\(/);
+  assert.match(source, /async function runSaleCardPlan\(/);
+  assert.match(source, /fetch\('\/api\/admin\/sale-cards\/config'/);
+  assert.match(source, /method:\s*'POST'/);
+  assert.match(source, /fetch\('\/api\/admin\/sale-cards\/run'/);
+  assert.match(source, /Authorization:\s*'Bearer '\s*\+\s*tok/);
+  assert.match(source, /adminRender\.buildSaleCardManagerHtml/);
+  assert.match(source, /serverErrorMessage: '上架配置加载失败，请稍后重试'/);
+  assert.match(source, /serverErrorMessage: '保存上架配置失败，请稍后重试'/);
+  assert.match(source, /serverErrorMessage: '生成并上架失败，请稍后重试'/);
+});
+
 test('admin stats ignores stale overlapping load failures', async () => {
   const source = await readFile(new URL('./admin.html', import.meta.url), 'utf8');
   const inlineScript = source.match(/<script>\s*([\s\S]*)<\/script>\s*<\/body>/)?.[1];
