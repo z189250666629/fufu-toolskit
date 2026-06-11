@@ -292,6 +292,45 @@ func TestMCYLoginReturnsErrorForHTTPFailure(t *testing.T) {
 	}
 }
 
+func TestMCYLoginFallsBackToEncryptedAdminEndpointToken(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = ""
+	var jsonLoginHits, encryptedLoginHits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/admin/login":
+			jsonLoginHits++
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": 404, "msg": "not found"})
+		case r.Method == http.MethodPost && r.URL.Path == "/admin":
+			encryptedLoginHits++
+			payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
+			if payload["email"] != "user@example.test" || payload["password"] != "pass" {
+				t.Fatalf("encrypted login payload=%#v", payload)
+			}
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"token": "fresh-token"}})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "user@example.test")
+	t.Setenv("MCY_PASSWORD", "pass")
+	t.Setenv("MCY_LOGIN_ENDPOINT", "/admin/login")
+
+	if err := mcyLogin(context.Background()); err != nil {
+		t.Fatalf("mcyLogin error: %v", err)
+	}
+	if got := getMCYCookie(); got != "manage_token=fresh-token" {
+		t.Fatalf("mcyCookie=%q", got)
+	}
+	if jsonLoginHits != 1 || encryptedLoginHits != 1 {
+		t.Fatalf("jsonLoginHits=%d encryptedLoginHits=%d", jsonLoginHits, encryptedLoginHits)
+	}
+}
+
 func TestMCYHTTPClientUsesFiniteTimeout(t *testing.T) {
 	if mcyHTTPClient == nil {
 		t.Fatal("mcyHTTPClient is nil")
