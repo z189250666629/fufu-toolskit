@@ -17,27 +17,20 @@ type ToolCard = {
   links?: ToolLink[];
 };
 
-const toolCards: ToolCard[] = [
-  {
-    stamp: '次数',
-    title: 'API 次数站',
-    accent: 'clay',
-    links: [
-      { label: '线路 一', href: 'https://api.fufuapi.top', ping: 'https://api.fufuapi.top' },
-      { label: '线路 二', href: 'https://api.fufuapi.online', ping: 'https://api.fufuapi.online' },
-      { label: '线路 三', href: 'https://api.fufuflower.top', ping: 'https://api.fufuflower.top' }
-    ]
-  },
-  {
-    stamp: '额度',
-    title: 'Token 站',
-    accent: 'moss',
-    links: [
-      { label: '线路 一', href: 'https://token.fufuapi.top', ping: 'https://token.fufuapi.top' },
-      { label: '线路 二', href: 'https://token.fufuapi.online', ping: 'https://token.fufuapi.online' },
-      { label: '线路 三', href: 'https://token.fufuflower.top', ping: 'https://token.fufuflower.top' }
-    ]
-  },
+// fallback line urls if /api/nav/lines is empty or unreachable
+const STATIC_API_LINES: ToolLink[] = [
+  { label: '线路 一', href: 'https://api.fufuapi.top', ping: 'https://api.fufuapi.top' },
+  { label: '线路 二', href: 'https://api.fufuapi.online', ping: 'https://api.fufuapi.online' },
+  { label: '线路 三', href: 'https://api.fufuflower.top', ping: 'https://api.fufuflower.top' }
+];
+
+const STATIC_TOKEN_LINES: ToolLink[] = [
+  { label: '线路 一', href: 'https://token.fufuapi.top', ping: 'https://token.fufuapi.top' },
+  { label: '线路 二', href: 'https://token.fufuapi.online', ping: 'https://token.fufuapi.online' },
+  { label: '线路 三', href: 'https://token.fufuflower.top', ping: 'https://token.fufuflower.top' }
+];
+
+const staticCards: ToolCard[] = [
   {
     stamp: '终端',
     title: 'Web Terminal',
@@ -53,6 +46,28 @@ const toolCards: ToolCard[] = [
   { stamp: '合卡', title: '合卡工具', description: '自助合并额度卡，复用统一 NewAPI 配置', accent: 'clay', href: '/combine' },
   { stamp: '活动', title: '活动前台', description: '抽奖、刮刮卡与福利入口', accent: 'stone', href: '/activity' }
 ];
+
+type NavLine = { name: string; url: string };
+type NavCategory = { kind: string; name: string; lines: NavLine[] };
+
+function useNavLines() {
+  const [cats, setCats] = useState<NavCategory[] | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/nav/lines', { signal: controller.signal })
+      .then((response) => response.json())
+      .then((data) => setCats(Array.isArray(data.categories) ? data.categories : []))
+      .catch(() => setCats(null));
+    return () => controller.abort();
+  }, []);
+  return cats;
+}
+
+function linesFor(cats: NavCategory[] | null, kind: string, fallback: ToolLink[]): ToolLink[] {
+  const lines = cats?.find((cat) => cat.kind === kind)?.lines ?? [];
+  if (!lines.length) return fallback;
+  return lines.map((line, index) => ({ label: line.name || `线路 ${index + 1}`, href: line.url, ping: line.url }));
+}
 
 function latencyClass(ms: number) {
   if (ms < 200) return 'good';
@@ -123,6 +138,12 @@ function NavigationCard({ card, index }: { card: ToolCard; index: number }) {
 }
 
 export function HomePage() {
+  const navCats = useNavLines();
+  const toolCards: ToolCard[] = [
+    { stamp: '次数', title: 'API 次数站', accent: 'clay', links: linesFor(navCats, 'api', STATIC_API_LINES) },
+    { stamp: '额度', title: 'Token 站', accent: 'moss', links: linesFor(navCats, 'token', STATIC_TOKEN_LINES) },
+    ...staticCards
+  ];
   return (
     <>
       <TopActions>
