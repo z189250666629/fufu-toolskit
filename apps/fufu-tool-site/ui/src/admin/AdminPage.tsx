@@ -539,20 +539,30 @@ export function AdminPage() {
         <NavPill href="/">首页</NavPill>
       </TopActions>
       <main className="blueprint-page admin-page">
-        <BlueprintHeader title="fufu 管 理 后 台" subtitle="站 点 · 补 货 · 活 动" label="ADMIN CONSOLE" compact />
-        <div className="admin-doc-meta" aria-hidden="true">
-          <span><b>ROUTE</b><span className="blueprint-route-badge">/admin</span></span>
-          <span><b>SOURCE</b>SQLite · tool-config.db</span>
-          <span><b>ACTOR</b>admin</span>
-        </div>
-        {checking ? <MessageLine>正在检查登录态…</MessageLine> : null}
-        {!authenticated && !checking ? <LoginPanel onLogin={login} busy={busy} /> : null}
-        <MessageLine tone={message.tone}>{message.text}</MessageLine>
-
         {authenticated ? (
           <section className="admin-dashboard fade-in">
             <Tabs className="admin-tabs" defaultSelectedKey="site-replenish">
-              <div className="admin-toolbar-row">
+              <header className="blueprint-header blueprint-header--compact admin-header" data-label="ADMIN CONSOLE">
+                <div className="admin-header-top">
+                  <div className="admin-header-titles">
+                    <h1 className="blueprint-title">fufu 管 理 后 台</h1>
+                    <p className="blueprint-subtitle">站 点 · 补 货 · 活 动</p>
+                  </div>
+                  <div className="admin-utility-bar">
+                    <span className="admin-utility-note">配置操作</span>
+                    <div className="admin-action-group">
+                      <Button className="blueprint-button" onPress={loadAll} isDisabled={busy}>重新加载配置</Button>
+                      <Button className="blueprint-primary-button" onPress={saveConfig} isDisabled={busy}>保存全部配置</Button>
+                      <Button className="blueprint-button" onPress={loadBusinessData} isDisabled={busy}>刷新业务数据</Button>
+                      <Button className="blueprint-danger-button" onPress={logout}>退出登录</Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="admin-doc-meta" aria-hidden="true">
+                  <span><b>ROUTE</b><span className="blueprint-route-badge">/admin</span></span>
+                  <span><b>SOURCE</b>SQLite · tool-config.db</span>
+                  <span><b>ACTOR</b>admin</span>
+                </div>
                 <Tabs.List className="admin-tab-list">
                   <Tabs.Tab id="site-replenish" className="admin-tab-card">
                     <span className="admin-tab-title">状态页 / 合卡 / 自动补货</span>
@@ -561,17 +571,8 @@ export function AdminPage() {
                     <span className="admin-tab-title">活动统计 / 奖池 / 期望值</span>
                   </Tabs.Tab>
                 </Tabs.List>
-
-                <div className="admin-utility-bar">
-                  <span className="admin-utility-note">配置操作</span>
-                  <div className="admin-action-group">
-                    <Button className="blueprint-button" onPress={loadAll} isDisabled={busy}>重新加载配置</Button>
-                    <Button className="blueprint-primary-button" onPress={saveConfig} isDisabled={busy}>保存全部配置</Button>
-                    <Button className="blueprint-button" onPress={loadBusinessData} isDisabled={busy}>刷新业务数据</Button>
-                    <Button className="blueprint-danger-button" onPress={logout}>退出登录</Button>
-                  </div>
-                </div>
-              </div>
+              </header>
+              <MessageLine tone={message.tone}>{message.text}</MessageLine>
 
               <Tabs.Panel id="site-replenish" className="admin-tab-panel">
                 <ConfigCard
@@ -612,7 +613,13 @@ export function AdminPage() {
               </Tabs.Panel>
             </Tabs>
           </section>
-        ) : null}
+        ) : (
+          <>
+            <BlueprintHeader title="fufu 管 理 后 台" subtitle="站 点 · 补 货 · 活 动" label="ADMIN CONSOLE" compact />
+            {checking ? <MessageLine>正在检查登录态…</MessageLine> : <LoginPanel onLogin={login} busy={busy} />}
+            <MessageLine tone={message.tone}>{message.text}</MessageLine>
+          </>
+        )}
       </main>
     </>
   );

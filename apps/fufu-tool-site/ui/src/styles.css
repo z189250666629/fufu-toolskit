@@ -520,6 +520,34 @@ select {
   gap: 14px;
 }
 
+/* logged-in page header banner: title + actions + meta + tabs in one block */
+.admin-header {
+  width: auto !important;
+}
+
+.admin-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px 24px;
+  flex-wrap: wrap;
+}
+
+.admin-header-titles {
+  min-width: 0;
+}
+
+.admin-header .admin-doc-meta {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px dashed var(--blueprint-grid-line-strong);
+}
+
+.admin-header .admin-tab-list {
+  margin-top: 14px;
+  border-bottom: 1.5px solid var(--blueprint-line) !important;
+}
+
 .admin-toolbar-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, auto);
