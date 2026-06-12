@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	activityapp "fufu-act"
+	"fufu/newapi"
 )
 
 func TestAdminConfigAPIRequiresAdminToken(t *testing.T) {
@@ -603,6 +604,133 @@ func TestAdminConfigMigratesLegacyFileAndBecomesSourceOfTruth(t *testing.T) {
 	snap = unifiedConfig.Snapshot()
 	if len(snap.NewAPI.Sites) != 1 || snap.NewAPI.Sites[0].Name != "迁移站点" || snap.NewAPI.Sites[0].URL != "https://migrated.example.test" {
 		t.Fatalf("database should stay source of truth over env, got %#v", snap.NewAPI.Sites)
+	}
+}
+
+func validBaseSiteConfig() ManagedAPISiteConfig {
+	return ManagedAPISiteConfig{
+		Name:          "次数fufu",
+		Category:      "api",
+		URLs:          []ManagedSiteURL{{Name: "线路 1", URL: "https://api.example.test"}},
+		Token:         "tok",
+		UserID:        "1",
+		Kind:          "api",
+		QuotaUnit:     500000,
+		Currency:      "$",
+		RechargeRatio: 1,
+	}
+}
+
+func TestNormalizeManagedAPISiteConfigsRejectsInvalidSites(t *testing.T) {
+	cases := []struct {
+		name    string
+		mutate  func(s *ManagedAPISiteConfig)
+		wantMsg string
+	}{
+		{"unsupported category", func(s *ManagedAPISiteConfig) { s.Category = "webhook" }, "只能 api 或 token"},
+		{"unsupported kind", func(s *ManagedAPISiteConfig) { s.Kind = "webhook" }, "kind 不支持"},
+		{"blank name", func(s *ManagedAPISiteConfig) { s.Name = "  " }, "缺少名称"},
+		{"zero urls", func(s *ManagedAPISiteConfig) { s.URLs = nil; s.URL = "" }, "至少需要一个 base_url"},
+		{"blank token new site", func(s *ManagedAPISiteConfig) { s.Token = "" }, "缺少 token"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			site := validBaseSiteConfig()
+			c.mutate(&site)
+			_, err := normalizeManagedAPISiteConfigs([]ManagedAPISiteConfig{site}, nil)
+			if err == nil || !strings.Contains(err.Error(), c.wantMsg) {
+				t.Fatalf("err=%v, want substring %q", err, c.wantMsg)
+			}
+		})
+	}
+}
+
+func TestNormalizeManagedAPISiteConfigsRejectsDuplicateNameDifferentToken(t *testing.T) {
+	a := validBaseSiteConfig()
+	a.Token = "tok-a"
+	b := validBaseSiteConfig() // same (category, name) but a different token + url
+	b.Token = "tok-b"
+	b.URLs = []ManagedSiteURL{{Name: "线路 2", URL: "https://api-2.example.test"}}
+
+	_, err := normalizeManagedAPISiteConfigs([]ManagedAPISiteConfig{a, b}, nil)
+	if err == nil || !strings.Contains(err.Error(), "重复") {
+		t.Fatalf("same name + different token should be a duplicate, err=%v", err)
+	}
+}
+
+func TestNormalizeManagedAPISiteConfigsMergesSameToken(t *testing.T) {
+	a := validBaseSiteConfig()
+	a.Name = "次数fufu"
+	a.URLs = []ManagedSiteURL{{Name: "线路 1", URL: "https://api-1.example.test"}}
+	b := validBaseSiteConfig()
+	b.Name = "线路 2"
+	b.URLs = []ManagedSiteURL{{Name: "线路 2", URL: "https://api-2.example.test"}}
+
+	out, err := normalizeManagedAPISiteConfigs([]ManagedAPISiteConfig{a, b}, nil)
+	if err != nil {
+		t.Fatalf("merge error: %v", err)
+	}
+	if len(out) != 1 || len(out[0].URLs) != 2 || out[0].URL != "https://api-1.example.test" {
+		t.Fatalf("same-token sites should merge into one with both urls: %#v", out)
+	}
+}
+
+func TestManagedSiteConfigsFromSitesGroupsByCategoryAndToken(t *testing.T) {
+	got := managedSiteConfigsFromSites([]newapi.Site{
+		{Name: "主站", Category: "api", Token: "tok1", URL: "https://a.example.test", LineName: "线路 一"},
+		{Name: "备站", Category: "api", Token: "tok1", URL: "https://b.example.test", LineName: "线路 二"},
+		{Name: "token-fufu", Category: "token", Token: "tok2", URL: "https://t.example.test"},
+	})
+	if len(got) != 2 {
+		t.Fatalf("expected 2 grouped sites (api+token), got %#v", got)
+	}
+	api := got[0]
+	if api.Category != "api" || api.Token != "tok1" || len(api.URLs) != 2 {
+		t.Fatalf("api group wrong: %#v", api)
+	}
+	if api.URLs[0].URL != "https://a.example.test" || api.URLs[1].Name != "线路 二" {
+		t.Fatalf("api urls wrong: %#v", api.URLs)
+	}
+}
+
+func TestAdminSiteResponsesNeverExposesRawToken(t *testing.T) {
+	secret := "super-secret-token-value-1234"
+	resp := adminSiteResponses([]ManagedAPISiteConfig{{
+		Name: "s", Category: "api", Token: secret,
+		URLs: []ManagedSiteURL{{Name: "线路 1", URL: "https://a.example.test"}},
+	}})
+	raw, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), secret) {
+		t.Fatalf("response must never contain the raw token: %s", raw)
+	}
+	if resp[0]["tokenSet"] != true || resp[0]["tokenMasked"] == "" {
+		t.Fatalf("response should expose tokenSet + tokenMasked, got %#v", resp[0])
+	}
+	if _, hasToken := resp[0]["token"]; hasToken {
+		t.Fatalf("response must not carry a raw token field")
+	}
+}
+
+func TestMergeManagedSiteURLsDedupesPreservingOrder(t *testing.T) {
+	got := mergeManagedSiteURLs(
+		[]ManagedSiteURL{{URL: "https://a"}, {URL: "https://b"}},
+		[]ManagedSiteURL{{URL: "https://b"}, {URL: "https://c"}},
+	)
+	if len(got) != 3 || got[0].URL != "https://a" || got[1].URL != "https://b" || got[2].URL != "https://c" {
+		t.Fatalf("merge should dedupe b and keep order a,b,c: %#v", got)
+	}
+}
+
+func TestNormalizeManagedSiteURLsFoldsLegacyAndDedupes(t *testing.T) {
+	got := normalizeManagedSiteURLs(
+		[]ManagedSiteURL{{Name: "线路 一", URL: "https://a"}, {URL: "https://b"}},
+		"https://b", // legacy singular url duplicates an entry
+	)
+	if len(got) != 2 || got[0].Name != "线路 一" || got[1].Name != "线路 2" {
+		t.Fatalf("legacy url should fold + dedupe, blanks get default names: %#v", got)
 	}
 }
 

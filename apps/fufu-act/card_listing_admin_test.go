@@ -94,6 +94,53 @@ func TestHandleAdminSaleCardsConfigPersistsValidatedSchedule(t *testing.T) {
 	}
 }
 
+func TestNormalizeSaleCardScheduleValidatesTimezone(t *testing.T) {
+	setupSaleCardConfigTestRoot(t)
+	base := SaleCardScheduleConfig{Enabled: true}
+
+	base.Timezone = "Asia/Shanghai"
+	got, err := normalizeSaleCardSchedule(base)
+	if err != nil || got.Timezone != "Asia/Shanghai" || len(got.Slots) != 2 {
+		t.Fatalf("valid tz should pass: schedule=%#v err=%v", got, err)
+	}
+
+	base.Timezone = "Asia/Shangha" // typo
+	if _, err := normalizeSaleCardSchedule(base); err == nil || !strings.Contains(err.Error(), "时区") {
+		t.Fatalf("typo tz should be rejected, err=%v", err)
+	}
+
+	base.Timezone = strings.Repeat("z", 65)
+	if _, err := normalizeSaleCardSchedule(base); err == nil || !strings.Contains(err.Error(), "时区格式错误") {
+		t.Fatalf("oversize tz should be rejected, err=%v", err)
+	}
+}
+
+func TestNormalizeSlotJobsValidatesTargetRange(t *testing.T) {
+	cases := []struct {
+		name    string
+		target  int
+		wantErr bool
+	}{
+		{"zero ok", 0, false},
+		{"max ok", 2000, false},
+		{"over max", 2001, true},
+		{"negative", -1, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := normalizeSlotJobs("special55", []SaleCardScheduleJob{
+				{Plan: "fufu-mix-special-55", TargetStock: c.target, Enabled: true},
+			})
+			if c.wantErr && err == nil {
+				t.Fatalf("target=%d should be rejected", c.target)
+			}
+			if !c.wantErr && err != nil {
+				t.Fatalf("target=%d should be accepted, err=%v", c.target, err)
+			}
+		})
+	}
+}
+
 func TestNormalizeSaleCardScheduleRejectsPlanInWrongSlot(t *testing.T) {
 	setupSaleCardConfigTestRoot(t)
 	// A month plan placed under the 55卡 slot must be rejected.

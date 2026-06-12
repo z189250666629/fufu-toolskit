@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 var saleCardScheduleTimeRE = regexp.MustCompile(`^\d{2}:\d{2}$`)
@@ -283,6 +284,11 @@ func normalizeSaleCardSchedule(schedule SaleCardScheduleConfig) (SaleCardSchedul
 	schedule.Timezone = strings.TrimSpace(schedule.Timezone)
 	if len([]rune(schedule.Timezone)) > 64 {
 		return SaleCardScheduleConfig{}, errors.New("时区格式错误")
+	}
+	// Reject a timezone the scheduler can't load, so a typo (e.g. "Asia/Shangha")
+	// fails at save time instead of silently firing in UTC at runtime.
+	if _, err := time.LoadLocation(schedule.Timezone); err != nil {
+		return SaleCardScheduleConfig{}, errors.New("时区不存在或格式错误")
 	}
 
 	// Index the submitted slots by group so we can rebuild the canonical two-slot

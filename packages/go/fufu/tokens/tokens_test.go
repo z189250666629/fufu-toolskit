@@ -416,6 +416,83 @@ func TestCountTokensByNameReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
 	}
 }
 
+func TestPayloadTotalReadsNestedTopLevelAndTypes(t *testing.T) {
+	if got, ok := payloadTotal(nil); ok || got != 0 {
+		t.Fatalf("nil data should yield (0,false), got (%d,%v)", got, ok)
+	}
+	// Nested data.total is the documented NewAPI shape.
+	for _, v := range []any{json.Number("42"), float64(42), "42", 42} {
+		got, ok := payloadTotal(map[string]any{"data": map[string]any{"total": v}})
+		if !ok || got != 42 {
+			t.Fatalf("nested total %T=%v -> (%d,%v), want (42,true)", v, v, got, ok)
+		}
+	}
+	// Explicit zero total must be honored, not treated as absent.
+	if got, ok := payloadTotal(map[string]any{"data": map[string]any{"total": json.Number("0")}}); !ok || got != 0 {
+		t.Fatalf("zero total -> (%d,%v), want (0,true)", got, ok)
+	}
+	// Top-level total wins when present (documents the precedence).
+	if got, _ := payloadTotal(map[string]any{"total": json.Number("100"), "data": map[string]any{"total": json.Number("50")}}); got != 100 {
+		t.Fatalf("top-level total should win, got %d", got)
+	}
+}
+
+func TestCountTokensByNameSkipsBlankNameWithoutRequest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("blank name should not issue a request: %s", r.URL.String())
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	got, err := svc.CountTokensByName(context.Background(), "   ")
+	if got != 0 || err != nil {
+		t.Fatalf("blank name -> (%d,%v), want (0,nil)", got, err)
+	}
+}
+
+func TestCountTokensByNameReturnsRequestError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	url := server.URL
+	server.Close() // force a connection error on the next request
+	svc := NewService(newapi.NewClient(newapi.Site{URL: url, Token: "x", UserID: "1"}))
+
+	got, err := svc.CountTokensByName(context.Background(), "card")
+	if err == nil || got != 0 {
+		t.Fatalf("request error should propagate, got (%d,%v)", got, err)
+	}
+}
+
+func TestCountTokensByNameHonorsZeroTotalOverItemCount(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// total:0 with a stray item present — must return 0, not fall back to len(items).
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{
+			"items": []any{map[string]any{"id": 1, "name": "card"}},
+			"total": json.Number("0"),
+		}})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	got, err := svc.CountTokensByName(context.Background(), "card")
+	if got != 0 || err != nil {
+		t.Fatalf("explicit total:0 -> (%d,%v), want (0,nil)", got, err)
+	}
+}
+
+func TestCountTokensByNameFallbackToleratesMalformedData(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// No total and a non-list data -> fallback len(DataList) = 0, no panic.
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": "not-a-list"})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	got, err := svc.CountTokensByName(context.Background(), "card")
+	if got != 0 || err != nil {
+		t.Fatalf("malformed data -> (%d,%v), want (0,nil)", got, err)
+	}
+}
+
 func TestSearchTokenByNameReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "name rejected"})

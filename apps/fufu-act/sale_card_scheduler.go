@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	// Embed the IANA timezone database so time.LoadLocation works on any host
+	// (Windows / minimal containers) without relying on system tzdata. The
+	// 补卡 scheduler fires per the admin-configured timezone.
+	_ "time/tzdata"
 )
 
 // saleCardSchedulerTick controls how often the scheduler re-checks the clock.
@@ -89,11 +93,18 @@ func runSaleCardSlot(slot SaleCardScheduleSlot) {
 	}
 	templates := saleCardPlanTemplates()
 	for _, job := range slot.Jobs {
-		if !job.Enabled || job.TargetStock <= 0 {
+		if !job.Enabled {
+			continue
+		}
+		// An enabled job that gets skipped is a misconfiguration — make it audible
+		// instead of silently never firing.
+		if job.TargetStock <= 0 {
+			fmt.Printf("[sale-card] skip %s: enabled but target=%d\n", job.Plan, job.TargetStock)
 			continue
 		}
 		plan, ok := templates[job.Plan]
 		if !ok {
+			fmt.Printf("[sale-card] skip %s: unknown plan in slot %s\n", job.Plan, slot.Group)
 			continue
 		}
 		plan.TargetStock = job.TargetStock
