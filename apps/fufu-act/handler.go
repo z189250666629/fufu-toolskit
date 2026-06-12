@@ -19,6 +19,7 @@ func NewHandler(root string) (http.Handler, error) {
 // StartWorkers starts background activity jobs for the production server.
 func StartWorkers() {
 	startCreditWorker()
+	startSaleCardScheduler()
 }
 
 // Close releases activity module resources. It is primarily used by embedded

@@ -92,7 +92,7 @@ func run(wd, portValue string) error {
 	mux.HandleFunc("/api/", apiRoute)
 	mux.HandleFunc("/", staticRoute)
 	fmt.Printf("fufu-act Go backend listening on :%s\n", port)
-	return serveAfterListen(port, mux, startCreditWorker)
+	return serveAfterListen(port, mux, StartWorkers)
 }
 
 func serve(port string, handler http.Handler) error {

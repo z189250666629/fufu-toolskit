@@ -17,6 +17,7 @@ var saleCardScheduleTimeRE = regexp.MustCompile(`^\d{2}:\d{2}$`)
 type saleCardRunRequest struct {
 	Plan          string  `json:"plan"`
 	Count         int     `json:"count"`
+	TargetStock   int     `json:"targetStock"`
 	Name          string  `json:"name"`
 	Quota         float64 `json:"quota"`
 	Group         string  `json:"group"`
@@ -37,17 +38,36 @@ type saleCardAdminConfigRequest struct {
 	Schedule SaleCardScheduleConfig `json:"schedule"`
 }
 
+// SaleCardScheduleConfig drives 自动补卡. 月次卡与 55 次混合特惠卡各占一个独立
+// 时段（slot），每个时段有自己的触发时间和补卡目标库存。
 type SaleCardScheduleConfig struct {
-	Enabled  bool                  `json:"enabled"`
-	Time     string                `json:"time"`
-	Timezone string                `json:"timezone"`
-	Jobs     []SaleCardScheduleJob `json:"jobs"`
+	Enabled  bool                   `json:"enabled"`
+	Timezone string                 `json:"timezone"`
+	Slots    []SaleCardScheduleSlot `json:"slots"`
+}
+
+type SaleCardScheduleSlot struct {
+	Group   string                `json:"group"` // saleCardSlotSpecial55 | saleCardSlotMonth
+	Label   string                `json:"label"`
+	Time    string                `json:"time"` // HH:MM
+	Enabled bool                  `json:"enabled"`
+	Jobs    []SaleCardScheduleJob `json:"jobs"`
 }
 
 type SaleCardScheduleJob struct {
-	Plan    string `json:"plan"`
-	Count   int    `json:"count"`
-	Enabled bool   `json:"enabled"`
+	Plan        string `json:"plan"`
+	TargetStock int    `json:"targetStock"`
+	Enabled     bool   `json:"enabled"`
+}
+
+// saleCardSlotDefs lists the canonical 补卡时段 in display order.
+var saleCardSlotDefs = []struct {
+	Group string
+	Label string
+	Time  string
+}{
+	{Group: saleCardSlotSpecial55, Label: "55 次混合特惠卡", Time: "09:00"},
+	{Group: saleCardSlotMonth, Label: "月次卡", Time: "09:30"},
 }
 
 func handleAdminSaleCardsRun(w http.ResponseWriter, r *http.Request) {
@@ -136,6 +156,9 @@ func saleCardPlanFromRunRequest(req saleCardRunRequest) (SaleCardPlan, error) {
 	if req.Count > 0 {
 		plan.Count = req.Count
 	}
+	if req.TargetStock > 0 {
+		plan.TargetStock = req.TargetStock
+	}
 	if req.Quota > 0 {
 		plan.Quota = req.Quota
 	}
@@ -187,12 +210,33 @@ func saleCardPlanList() []SaleCardPlan {
 }
 
 func defaultSaleCardSchedule() SaleCardScheduleConfig {
+	slots := make([]SaleCardScheduleSlot, 0, len(saleCardSlotDefs))
+	for _, def := range saleCardSlotDefs {
+		slots = append(slots, SaleCardScheduleSlot{
+			Group:   def.Group,
+			Label:   def.Label,
+			Time:    def.Time,
+			Enabled: false,
+			Jobs:    defaultSlotJobs(def.Group),
+		})
+	}
 	return SaleCardScheduleConfig{
 		Enabled:  false,
-		Time:     "09:00",
 		Timezone: "Asia/Shanghai",
-		Jobs:     []SaleCardScheduleJob{},
+		Slots:    slots,
 	}
+}
+
+// defaultSlotJobs lists every plan that belongs to a slot, disabled with no
+// target — a ready-to-fill row per card type.
+func defaultSlotJobs(group string) []SaleCardScheduleJob {
+	jobs := []SaleCardScheduleJob{}
+	for _, plan := range saleCardPlanList() {
+		if saleCardPlanSlot(plan.ID) == group {
+			jobs = append(jobs, SaleCardScheduleJob{Plan: plan.ID, TargetStock: 0, Enabled: false})
+		}
+	}
+	return jobs
 }
 
 func loadSaleCardSchedule() (SaleCardScheduleConfig, error) {
@@ -233,39 +277,70 @@ func saleCardSchedulePath() string {
 
 func normalizeSaleCardSchedule(schedule SaleCardScheduleConfig) (SaleCardScheduleConfig, error) {
 	defaultSchedule := defaultSaleCardSchedule()
-	if strings.TrimSpace(schedule.Time) == "" {
-		schedule.Time = defaultSchedule.Time
-	}
 	if strings.TrimSpace(schedule.Timezone) == "" {
 		schedule.Timezone = defaultSchedule.Timezone
 	}
-	schedule.Time = strings.TrimSpace(schedule.Time)
 	schedule.Timezone = strings.TrimSpace(schedule.Timezone)
-	if !validSaleCardScheduleTime(schedule.Time) {
-		return SaleCardScheduleConfig{}, errors.New("上架时间格式错误")
-	}
 	if len([]rune(schedule.Timezone)) > 64 {
 		return SaleCardScheduleConfig{}, errors.New("时区格式错误")
 	}
+
+	// Index the submitted slots by group so we can rebuild the canonical two-slot
+	// layout regardless of order or missing entries.
+	submitted := map[string]SaleCardScheduleSlot{}
+	for _, slot := range schedule.Slots {
+		submitted[strings.TrimSpace(slot.Group)] = slot
+	}
+
+	slots := make([]SaleCardScheduleSlot, 0, len(saleCardSlotDefs))
+	for _, def := range saleCardSlotDefs {
+		slot := SaleCardScheduleSlot{Group: def.Group, Label: def.Label, Time: def.Time}
+		if provided, ok := submitted[def.Group]; ok {
+			slot.Enabled = provided.Enabled
+			if t := strings.TrimSpace(provided.Time); t != "" {
+				slot.Time = t
+			}
+			jobs, err := normalizeSlotJobs(def.Group, provided.Jobs)
+			if err != nil {
+				return SaleCardScheduleConfig{}, err
+			}
+			slot.Jobs = jobs
+		} else {
+			slot.Jobs = defaultSlotJobs(def.Group)
+		}
+		if !validSaleCardScheduleTime(slot.Time) {
+			return SaleCardScheduleConfig{}, errors.New("补卡时间格式错误")
+		}
+		slots = append(slots, slot)
+	}
+	schedule.Slots = slots
+	return schedule, nil
+}
+
+// normalizeSlotJobs validates a slot's per-plan jobs: each plan must belong to
+// the slot's group, with no duplicates and a target stock within [0, 2000].
+func normalizeSlotJobs(group string, raw []SaleCardScheduleJob) ([]SaleCardScheduleJob, error) {
 	templates := saleCardPlanTemplates()
 	seen := map[string]bool{}
-	jobs := make([]SaleCardScheduleJob, 0, len(schedule.Jobs))
-	for _, job := range schedule.Jobs {
+	jobs := make([]SaleCardScheduleJob, 0, len(raw))
+	for _, job := range raw {
 		job.Plan = strings.TrimSpace(job.Plan)
 		if _, ok := templates[job.Plan]; !ok {
-			return SaleCardScheduleConfig{}, errors.New("未知上架计划")
+			return nil, errors.New("未知上架计划")
+		}
+		if saleCardPlanSlot(job.Plan) != group {
+			return nil, errors.New("上架计划与时段不匹配")
 		}
 		if seen[job.Plan] {
-			return SaleCardScheduleConfig{}, errors.New("上架计划重复")
+			return nil, errors.New("上架计划重复")
 		}
 		seen[job.Plan] = true
-		if job.Count < 1 || job.Count > 100 {
-			return SaleCardScheduleConfig{}, errors.New("上架数量必须在 1 到 100 之间")
+		if job.TargetStock < 0 || job.TargetStock > 2000 {
+			return nil, errors.New("补卡目标库存必须在 0 到 2000 之间")
 		}
 		jobs = append(jobs, job)
 	}
-	schedule.Jobs = jobs
-	return schedule, nil
+	return jobs, nil
 }
 
 func validSaleCardScheduleTime(value string) bool {

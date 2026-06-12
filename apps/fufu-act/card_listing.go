@@ -26,12 +26,31 @@ type SaleCardPlan struct {
 	TargetStock   int     `json:"targetStock,omitempty"`
 	Quota         float64 `json:"quota"`
 	Group         string  `json:"group,omitempty"`
+	Slot          string  `json:"slot,omitempty"`
 	IntervalUnit  int     `json:"intervalUnit"`
 	ItemID        int     `json:"itemId"`
 	SKUID         int     `json:"skuId"`
 	Remark        string  `json:"remark,omitempty"`
 	Unique        bool    `json:"unique"`
 	TokenNameSlug string  `json:"tokenNameSlug,omitempty"`
+}
+
+// Sale-card 补卡时段分组：55 次混合特惠卡与月次卡各占一个独立时段。
+const (
+	saleCardSlotSpecial55 = "special55"
+	saleCardSlotMonth     = "month"
+)
+
+// saleCardPlanSlot maps a plan id to its 补卡时段分组。
+func saleCardPlanSlot(planID string) string {
+	switch {
+	case planID == "fufu-mix-special-55":
+		return saleCardSlotSpecial55
+	case strings.HasPrefix(planID, "fufu-mix-month-"):
+		return saleCardSlotMonth
+	default:
+		return ""
+	}
 }
 
 type SaleCardListingResult struct {
@@ -54,6 +73,7 @@ func saleCardPlanTemplates() map[string]SaleCardPlan {
 			Name:          "FuFu 55次混合特惠卡",
 			Quota:         55,
 			Group:         "mix",
+			Slot:          saleCardSlotSpecial55,
 			IntervalUnit:  9,
 			ItemID:        29,
 			SKUID:         66,
@@ -75,6 +95,7 @@ func fufuMixMonthPlan(id, name string, skuID int, quota float64) SaleCardPlan {
 		Name:          name,
 		Quota:         quota,
 		Group:         "mix",
+		Slot:          saleCardSlotMonth,
 		IntervalUnit:  9,
 		ItemID:        28,
 		SKUID:         skuID,
