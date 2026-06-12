@@ -15,6 +15,22 @@ func DataList(data map[string]any) []map[string]any {
 	return newapi.PayloadItems(data, "data", "items", "tokens")
 }
 
+// payloadTotal reads the paginated total count from a NewAPI list/search
+// payload. NewAPI wraps list responses as {data:{items,total,page,page_size}}
+// (common.GetPageQuery / SetTotal), so the precise match count lives at
+// data.total. Older flat {data:[...]} responses have no total; ok is false then.
+func payloadTotal(data map[string]any) (int, bool) {
+	if v, ok := data["total"]; ok {
+		return toInt(v), true
+	}
+	if nested, ok := data["data"].(map[string]any); ok {
+		if v, ok := nested["total"]; ok {
+			return toInt(v), true
+		}
+	}
+	return 0, false
+}
+
 func getString(obj map[string]any, key string) string {
 	if obj == nil {
 		return ""

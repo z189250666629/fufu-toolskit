@@ -35,10 +35,10 @@ type SaleCardPlan struct {
 }
 
 type SaleCardListingResult struct {
-	PlanID    string   `json:"planId,omitempty"`
-	PlanName  string   `json:"planName,omitempty"`
-	ItemID    int      `json:"itemId"`
-	SKUID     int      `json:"skuId"`
+	PlanID       string   `json:"planId,omitempty"`
+	PlanName     string   `json:"planName,omitempty"`
+	ItemID       int      `json:"itemId"`
+	SKUID        int      `json:"skuId"`
 	Generated    int      `json:"generated"`
 	Uploaded     int      `json:"uploaded"`
 	CurrentStock int      `json:"currentStock"`
@@ -100,19 +100,18 @@ func generateAndUploadSaleCards(ctx context.Context, svc *tokens.Service, plan S
 		return result, fmt.Errorf("%w: token service is not configured", ErrSaleCardGenerationFailed)
 	}
 
-	// 补卡：若设了目标库存，先查 MCY 当前可用卡数，补齐到目标（补 target-current）。
+	// 补卡：设了目标库存时，先按卡密命名精准查询 NewAPI 当前库存，补齐到目标
+	// （补 target-current）。NewAPI /api/token/search 以名称 LIKE 命中并直接返回
+	// total，无需分页。
 	uploadCount := plan.Count
 	if plan.TargetStock > 0 {
-		current, err := queryMCYUsableStock(ctx, plan.ItemID, plan.SKUID)
+		current, err := svc.CountTokensByName(ctx, saleCardStockKeyword(plan))
 		if err != nil {
-			return result, err
+			return result, fmt.Errorf("%w: %v", ErrSaleCardGenerationFailed, err)
 		}
 		result.CurrentStock = current
 		result.TargetStock = plan.TargetStock
-		uploadCount = plan.TargetStock - current
-		if uploadCount < 0 {
-			uploadCount = 0
-		}
+		uploadCount = max(0, plan.TargetStock-current)
 	}
 	result.ToUpload = uploadCount
 	if uploadCount <= 0 {
@@ -164,7 +163,11 @@ func normalizeSaleCardPlan(plan SaleCardPlan) SaleCardPlan {
 
 func validateSaleCardPlan(plan SaleCardPlan) error {
 	switch {
-	case plan.Count < 1 || plan.Count > 100:
+	case plan.TargetStock < 0:
+		return fmt.Errorf("%w: target stock cannot be negative", ErrSaleCardInvalidPlan)
+	case plan.TargetStock > 2000:
+		return fmt.Errorf("%w: target stock must be 2000 or fewer", ErrSaleCardInvalidPlan)
+	case plan.TargetStock == 0 && (plan.Count < 1 || plan.Count > 100):
 		return fmt.Errorf("%w: count must be between 1 and 100", ErrSaleCardInvalidPlan)
 	case plan.Quota <= 0:
 		return fmt.Errorf("%w: quota must be positive", ErrSaleCardInvalidPlan)
@@ -191,11 +194,24 @@ func buildSaleTokenCreateBody(name string, quota int64, group string, intervalUn
 }
 
 func saleCardTokenName(plan SaleCardPlan) string {
+	return saleCardSlugPrefix(plan) + saleCardNow().UTC().Format("20060102-150405")
+}
+
+// saleCardSlugPrefix is the stable "<slug>-" prefix shared by every batch of a
+// plan's card tokens. saleCardTokenName appends a timestamp to it.
+func saleCardSlugPrefix(plan SaleCardPlan) string {
 	slug := sanitizeSaleCardSlug(plan.TokenNameSlug)
 	if slug == "" {
 		slug = "sale-card"
 	}
-	return slug + "-" + saleCardNow().UTC().Format("20060102-150405")
+	return slug + "-"
+}
+
+// saleCardStockKeyword is the NewAPI name keyword that matches every batch of a
+// plan's cards. The trailing dash keeps the LIKE match precise so the keyword
+// for "fufu-mix-month-100" does not also count "fufu-mix-month-1000" tokens.
+func saleCardStockKeyword(plan SaleCardPlan) string {
+	return saleCardSlugPrefix(plan)
 }
 
 func sanitizeSaleCardSlug(value string) string {

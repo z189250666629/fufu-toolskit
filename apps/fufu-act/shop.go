@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"fufu/config"
-	"fufu/rawconv"
 	"fufu/webutil"
 	"io"
 	"net/http"
@@ -62,49 +61,6 @@ func findShopPurchase(ctx context.Context, cardKey string) (ShopPurchaseLookup, 
 		return lookup, nil
 	}
 	return lookup, ErrShopInvalidResponse
-}
-
-// queryMCYUsableStock returns how many cards of (itemID, skuID) are currently
-// available (status:0 — not yet sold) on the MCY shop. Used by 补卡 to compute
-// how many cards to top up.
-func queryMCYUsableStock(ctx context.Context, itemID, skuID int) (int, error) {
-	if config.Env("MCY_BASE_URL") == "" && config.Env("SHOP_BASE_URL") == "" {
-		return 0, fmt.Errorf("%w: MCY 未配置", ErrShopRequestFailed)
-	}
-	if err := ensureMCYCookie(ctx); err != nil {
-		return 0, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
-	}
-	payload := map[string]any{"item_id": itemID, "sku_id": skuID, "status": 0, "page": 1, "limit": 1}
-	staleCookie := getMCYCookie()
-	data, err := mcyPost(ctx, "/plugin/virtual-card-ship/card/get", payload)
-	if err != nil {
-		if !isMCYAuthError(err) {
-			return 0, classifyShopRequestError(err)
-		}
-		if err := refreshMCYCookie(ctx, staleCookie); err != nil {
-			return 0, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
-		}
-		data, err = mcyPost(ctx, "/plugin/virtual-card-ship/card/get", payload)
-		if err != nil {
-			return 0, classifyShopRequestError(err)
-		}
-	}
-	return mcyUsableCount(data), nil
-}
-
-// mcyUsableCount reads the available-card count from a card/get response.
-// The status:0 filter makes data.total the usable count for that SKU; some
-// responses also carry a top-level card_usable_count for the whole SKU.
-func mcyUsableCount(data map[string]any) int {
-	if d, ok := data["data"].(map[string]any); ok {
-		if total, ok := d["total"]; ok {
-			return rawconv.Int(total)
-		}
-	}
-	if v, ok := data["card_usable_count"]; ok {
-		return rawconv.Int(v)
-	}
-	return 0
 }
 
 func classifyShopRequestError(err error) error {

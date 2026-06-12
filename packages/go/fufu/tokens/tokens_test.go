@@ -355,6 +355,67 @@ func TestSearchTokenByKeyMasksKeyInErrors(t *testing.T) {
 	}
 }
 
+func TestCountTokensByNameReadsPaginatedTotal(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/token/search" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+		q := r.URL.Query()
+		if q.Get("keyword") != "fufu-mix-month-100-" {
+			t.Fatalf("keyword=%q, want fufu-mix-month-100-", q.Get("keyword"))
+		}
+		if q.Get("size") != "1" || q.Get("p") != "0" {
+			t.Fatalf("expected single-row page query, got p=%q size=%q", q.Get("p"), q.Get("size"))
+		}
+		// NewAPI wraps list/search payloads as data:{items,total,page,page_size}.
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data": map[string]any{
+				"items":     []any{map[string]any{"id": 1, "name": "fufu-mix-month-100-20260613-000000"}},
+				"total":     json.Number("37"),
+				"page":      1,
+				"page_size": 1,
+			},
+		})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	got, err := svc.CountTokensByName(context.Background(), "fufu-mix-month-100-")
+	if err != nil || got != 37 {
+		t.Fatalf("CountTokensByName = %d err=%v, want 37", got, err)
+	}
+}
+
+func TestCountTokensByNameFallsBackToPageLengthWithoutTotal(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Older flat {data:[...]} payload carries no total field.
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+			map[string]any{"id": 1, "name": "card"},
+		}})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	got, err := svc.CountTokensByName(context.Background(), "card")
+	if err != nil || got != 1 {
+		t.Fatalf("CountTokensByName fallback = %d err=%v, want 1", got, err)
+	}
+}
+
+func TestCountTokensByNameReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "stock query denied"})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	got, err := svc.CountTokensByName(context.Background(), "card")
+	if err == nil || !strings.Contains(err.Error(), "stock query denied") || got != 0 {
+		t.Fatalf("CountTokensByName = %d err=%v, want payload error", got, err)
+	}
+}
+
 func TestSearchTokenByNameReturnsPayloadErrorOnSuccessFalse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "name rejected"})
