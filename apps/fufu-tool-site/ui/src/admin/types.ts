@@ -4,6 +4,7 @@ export type AdminSession = {
 
 export type ManagedSite = {
   name: string;
+  category?: string;
   url: string;
   token?: string;
   tokenMasked?: string;

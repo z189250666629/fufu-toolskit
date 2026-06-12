@@ -813,6 +813,41 @@ select {
   gap: 14px;
 }
 
+/* site config grouped into 次数站 / token 站, each with multiple lines */
+.site-groups {
+  display: grid;
+  gap: 16px;
+}
+
+.site-line {
+  padding: 14px 0;
+  border-bottom: 1px dashed var(--blueprint-grid-line-strong);
+}
+
+.site-line:first-child {
+  padding-top: 2px;
+}
+
+.site-line:last-child {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+
+.site-line-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.site-line-name {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--blueprint-text-secondary);
+}
+
 .site-card {
   background: var(--blueprint-panel) !important;
 }

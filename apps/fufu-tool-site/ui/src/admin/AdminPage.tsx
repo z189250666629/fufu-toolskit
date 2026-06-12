@@ -34,6 +34,7 @@ const emptyConfig: AdminConfig = {
 
 const defaultSite: ManagedSite = {
   name: '',
+  category: 'api',
   url: '',
   token: '',
   userId: '1',
@@ -160,6 +161,11 @@ function LoginPanel({ onLogin, busy }: { onLogin: (token: string) => Promise<voi
   );
 }
 
+const SITE_GROUPS: { category: string; title: string; desc: string }[] = [
+  { category: 'api', title: 'API 次数站', desc: '次数站线路；合卡默认复用第一条。每条填 base_url + access token。' },
+  { category: 'token', title: 'Token 站', desc: 'Token 站线路。每条填 base_url + access token。' }
+];
+
 function SiteEditor({
   sites,
   onChange
@@ -170,38 +176,58 @@ function SiteEditor({
   function updateSite(index: number, patch: Partial<ManagedSite>) {
     onChange(sites.map((site, siteIndex) => siteIndex === index ? { ...site, ...patch } : site));
   }
+  function removeSite(index: number) {
+    onChange(sites.filter((_, siteIndex) => siteIndex !== index));
+  }
+  function addLine(category: string) {
+    const count = sites.filter((site) => (site.category || 'api') === category).length;
+    const label = category === 'token' ? 'Token' : '次数';
+    onChange([...sites, { ...defaultSite, category, name: `${label}线路 ${count + 1}` }]);
+  }
 
   return (
-    <div className="site-list">
-      {sites.map((site, index) => (
-        <section key={`${site.name}-${index}`} className="bp-card site-card">
-          <header className="bp-card-titlebar">
-            <span>{index === 0 ? '主站点（合卡复用）' : '备用站点'} #{index + 1}</span>
-            <Button className="blueprint-danger-button" onPress={() => onChange(sites.filter((_, siteIndex) => siteIndex !== index))}>
-              删除
-            </Button>
-          </header>
-          <div className="bp-card-body">
-            <div className="field-grid">
-              <label className="field">名称<Input className="blueprint-input" value={site.name || ''} onChange={(event) => updateSite(index, { name: event.target.value })} /></label>
-              <label className="field">base_url<Input className="blueprint-input" value={site.url || ''} placeholder="https://api.example.com" onChange={(event) => updateSite(index, { url: event.target.value })} /></label>
-              <label className="field">Token<Input className="blueprint-input" type="password" value={site.token || ''} placeholder={site.tokenMasked || '留空不变'} onChange={(event) => updateSite(index, { token: event.target.value })} /></label>
-              <label className="field">User ID<Input className="blueprint-input" value={site.userId || '1'} onChange={(event) => updateSite(index, { userId: event.target.value })} /></label>
-              <label className="field">Kind<Input className="blueprint-input" value={site.kind || 'api'} onChange={(event) => updateSite(index, { kind: event.target.value })} /></label>
-              <label className="field">Quota Unit<Input className="blueprint-input" type="number" value={String(site.quotaUnit || 500000)} onChange={(event) => updateSite(index, { quotaUnit: Number(event.target.value) })} /></label>
-              <label className="field">Currency<Input className="blueprint-input" value={site.currency || '$'} onChange={(event) => updateSite(index, { currency: event.target.value })} /></label>
-              <label className="field">Recharge Ratio<Input className="blueprint-input" type="number" step="0.0001" value={String(site.rechargeRatio || 1)} onChange={(event) => updateSite(index, { rechargeRatio: Number(event.target.value) })} /></label>
-              <label className="field">Channel Endpoint<Input className="blueprint-input" value={site.channelListEndpoint || ''} onChange={(event) => updateSite(index, { channelListEndpoint: event.target.value })} /></label>
-              <label className="field">Note<Input className="blueprint-input" value={site.note || ''} onChange={(event) => updateSite(index, { note: event.target.value })} /></label>
-              <label className="field field--inline">
-                <input type="checkbox" checked={Boolean(site.skipUserHeader)} onChange={(event) => updateSite(index, { skipUserHeader: event.target.checked })} />
-                Skip User Header
-              </label>
+    <div className="site-groups">
+      {SITE_GROUPS.map((group) => {
+        const lines = sites
+          .map((site, index) => ({ site, index }))
+          .filter(({ site }) => (site.category || 'api') === group.category);
+        return (
+          <section key={group.category} className="bp-card">
+            <header className="bp-card-titlebar">
+              <span>{group.title}</span>
+              <Button className="blueprint-button" onPress={() => addLine(group.category)}>新增线路</Button>
+            </header>
+            <div className="bp-card-body">
+              <p className="bp-card-desc">{group.desc}</p>
+              {lines.length === 0 ? <p className="inline-help">还没有线路，点“新增线路”添加。</p> : null}
+              {lines.map(({ site, index }, lineIdx) => (
+                <div key={index} className="site-line">
+                  <div className="site-line-head">
+                    <span className="site-line-name">线路 #{lineIdx + 1}{group.category === 'api' && lineIdx === 0 ? '（合卡复用）' : ''}</span>
+                    <Button className="blueprint-danger-button" onPress={() => removeSite(index)}>删除</Button>
+                  </div>
+                  <div className="field-grid">
+                    <label className="field">名称<Input className="blueprint-input" value={site.name || ''} onChange={(event) => updateSite(index, { name: event.target.value })} /></label>
+                    <label className="field">base_url<Input className="blueprint-input" value={site.url || ''} placeholder="https://api.example.com" onChange={(event) => updateSite(index, { url: event.target.value })} /></label>
+                    <label className="field">access token<Input className="blueprint-input" type="password" value={site.token || ''} placeholder={site.tokenMasked || '留空不变'} onChange={(event) => updateSite(index, { token: event.target.value })} /></label>
+                    <label className="field">User ID<Input className="blueprint-input" value={site.userId || '1'} onChange={(event) => updateSite(index, { userId: event.target.value })} /></label>
+                    <label className="field">Quota Unit<Input className="blueprint-input" type="number" value={String(site.quotaUnit || 500000)} onChange={(event) => updateSite(index, { quotaUnit: Number(event.target.value) })} /></label>
+                    <label className="field">Currency<Input className="blueprint-input" value={site.currency || '$'} onChange={(event) => updateSite(index, { currency: event.target.value })} /></label>
+                    <label className="field">Recharge Ratio<Input className="blueprint-input" type="number" step="0.0001" value={String(site.rechargeRatio || 1)} onChange={(event) => updateSite(index, { rechargeRatio: Number(event.target.value) })} /></label>
+                    <label className="field">Channel Endpoint<Input className="blueprint-input" value={site.channelListEndpoint || ''} onChange={(event) => updateSite(index, { channelListEndpoint: event.target.value })} /></label>
+                    <label className="field">Note<Input className="blueprint-input" value={site.note || ''} onChange={(event) => updateSite(index, { note: event.target.value })} /></label>
+                    <label className="field field--inline">
+                      <input type="checkbox" checked={Boolean(site.skipUserHeader)} onChange={(event) => updateSite(index, { skipUserHeader: event.target.checked })} />
+                      Skip User Header
+                    </label>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        </section>
-      ))}
-      <p className="inline-help">Token 字段加载时只显示掩码；保存时留空表示沿用原 token，新站点必须填写 token。</p>
+          </section>
+        );
+      })}
+      <p className="inline-help">Token 加载时只显示掩码；保存时留空表示沿用原 token，新线路必须填写。</p>
     </div>
   );
 }
@@ -581,8 +607,7 @@ export function AdminPage() {
                 </ConfigCard>
                 <ConfigCard
                   title="NewAPI 站点配置"
-                  description="第一个站点作为合卡主站复用；状态页会显示脱敏后的站点信息。"
-                  action={<Button className="blueprint-button" onPress={() => setConfig({ ...config, newapi: { sites: [...configSites, { ...defaultSite }] } })}>新增站点</Button>}
+                  description="分 2 类（次数站 / token 站），每类可加多条线路（base_url + access token）；第一条次数站线路作为合卡主站。"
                 >
                   <SiteEditor
                     sites={configSites}
