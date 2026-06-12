@@ -2,24 +2,33 @@
 
 :root,
 .light {
-  /* blueprint-design primitives: drafting canvas, crisp grid lines, compact operations */
-  --blueprint-canvas: #f5f8fc;
-  --blueprint-canvas-raised: #ebf1f7;
-  --blueprint-panel: rgba(255, 255, 255, 0.92);
-  --blueprint-panel-muted: #d8e2ee;
-  --blueprint-text-primary: #182026;
-  --blueprint-text-secondary: #4b5f73;
-  --blueprint-text-muted: #738091;
-  --blueprint-accent: #2f6db3;
-  --blueprint-accent-muted: #5c7080;
-  --blueprint-accent-steel: #8a9ba8;
-  --blueprint-grid-line: rgba(16, 22, 26, 0.14);
-  --blueprint-grid-line-strong: rgba(16, 22, 26, 0.32);
-  --blueprint-danger: #c23030;
-  --blueprint-danger-soft: rgba(194, 48, 48, 0.1);
-  --blueprint-success: #0f9960;
-  --blueprint-success-soft: rgba(15, 153, 96, 0.1);
-  --blueprint-shadow: rgba(16, 22, 26, 0.08);
+  /* blueprint-design primitives: engineering graph-paper, black ink, hard shadows */
+  --blueprint-canvas: #fbfaf6;
+  --blueprint-canvas-raised: #efece4;
+  --blueprint-panel: #ffffff;
+  --blueprint-panel-muted: #ddd9cd;
+  --blueprint-text-primary: #1a1a1a;
+  --blueprint-text-secondary: #4a4a4a;
+  --blueprint-text-muted: #8a8580;
+  --blueprint-accent: #b3441e;
+  --blueprint-accent-muted: #9a6b2f;
+  --blueprint-accent-steel: #2d6a4f;
+  --blueprint-line: #2a2a2a;
+  --blueprint-grid-line: #ece8dd;
+  --blueprint-grid-line-strong: #b8b3a8;
+  --blueprint-danger: #b3441e;
+  --blueprint-danger-soft: rgba(179, 68, 30, 0.1);
+  --blueprint-success: #2d6a4f;
+  --blueprint-success-soft: rgba(45, 106, 79, 0.12);
+  --blueprint-warn: #c98c2a;
+  --blueprint-warn-soft: rgba(201, 140, 42, 0.14);
+  --blueprint-shadow: 4px 4px 0 var(--blueprint-grid-line-strong);
+  --blueprint-shadow-sm: 2px 2px 0 var(--blueprint-grid-line-strong);
+
+  /* typography roles */
+  --font-sans: "Noto Sans SC", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Noto Serif SC", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
 
   /* radius roles: blueprint keeps drafting controls square */
   --blueprint-radius-control: 2px;
@@ -35,36 +44,41 @@
   --surface-tertiary: var(--blueprint-panel-muted);
   --overlay: var(--blueprint-panel);
   --default: var(--blueprint-canvas-raised);
-  --border: var(--blueprint-grid-line);
-  --separator: var(--blueprint-grid-line);
+  --border: var(--blueprint-line);
+  --separator: var(--blueprint-grid-line-strong);
   --muted: var(--blueprint-text-muted);
   --accent: var(--blueprint-accent);
   --accent-foreground: #fff;
-  --focus: var(--blueprint-accent-muted);
-  --field-background: color-mix(in srgb, var(--blueprint-canvas-raised) 76%, transparent);
-  --field-border: var(--blueprint-grid-line);
+  --focus: var(--blueprint-text-primary);
+  --field-background: var(--blueprint-panel);
+  --field-border: var(--blueprint-line);
   --radius: var(--blueprint-radius-control);
   color-scheme: light;
 }
 
 .dark {
-  --blueprint-canvas: #10161a;
-  --blueprint-canvas-raised: #1c2833;
-  --blueprint-panel: rgba(25, 32, 38, 0.94);
-  --blueprint-panel-muted: #30404d;
-  --blueprint-text-primary: #f5f8fa;
-  --blueprint-text-secondary: #bfccd6;
-  --blueprint-text-muted: #8a9ba8;
-  --blueprint-accent: #48aff0;
-  --blueprint-accent-muted: #738091;
-  --blueprint-accent-steel: #a7b6c2;
-  --blueprint-grid-line: rgba(245, 248, 250, 0.13);
-  --blueprint-grid-line-strong: rgba(245, 248, 250, 0.3);
-  --blueprint-danger: #ff7373;
-  --blueprint-danger-soft: rgba(255, 115, 115, 0.12);
-  --blueprint-success: #3dcc91;
-  --blueprint-success-soft: rgba(61, 204, 145, 0.12);
-  --blueprint-shadow: transparent;
+  /* dark drafting paper: warm charcoal stock, parchment ink */
+  --blueprint-canvas: #1c1a16;
+  --blueprint-canvas-raised: #262320;
+  --blueprint-panel: #211e1a;
+  --blueprint-panel-muted: #2f2b25;
+  --blueprint-text-primary: #ece7da;
+  --blueprint-text-secondary: #c4bdac;
+  --blueprint-text-muted: #938b7a;
+  --blueprint-accent: #e0703f;
+  --blueprint-accent-muted: #d6a24a;
+  --blueprint-accent-steel: #5fae84;
+  --blueprint-line: #4a4640;
+  --blueprint-grid-line: #2a2722;
+  --blueprint-grid-line-strong: #3d3933;
+  --blueprint-danger: #e0703f;
+  --blueprint-danger-soft: rgba(224, 112, 63, 0.14);
+  --blueprint-success: #5fae84;
+  --blueprint-success-soft: rgba(95, 174, 132, 0.14);
+  --blueprint-warn: #d6a24a;
+  --blueprint-warn-soft: rgba(214, 162, 74, 0.16);
+  --blueprint-shadow: 4px 4px 0 #000000;
+  --blueprint-shadow-sm: 2px 2px 0 #000000;
 
   --background: var(--blueprint-canvas);
   --foreground: var(--blueprint-text-primary);
@@ -73,14 +87,14 @@
   --surface-tertiary: var(--blueprint-panel-muted);
   --overlay: var(--blueprint-panel);
   --default: var(--blueprint-canvas-raised);
-  --border: var(--blueprint-grid-line);
-  --separator: var(--blueprint-grid-line);
+  --border: var(--blueprint-line);
+  --separator: var(--blueprint-grid-line-strong);
   --muted: var(--blueprint-text-muted);
   --accent: var(--blueprint-accent);
-  --accent-foreground: #151711;
-  --focus: var(--blueprint-accent-muted);
-  --field-background: color-mix(in srgb, var(--blueprint-canvas-raised) 76%, transparent);
-  --field-border: var(--blueprint-grid-line);
+  --accent-foreground: #1c1a16;
+  --focus: var(--blueprint-text-primary);
+  --field-background: var(--blueprint-panel);
+  --field-border: var(--blueprint-line);
   --radius: var(--blueprint-radius-control);
   color-scheme: dark;
 }
@@ -94,13 +108,14 @@ body {
   margin: 0;
   background: var(--blueprint-canvas);
   color: var(--blueprint-text-primary);
-  font-family: Inter, "Noto Sans SC", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.65;
   letter-spacing: 0.01em;
   overflow-x: hidden;
   transition: background 260ms ease, color 260ms ease;
 }
 
+/* engineering graph-paper grid: faint 24px ruling floating under the cards */
 body::before {
   content: "";
   position: fixed;
@@ -109,12 +124,10 @@ body::before {
   pointer-events: none;
   background-image:
     linear-gradient(var(--blueprint-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--blueprint-grid-line) 1px, transparent 1px),
-    linear-gradient(var(--blueprint-grid-line-strong) 1px, transparent 1px),
-    linear-gradient(90deg, var(--blueprint-grid-line-strong) 1px, transparent 1px);
+    linear-gradient(90deg, var(--blueprint-grid-line) 1px, transparent 1px);
   background-position: -1px -1px;
-  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
-  opacity: 0.34;
+  background-size: 24px 24px;
+  opacity: 0.9;
 }
 
 a {
@@ -157,18 +170,20 @@ select {
 .blueprint-title {
   margin: 0 0 14px;
   color: var(--blueprint-text-primary);
+  font-family: var(--font-serif);
   font-size: clamp(2rem, 5vw, 3.2rem);
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   line-height: 1.08;
 }
 
 .blueprint-subtitle {
   margin: 0;
   color: var(--blueprint-text-muted);
-  font-size: clamp(0.8rem, 2vw, 0.95rem);
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  font-family: var(--font-mono);
+  font-size: clamp(0.72rem, 2vw, 0.85rem);
+  font-weight: 500;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
@@ -177,7 +192,7 @@ select {
   width: min(280px, 60vw);
   height: 12px;
   margin: 0 0 14px;
-  opacity: 0.42;
+  opacity: 0.7;
 }
 
 .blueprint-guide-line path {
@@ -202,15 +217,15 @@ select {
 .blueprint-primary-button,
 .blueprint-danger-button {
   min-height: 36px;
-  border: 1px solid var(--blueprint-grid-line) !important;
-  background: color-mix(in srgb, var(--blueprint-panel) 88%, transparent) !important;
-  color: var(--blueprint-text-secondary) !important;
-  box-shadow: none !important;
-  font-size: 0.78rem !important;
+  border: 1.5px solid var(--blueprint-line) !important;
+  background: var(--blueprint-panel) !important;
+  color: var(--blueprint-text-primary) !important;
+  box-shadow: var(--blueprint-shadow-sm) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.74rem !important;
   font-weight: 500 !important;
   letter-spacing: 0.06em;
-  backdrop-filter: blur(10px);
-  transition: transform 200ms ease, border-color 200ms ease, background 200ms ease, color 200ms ease;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 200ms ease, background 200ms ease, color 200ms ease;
 }
 
 .blueprint-icon-button,
@@ -221,6 +236,8 @@ select {
 .blueprint-icon-button {
   width: 36px !important;
   padding: 0 !important;
+  font-family: inherit !important;
+  font-size: 0.95rem !important;
 }
 
 .blueprint-nav-button {
@@ -242,16 +259,16 @@ select {
 }
 
 .blueprint-primary-button {
-  border-color: var(--blueprint-accent) !important;
-  background: var(--blueprint-accent) !important;
-  color: #fff !important;
+  border-color: var(--blueprint-line) !important;
+  background: var(--blueprint-text-primary) !important;
+  color: var(--blueprint-canvas) !important;
   padding-inline: 16px !important;
 }
 
 .blueprint-danger-button {
-  border-color: color-mix(in srgb, var(--blueprint-danger) 52%, var(--blueprint-grid-line)) !important;
-  background: var(--blueprint-danger-soft) !important;
-  color: var(--blueprint-danger) !important;
+  border-color: var(--blueprint-accent) !important;
+  background: var(--blueprint-accent) !important;
+  color: #fff !important;
   padding-inline: 14px !important;
 }
 
@@ -260,44 +277,83 @@ select {
 .blueprint-button:hover,
 .blueprint-primary-button:hover,
 .blueprint-danger-button:hover {
-  transform: translateY(-1px);
-  border-color: var(--blueprint-grid-line-strong) !important;
-  color: var(--blueprint-text-primary) !important;
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--blueprint-grid-line-strong) !important;
+  border-color: var(--blueprint-line) !important;
+}
+
+.blueprint-icon-button:active,
+.blueprint-nav-button:active,
+.blueprint-button:active,
+.blueprint-primary-button:active,
+.blueprint-danger-button:active {
+  transform: translate(1px, 1px);
+  box-shadow: 0 0 0 var(--blueprint-grid-line-strong) !important;
 }
 
 .blueprint-primary-button:hover {
+  background: #000000 !important;
+  color: var(--blueprint-canvas) !important;
+}
+
+.blueprint-danger-button:hover {
+  background: color-mix(in srgb, var(--blueprint-accent) 86%, #000) !important;
   color: #fff !important;
-  background: color-mix(in srgb, var(--blueprint-accent) 88%, var(--blueprint-text-primary)) !important;
 }
 
 .blueprint-stamp {
   align-self: flex-start;
-  min-height: 24px;
-  padding: 0 10px !important;
-  border: 1px solid var(--card-accent, var(--blueprint-accent-steel)) !important;
+  min-height: 22px;
+  padding: 0 8px !important;
+  border: 1px solid var(--card-accent, var(--blueprint-line)) !important;
   border-radius: var(--blueprint-radius-stamp) !important;
-  background: color-mix(in srgb, var(--card-accent, var(--blueprint-accent-steel)) 10%, transparent) !important;
-  color: var(--card-accent, var(--blueprint-accent-steel)) !important;
-  font-size: 0.65rem !important;
+  background: transparent !important;
+  color: var(--card-accent, var(--blueprint-line)) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.62rem !important;
   font-weight: 700 !important;
-  letter-spacing: 0.1em;
-  opacity: 0.9;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* mono route badge for endpoints / codes */
+.blueprint-route-badge,
+.code-text {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--blueprint-text-secondary);
+}
+
+.blueprint-route-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--blueprint-grid-line-strong);
+  border-radius: var(--blueprint-radius-stamp);
+  background: var(--blueprint-canvas-raised);
+}
+
+/* tabular monospace amounts */
+.amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 .tool-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 14px;
+  gap: 18px;
 }
 
 .tool-card,
 .admin-panel,
 .auth-panel,
 .site-card {
-  border: 1px solid var(--blueprint-grid-line) !important;
+  border: 1.5px solid var(--blueprint-line) !important;
   border-radius: var(--blueprint-radius-panel) !important;
   background: var(--blueprint-panel) !important;
-  box-shadow: none !important;
+  box-shadow: var(--blueprint-shadow) !important;
   color: var(--blueprint-text-primary) !important;
 }
 
@@ -306,7 +362,7 @@ select {
   padding: 0 !important;
   text-decoration: none;
   cursor: pointer;
-  transition: border-color 220ms ease, background 220ms ease, transform 220ms ease;
+  transition: border-color 200ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .tool-card > [class*="content"] {
@@ -314,18 +370,17 @@ select {
   flex-direction: column;
   gap: 10px;
   min-height: 100%;
-  padding: 24px !important;
+  padding: 22px !important;
 }
 
 .tool-card:hover {
-  transform: translateY(-1px);
-  border-color: var(--blueprint-grid-line-strong) !important;
-  background: color-mix(in srgb, var(--blueprint-panel) 82%, var(--blueprint-canvas-raised)) !important;
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--blueprint-grid-line-strong) !important;
 }
 
-.accent-clay { --card-accent: var(--blueprint-accent-muted); }
-.accent-moss { --card-accent: var(--blueprint-accent); }
-.accent-stone { --card-accent: var(--blueprint-accent-steel); }
+.accent-clay { --card-accent: var(--blueprint-accent); }
+.accent-moss { --card-accent: var(--blueprint-accent-steel); }
+.accent-stone { --card-accent: var(--blueprint-accent-muted); }
 
 .tool-card-title,
 .admin-panel h3,
@@ -334,9 +389,10 @@ select {
 .admin-tab-title {
   margin: 4px 0 0;
   color: var(--blueprint-text-primary) !important;
-  font-size: 1.1rem;
+  font-family: var(--font-serif);
+  font-size: 1.12rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
 }
 
 .tool-card-description,
@@ -362,17 +418,19 @@ select {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border-left: 2px solid var(--blueprint-grid-line);
-  border-bottom: 1px solid var(--blueprint-grid-line);
+  border-left: 2px solid var(--blueprint-line);
+  border-bottom: 1px dashed var(--blueprint-grid-line-strong);
   color: var(--blueprint-text-secondary);
-  font-size: 0.8rem;
-  font-weight: 300;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 400;
   text-decoration: none;
-  transition: color 200ms ease, border-color 200ms ease;
+  transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
 }
 
 .tool-link:hover {
-  border-color: var(--blueprint-grid-line-strong);
+  border-left-color: var(--blueprint-accent);
+  background: var(--blueprint-canvas-raised);
   color: var(--blueprint-text-primary);
 }
 
@@ -380,23 +438,26 @@ select {
   min-width: 42px;
   margin-left: auto;
   color: var(--blueprint-text-muted);
+  font-family: var(--font-mono);
   font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
   text-align: right;
-  opacity: 0.72;
 }
 
-.latency.good { color: var(--blueprint-accent); }
-.latency.slow { color: #b08a5e; }
+.latency.good { color: var(--blueprint-accent-steel); }
+.latency.slow { color: var(--blueprint-warn); }
 .latency.bad { color: var(--blueprint-danger); }
-.arrow { opacity: 0.36; }
+.arrow { opacity: 0.4; }
 
 .tool-enter {
   margin-top: auto;
   padding-top: 10px;
   color: var(--blueprint-text-muted);
-  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .home-footer {
@@ -408,7 +469,7 @@ select {
 .auth-panel {
   max-width: 760px;
   margin: 0 auto 18px;
-  background: var(--blueprint-panel) !important;
+  padding: 22px !important;
 }
 
 .auth-form {
@@ -421,7 +482,7 @@ select {
   min-height: 26px;
   margin: 10px 0 20px;
   padding: 8px 12px;
-  border: 1px solid transparent;
+  border: 1.5px solid transparent;
   border-radius: var(--blueprint-radius-control);
   color: var(--blueprint-text-muted);
   font-size: 0.86rem;
@@ -429,13 +490,13 @@ select {
 }
 
 .blueprint-message--ok {
-  border-color: color-mix(in srgb, var(--blueprint-success) 34%, transparent);
+  border-color: var(--blueprint-success);
   background: var(--blueprint-success-soft);
   color: var(--blueprint-success);
 }
 
 .blueprint-message--error {
-  border-color: color-mix(in srgb, var(--blueprint-danger) 34%, transparent);
+  border-color: var(--blueprint-danger);
   background: var(--blueprint-danger-soft);
   color: var(--blueprint-danger);
 }
@@ -451,7 +512,7 @@ select {
   align-items: end;
   gap: 14px;
   padding-bottom: 14px;
-  border-bottom: 1px solid var(--blueprint-grid-line-strong);
+  border-bottom: 1.5px solid var(--blueprint-line);
 }
 
 .admin-utility-bar {
@@ -465,9 +526,10 @@ select {
 
 .admin-utility-note {
   color: var(--blueprint-text-muted);
-  font-size: 0.66rem;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -483,13 +545,13 @@ select {
 .admin-action-group .blueprint-danger-button {
   min-height: 32px;
   padding-inline: 10px !important;
-  font-size: 0.72rem !important;
+  font-size: 0.7rem !important;
 }
 
 .admin-tab-list {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
   padding: 0 !important;
   border-radius: var(--blueprint-radius-panel) !important;
   background: transparent !important;
@@ -505,30 +567,36 @@ select {
   align-items: flex-start !important;
   justify-content: center;
   gap: 6px;
-  border: 1px solid var(--blueprint-grid-line) !important;
-  border-left: 3px solid var(--card-accent, var(--blueprint-accent)) !important;
+  border: 1.5px solid var(--blueprint-line) !important;
+  border-left: 4px solid var(--card-accent, var(--blueprint-accent)) !important;
   border-radius: var(--blueprint-radius-panel) !important;
   background: var(--blueprint-panel) !important;
+  box-shadow: var(--blueprint-shadow-sm) !important;
   color: var(--blueprint-text-primary) !important;
   text-align: left !important;
   white-space: normal !important;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 200ms ease;
 }
 
 .admin-tab-card[data-selected="true"] {
-  border-color: var(--blueprint-grid-line-strong) !important;
-  border-left-color: var(--blueprint-accent) !important;
-  background: color-mix(in srgb, var(--blueprint-accent) 8%, var(--blueprint-panel)) !important;
+  background: color-mix(in srgb, var(--card-accent, var(--blueprint-accent)) 10%, var(--blueprint-panel)) !important;
+  box-shadow: var(--blueprint-shadow) !important;
 }
 
 .hero-chip {
-  border-color: var(--blueprint-grid-line) !important;
-  color: var(--blueprint-accent) !important;
+  border: 1px solid var(--blueprint-line) !important;
+  border-radius: var(--blueprint-radius-stamp) !important;
+  color: var(--blueprint-text-secondary) !important;
   background: transparent !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.62rem !important;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .admin-tab-panel {
   display: grid;
-  gap: 18px;
+  gap: 20px;
 }
 
 .admin-panel {
@@ -536,17 +604,62 @@ select {
   background: var(--blueprint-panel) !important;
 }
 
+/* card titlebar: blocked header strip on panels */
 .admin-panel-head,
 .site-card-head {
   display: flex !important;
   align-items: flex-start !important;
   justify-content: space-between;
   gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1.5px solid var(--blueprint-line);
+  background: var(--blueprint-canvas-raised);
+}
+
+.admin-panel > :where([class*="content"], .admin-panel-body) {
+  padding: 18px !important;
 }
 
 .admin-panel-title {
   display: grid;
   gap: 4px;
+}
+
+/* doc-header meta strip: ROUTE / SOURCE / ACTOR, engineering-notebook identity */
+.admin-doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin: -22px 0 26px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--blueprint-grid-line-strong);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--blueprint-text-muted);
+}
+
+.admin-doc-meta b {
+  margin-right: 6px;
+  color: var(--blueprint-text-secondary);
+  font-weight: 700;
+}
+
+/* section divider inside a panel body */
+.config-subhead {
+  margin: 4px 0 2px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blueprint-text-muted);
+}
+
+.config-subhead::before {
+  content: "▚ ";
+  color: var(--blueprint-accent);
 }
 
 .field-grid {
@@ -563,9 +676,11 @@ select {
 
 .field {
   color: var(--blueprint-text-muted);
-  font-size: 0.76rem;
-  font-weight: 650;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
   letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .field--inline,
@@ -580,9 +695,9 @@ select {
 .blueprint-textarea,
 .native-select {
   width: 100%;
-  border: 1px solid var(--blueprint-grid-line) !important;
+  border: 1.5px solid var(--blueprint-line) !important;
   border-radius: var(--blueprint-radius-control) !important;
-  background: color-mix(in srgb, var(--blueprint-panel) 72%, var(--blueprint-canvas-raised)) !important;
+  background: var(--blueprint-panel) !important;
   color: var(--blueprint-text-primary) !important;
   box-shadow: none !important;
 }
@@ -594,7 +709,8 @@ select {
 
 .blueprint-textarea {
   min-height: 138px;
-  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.8rem !important;
   line-height: 1.55 !important;
 }
 
@@ -602,15 +718,20 @@ select {
   width: auto;
   min-height: 36px;
   padding: 0 12px;
+  font-family: var(--font-mono);
 }
 
 .site-list {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .site-card {
-  background: color-mix(in srgb, var(--blueprint-panel) 72%, var(--blueprint-canvas-raised)) !important;
+  background: var(--blueprint-panel) !important;
+}
+
+.site-card > :where([class*="content"]) {
+  padding: 18px !important;
 }
 
 .metrics,
@@ -622,23 +743,29 @@ select {
 
 .admin-metric {
   min-width: 0;
-  padding: 10px 12px;
-  border-left: 3px solid var(--blueprint-accent);
+  padding: 12px 14px;
+  border: 1px solid var(--blueprint-grid-line-strong);
+  border-left: 4px solid var(--blueprint-accent);
   border-radius: var(--blueprint-radius-control);
-  background: color-mix(in srgb, var(--blueprint-accent) 6%, var(--blueprint-panel));
+  background: var(--blueprint-panel);
 }
 
 .admin-metric span {
   display: block;
   color: var(--blueprint-text-muted);
-  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .admin-metric b {
   display: block;
   margin-top: 4px;
   color: var(--blueprint-text-primary);
-  font-size: 1.05rem;
+  font-family: var(--font-mono);
+  font-size: 1.12rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .json-grid {
@@ -657,7 +784,7 @@ select {
 
 .table-wrap {
   overflow-x: auto;
-  border: 1px solid var(--blueprint-grid-line);
+  border: 1.5px solid var(--blueprint-line);
   border-radius: var(--blueprint-radius-panel);
   background: var(--blueprint-panel);
 }
@@ -671,7 +798,7 @@ table {
 th,
 td {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--blueprint-grid-line);
+  border-bottom: 1px solid var(--blueprint-grid-line-strong);
   color: var(--blueprint-text-secondary);
   font-size: 0.84rem;
   text-align: left;
@@ -680,8 +807,16 @@ td {
 
 th {
   color: var(--blueprint-text-muted);
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--blueprint-canvas-raised);
+}
+
+td {
+  font-variant-numeric: tabular-nums;
 }
 
 tr:last-child td {
@@ -703,7 +838,7 @@ tr:last-child td {
   gap: 10px;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid var(--blueprint-grid-line);
+  border-bottom: 1px dashed var(--blueprint-grid-line-strong);
 }
 
 .fade-in {
@@ -725,7 +860,6 @@ tr:last-child td {
   }
 
   .admin-tab-list {
-    position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

@@ -394,6 +394,7 @@ function ActivityConfigEditor({
         <Metric label="目标期望值" value={activity.targetExpectedValue} />
         <Metric label="实际期望值" value={activity.actualExpectedValue} />
       </div>
+      <div className="config-subhead">活动窗口与整体期望值</div>
       <div className="field-grid">
         <label className="field">开始时间文本<Input className="blueprint-input" value={activity.startText || ''} placeholder="2026-06-01 00:00:00" onChange={(event) => update({ startText: event.target.value })} /></label>
         <label className="field">结束时间文本<Input className="blueprint-input" value={activity.endText || ''} placeholder="2026-06-30 23:59:59" onChange={(event) => update({ endText: event.target.value })} /></label>
@@ -401,6 +402,7 @@ function ActivityConfigEditor({
         <label className="field">结束时间戳<Input className="blueprint-input" type="number" min={1} value={String(activity.endTS ?? '')} onChange={(event) => update({ endTS: Number(event.target.value) })} /></label>
         <label className="field">整体数学期望值<Input className="blueprint-input" type="number" step="0.0001" min={0} value={String(activity.targetExpectedValue ?? '')} onChange={(event) => update({ targetExpectedValue: Number(event.target.value) })} /></label>
       </div>
+      <div className="config-subhead">奖池权重配置 · JSON</div>
       <div className="json-grid">
         <label className="field">额度 → 抽奖次数<Textarea className="blueprint-textarea" value={spinMap} onChange={(event) => setSpinMap(event.target.value)} /></label>
         <label className="field">普通奖池权重（调整中奖率）<Textarea className="blueprint-textarea" value={prizePool} onChange={(event) => setPrizePool(event.target.value)} /></label>
@@ -541,6 +543,11 @@ export function AdminPage() {
       </TopActions>
       <main className="blueprint-page admin-page">
         <BlueprintHeader title="fufu 管 理 后 台" subtitle="站 点 · 补 货 · 活 动" compact />
+        <div className="admin-doc-meta" aria-hidden="true">
+          <span><b>ROUTE</b><span className="blueprint-route-badge">/admin</span></span>
+          <span><b>SOURCE</b>SQLite · tool-config.db</span>
+          <span><b>ACTOR</b>admin</span>
+        </div>
         {checking ? <MessageLine>正在检查登录态…</MessageLine> : null}
         {!authenticated && !checking ? <LoginPanel onLogin={login} busy={busy} /> : null}
         <MessageLine tone={message.tone}>{message.text}</MessageLine>
