@@ -38,10 +38,6 @@ const toolCards: ToolCard[] = [
       { label: '线路 三', href: 'https://token.fufuflower.top', ping: 'https://token.fufuflower.top' }
     ]
   },
-  { stamp: '造物', title: 'Build', description: 'AI 画图生成', accent: 'stone', href: 'https://build.fufuapi.online' },
-  { stamp: '状态', title: 'API / 模型状态', description: '连通性检测、模型可用性与手动测试', accent: 'moss', href: '/status' },
-  { stamp: '合卡', title: '合卡工具', description: '自助合并额度卡，复用统一 NewAPI 配置', accent: 'clay', href: '/combine' },
-  { stamp: '活动', title: '活动前台', description: '抽奖、刮刮卡与福利入口', accent: 'stone', href: '/activity' },
   {
     stamp: '终端',
     title: 'Web Terminal',
@@ -51,7 +47,11 @@ const toolCards: ToolCard[] = [
       { label: '线路 一', href: 'https://terminal.fufuapi.top', ping: 'https://terminal.fufuapi.top' },
       { label: '线路 二', href: 'https://terminal.if.tc', ping: 'https://terminal.if.tc' }
     ]
-  }
+  },
+  { stamp: '造物', title: 'Build', description: 'AI 画图生成', accent: 'stone', href: 'https://build.fufuapi.online' },
+  { stamp: '状态', title: 'API / 模型状态', description: '连通性检测、模型可用性与手动测试', accent: 'moss', href: '/status' },
+  { stamp: '合卡', title: '合卡工具', description: '自助合并额度卡，复用统一 NewAPI 配置', accent: 'clay', href: '/combine' },
+  { stamp: '活动', title: '活动前台', description: '抽奖、刮刮卡与福利入口', accent: 'stone', href: '/activity' }
 ];
 
 function latencyClass(ms: number) {
