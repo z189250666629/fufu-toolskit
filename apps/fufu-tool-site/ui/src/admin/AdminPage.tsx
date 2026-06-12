@@ -537,9 +537,6 @@ export function AdminPage() {
       <TopActions>
         <ThemeToggle />
         <NavPill href="/">首页</NavPill>
-        <NavPill href="/status">状态</NavPill>
-        <NavPill href="/combine">合卡</NavPill>
-        <NavPill href="/activity">活动</NavPill>
       </TopActions>
       <main className="blueprint-page admin-page">
         <BlueprintHeader title="fufu 管 理 后 台" subtitle="站 点 · 补 货 · 活 动" label="ADMIN CONSOLE" compact />
@@ -560,12 +557,10 @@ export function AdminPage() {
                   <Tabs.Tab id="site-replenish" className="admin-tab-card">
                     <BlueprintStamp>站点</BlueprintStamp>
                     <span className="admin-tab-title">状态页 / 合卡 / 自动补货</span>
-                    <span className="admin-tab-desc">NewAPI base_url、合卡主站复用、销售卡每日上架放在同一组。</span>
                   </Tabs.Tab>
                   <Tabs.Tab id="activity" className="admin-tab-card">
                     <BlueprintStamp>活动</BlueprintStamp>
                     <span className="admin-tab-title">活动统计 / 奖池 / 期望值</span>
-                    <span className="admin-tab-desc">活动日期、抽奖次数、中奖率权重与运行统计统一管理。</span>
                   </Tabs.Tab>
                 </Tabs.List>
 
