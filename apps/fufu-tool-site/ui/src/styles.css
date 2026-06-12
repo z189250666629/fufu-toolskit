@@ -35,6 +35,7 @@
   --blueprint-radius-panel: 2px;
   --blueprint-radius-stamp: 1px;
   --blueprint-radius-nav: 2px;
+  --blueprint-radius-flat: 0;
 
   /* HeroUI bridge tokens mapped to the project blueprint layer */
   --background: var(--blueprint-canvas);
@@ -233,12 +234,12 @@ select {
   border: 1.5px solid var(--blueprint-line) !important;
   background: var(--blueprint-panel) !important;
   color: var(--blueprint-text-primary) !important;
-  box-shadow: var(--blueprint-shadow-sm) !important;
+  box-shadow: none !important;
   font-family: var(--font-mono) !important;
   font-size: 0.74rem !important;
   font-weight: 500 !important;
   letter-spacing: 0.06em;
-  transition: transform 120ms ease, box-shadow 120ms ease, border-color 200ms ease, background 200ms ease, color 200ms ease;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
 }
 
 .blueprint-icon-button,
@@ -287,21 +288,9 @@ select {
 
 .blueprint-icon-button:hover,
 .blueprint-nav-button:hover,
-.blueprint-button:hover,
-.blueprint-primary-button:hover,
-.blueprint-danger-button:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 3px 3px 0 var(--blueprint-grid-line-strong) !important;
+.blueprint-button:hover {
+  background: var(--blueprint-canvas-raised) !important;
   border-color: var(--blueprint-line) !important;
-}
-
-.blueprint-icon-button:active,
-.blueprint-nav-button:active,
-.blueprint-button:active,
-.blueprint-primary-button:active,
-.blueprint-danger-button:active {
-  transform: translate(1px, 1px);
-  box-shadow: 0 0 0 var(--blueprint-grid-line-strong) !important;
 }
 
 .blueprint-primary-button:hover {
@@ -537,15 +526,36 @@ select {
   min-width: 0;
 }
 
+/* theme + home nav, now inside the banner (top-right of the actions column) */
+.admin-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* tighter serif title in the banner (no full-width spacing) */
+.admin-title {
+  font-size: clamp(1.5rem, 3.5vw, 1.95rem) !important;
+  letter-spacing: 0.01em !important;
+}
+
+/* meta sits right under the title: actor in terracotta, dot-separated */
 .admin-header .admin-doc-meta {
-  margin: 14px 0 0;
-  padding-top: 12px;
-  border-top: 1px dashed var(--blueprint-grid-line-strong);
+  margin: 7px 0 0;
+  gap: 0 7px;
+}
+
+.admin-meta-actor {
+  color: var(--blueprint-accent) !important;
+  font-weight: 700;
+}
+
+.admin-meta-dot {
+  color: var(--blueprint-text-muted);
 }
 
 .admin-header .admin-tab-list {
   margin-top: 14px;
-  border-bottom: 1.5px solid var(--blueprint-line) !important;
 }
 
 .admin-toolbar-row {
@@ -590,13 +600,13 @@ select {
   font-size: 0.7rem !important;
 }
 
-/* horizontal text tabs with an underline cursor — the blueprint-design way
-   (heroui-overrides tabPresetContentWidth), not card-shaped tabs */
+/* nav-pill tabs — tte SubPageHeader style: active = filled ink block,
+   inactive = transparent border that shows on hover, square corners */
 .admin-tab-list {
   display: flex !important;
   flex-wrap: wrap;
-  align-items: stretch !important;
-  gap: 0 !important;
+  align-items: center !important;
+  gap: 5px !important;
   height: auto !important;
   padding: 0 !important;
   background: transparent !important;
@@ -611,26 +621,26 @@ select {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 8px 18px !important;
-  margin-bottom: -1.5px;
-  border: 0 !important;
-  border-bottom: 2px solid transparent !important;
-  border-radius: var(--blueprint-radius-stamp) !important;
+  padding: 5px 12px !important;
+  margin: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--blueprint-radius-flat) !important;
   background: transparent !important;
   box-shadow: none !important;
-  color: var(--blueprint-text-muted) !important;
+  color: var(--blueprint-text-secondary) !important;
   white-space: nowrap !important;
-  transition: color 160ms ease, border-color 160ms ease;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 
 .admin-tab-card:hover {
   color: var(--blueprint-text-primary) !important;
+  border-color: var(--blueprint-line) !important;
 }
 
 .admin-tab-card[data-selected="true"] {
-  color: var(--blueprint-text-primary) !important;
-  border-bottom-color: var(--blueprint-accent) !important;
-  background: transparent !important;
+  color: var(--blueprint-canvas) !important;
+  background: var(--blueprint-text-primary) !important;
+  border-color: var(--blueprint-line) !important;
   box-shadow: none !important;
 }
 
@@ -640,6 +650,7 @@ select {
   font-weight: 500 !important;
   letter-spacing: 0.02em;
   margin: 0 !important;
+  color: inherit !important;
 }
 
 .hero-chip {
@@ -655,7 +666,7 @@ select {
 
 .admin-tab-panel {
   display: grid;
-  gap: 20px;
+  gap: 26px;
 }
 
 .admin-panel {
@@ -670,9 +681,28 @@ select {
   align-items: flex-start !important;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 18px;
+  padding: 11px 16px;
   border-bottom: 1.5px solid var(--blueprint-line);
   background: var(--blueprint-canvas-raised);
+  font-family: var(--font-mono);
+}
+
+/* card titlebar title — mono, like tte .bp-card-titlebar (not serif) */
+.admin-panel-head [data-slot="card-title"],
+.site-card-head [data-slot="card-title"] {
+  font-family: var(--font-mono) !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  color: var(--blueprint-text-primary) !important;
+}
+
+.admin-panel-head [data-slot="card-description"],
+.site-card-head [data-slot="card-description"] {
+  font-family: var(--font-sans) !important;
+  font-size: 0.76rem !important;
+  font-weight: 400 !important;
+  letter-spacing: normal !important;
 }
 
 .admin-panel > :where([class*="content"], .admin-panel-body) {
@@ -800,29 +830,31 @@ select {
 
 .admin-metric {
   min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--blueprint-grid-line-strong);
-  border-left: 4px solid var(--blueprint-accent);
+  padding: 14px 16px;
+  border: 1.5px solid var(--blueprint-line);
   border-radius: var(--blueprint-radius-control);
   background: var(--blueprint-panel);
+  box-shadow: var(--blueprint-shadow);
 }
 
 .admin-metric span {
   display: block;
   color: var(--blueprint-text-muted);
   font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .admin-metric b {
   display: block;
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--blueprint-text-primary);
   font-family: var(--font-mono);
-  font-size: 1.12rem;
+  font-size: 1.5rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
+  line-height: 1.1;
 }
 
 .json-grid {
@@ -844,6 +876,7 @@ select {
   border: 1.5px solid var(--blueprint-line);
   border-radius: var(--blueprint-radius-panel);
   background: var(--blueprint-panel);
+  box-shadow: var(--blueprint-shadow);
 }
 
 table {
@@ -855,7 +888,6 @@ table {
 th,
 td {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--blueprint-grid-line-strong);
   color: var(--blueprint-text-secondary);
   font-size: 0.84rem;
   text-align: left;
@@ -870,10 +902,12 @@ th {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   background: var(--blueprint-canvas-raised);
+  border-bottom: 1.5px solid var(--blueprint-line);
 }
 
 td {
   font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed var(--blueprint-grid-line-strong);
 }
 
 tr:last-child td {
@@ -954,4 +988,182 @@ tr:last-child td {
   .sale-job-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   tte_system blueprint utility classes (.bp-*) — ported so cards,
+   KPIs and the doc-header match tte exactly. The bp tokens alias the
+   existing --blueprint-* vars, so dark mode keeps following them.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --bp-bg: var(--blueprint-canvas);
+  --bp-grid: var(--blueprint-grid-line);
+  --bp-fill: var(--blueprint-panel);
+  --bp-fill-block: var(--blueprint-canvas-raised);
+  --bp-fill-block-strong: var(--blueprint-panel-muted);
+  --bp-ink: var(--blueprint-text-primary);
+  --bp-ink-soft: var(--blueprint-text-secondary);
+  --bp-ink-faint: var(--blueprint-text-muted);
+  --bp-line: var(--blueprint-line);
+  --bp-line-soft: var(--blueprint-grid-line-strong);
+  --bp-accent: var(--blueprint-accent);
+  --bp-accent-soft: var(--blueprint-danger-soft);
+  --bp-warn: var(--blueprint-warn);
+  --bp-warn-soft: var(--blueprint-warn-soft);
+  --bp-manager: var(--blueprint-success);
+  --bp-manager-soft: var(--blueprint-success-soft);
+}
+
+/* doc-header banner */
+.bp-doc-header {
+  position: relative;
+  border: 2px solid var(--bp-line);
+  border-radius: var(--blueprint-radius-panel);
+  background: var(--bp-fill);
+  padding: 18px 20px;
+  box-shadow: 4px 4px 0 var(--bp-line-soft);
+  isolation: isolate;
+}
+
+@media (min-width: 640px) {
+  .bp-doc-header {
+    padding: 24px 30px;
+  }
+}
+
+.bp-doc-header::before {
+  content: attr(data-label);
+  position: absolute;
+  z-index: 1;
+  top: -10px;
+  left: 24px;
+  background: var(--bp-bg);
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--bp-ink-faint);
+  text-transform: uppercase;
+}
+
+.bp-doc-header h1 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 1.4rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: var(--bp-ink);
+}
+
+@media (min-width: 640px) {
+  .bp-doc-header h1 {
+    font-size: 1.85rem;
+  }
+}
+
+.bp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--bp-ink-soft);
+}
+
+/* card */
+.bp-card {
+  background: var(--bp-fill);
+  border: 1.5px solid var(--bp-line);
+  border-radius: var(--blueprint-radius-panel);
+  box-shadow: 4px 4px 0 var(--bp-line-soft);
+}
+
+.bp-card-titlebar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-bottom: 1.5px solid var(--bp-line);
+  background: var(--bp-fill-block);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--bp-ink);
+}
+
+.bp-card-body {
+  padding: 16px;
+}
+
+.bp-card-desc {
+  margin: 0 0 12px;
+  color: var(--bp-ink-faint);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+/* actor chip */
+.bp-actor-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--blueprint-radius-stamp);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: transparent;
+}
+
+.bp-actor-admin { color: var(--bp-accent); }
+.bp-actor-manager { color: var(--bp-manager); }
+.bp-actor-worker { color: var(--bp-warn); }
+
+/* KPI block */
+.bp-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bp-fill);
+  border: 1.5px solid var(--bp-line);
+  border-radius: var(--blueprint-radius-control);
+  box-shadow: 4px 4px 0 var(--bp-line-soft);
+  padding: 12px 14px;
+}
+
+.bp-kpi-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bp-ink-faint);
+}
+
+.bp-kpi-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1.1;
+  color: var(--bp-ink);
+}
+
+/* route badge */
+.bp-route-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  background: var(--bp-fill-block);
+  border: 1px solid var(--bp-line-soft);
+  border-radius: var(--blueprint-radius-stamp);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--bp-ink);
 }

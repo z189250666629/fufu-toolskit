@@ -62,9 +62,9 @@ function parseJSONField<T>(value: string, fallback: T, label: string): T {
 
 function Metric({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className="admin-metric">
-      <span>{label}</span>
-      <b>{formatNumber(value)}</b>
+    <div className="bp-kpi">
+      <span className="bp-kpi-label">{label}</span>
+      <span className="bp-kpi-num">{formatNumber(value)}</span>
     </div>
   );
 }
@@ -112,16 +112,16 @@ function ConfigCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="admin-panel">
-      <Card.Header className="admin-panel-head">
-        <div className="admin-panel-title">
-          <Card.Title>{title}</Card.Title>
-          {description ? <Card.Description>{description}</Card.Description> : null}
-        </div>
+    <section className="bp-card admin-panel">
+      <header className="bp-card-titlebar">
+        <span>{title}</span>
         {action}
-      </Card.Header>
-      <Card.Content>{children}</Card.Content>
-    </Card>
+      </header>
+      <div className="bp-card-body">
+        {description ? <p className="bp-card-desc">{description}</p> : null}
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -174,17 +174,14 @@ function SiteEditor({
   return (
     <div className="site-list">
       {sites.map((site, index) => (
-        <Card key={`${site.name}-${index}`} className="site-card">
-          <Card.Header className="site-card-head">
-            <div>
-              <Card.Title>{index === 0 ? '主站点（合卡复用）' : '备用站点'} #{index + 1}</Card.Title>
-              <Card.Description>{site.tokenSet ? `当前 token：${site.tokenMasked || '已保存'}` : '新站点必须填写 token'}</Card.Description>
-            </div>
+        <section key={`${site.name}-${index}`} className="bp-card site-card">
+          <header className="bp-card-titlebar">
+            <span>{index === 0 ? '主站点（合卡复用）' : '备用站点'} #{index + 1}</span>
             <Button className="blueprint-danger-button" onPress={() => onChange(sites.filter((_, siteIndex) => siteIndex !== index))}>
               删除
             </Button>
-          </Card.Header>
-          <Card.Content>
+          </header>
+          <div className="bp-card-body">
             <div className="field-grid">
               <label className="field">名称<Input className="blueprint-input" value={site.name || ''} onChange={(event) => updateSite(index, { name: event.target.value })} /></label>
               <label className="field">base_url<Input className="blueprint-input" value={site.url || ''} placeholder="https://api.example.com" onChange={(event) => updateSite(index, { url: event.target.value })} /></label>
@@ -201,8 +198,8 @@ function SiteEditor({
                 Skip User Header
               </label>
             </div>
-          </Card.Content>
-        </Card>
+          </div>
+        </section>
       ))}
       <p className="inline-help">Token 字段加载时只显示掩码；保存时留空表示沿用原 token，新站点必须填写 token。</p>
     </div>
@@ -533,22 +530,27 @@ export function AdminPage() {
   const configSites = useMemo(() => config.newapi.sites ?? [], [config]);
 
   return (
-    <>
-      <TopActions>
-        <ThemeToggle />
-        <NavPill href="/">首页</NavPill>
-      </TopActions>
-      <main className="blueprint-page admin-page">
+    <main className="blueprint-page admin-page">
         {authenticated ? (
           <section className="admin-dashboard fade-in">
             <Tabs className="admin-tabs" defaultSelectedKey="site-replenish">
               <header className="blueprint-header blueprint-header--compact admin-header" data-label="ADMIN CONSOLE">
                 <div className="admin-header-top">
                   <div className="admin-header-titles">
-                    <h1 className="blueprint-title">fufu 管 理 后 台</h1>
-                    <p className="blueprint-subtitle">站 点 · 补 货 · 活 动</p>
+                    <h1 className="blueprint-title admin-title">fufu 管理后台</h1>
+                    <div className="admin-doc-meta" aria-hidden="true">
+                      <span className="admin-meta-actor">admin</span>
+                      <span className="admin-meta-dot">·</span>
+                      <span>/admin</span>
+                      <span className="admin-meta-dot">·</span>
+                      <span>tool-config.db</span>
+                    </div>
                   </div>
                   <div className="admin-utility-bar">
+                    <div className="admin-header-nav">
+                      <ThemeToggle />
+                      <NavPill href="/">首页</NavPill>
+                    </div>
                     <span className="admin-utility-note">配置操作</span>
                     <div className="admin-action-group">
                       <Button className="blueprint-button" onPress={loadAll} isDisabled={busy}>重新加载配置</Button>
@@ -557,11 +559,6 @@ export function AdminPage() {
                       <Button className="blueprint-danger-button" onPress={logout}>退出登录</Button>
                     </div>
                   </div>
-                </div>
-                <div className="admin-doc-meta" aria-hidden="true">
-                  <span><b>ROUTE</b><span className="blueprint-route-badge">/admin</span></span>
-                  <span><b>SOURCE</b>SQLite · tool-config.db</span>
-                  <span><b>ACTOR</b>admin</span>
                 </div>
                 <Tabs.List className="admin-tab-list">
                   <Tabs.Tab id="site-replenish" className="admin-tab-card">
@@ -615,12 +612,15 @@ export function AdminPage() {
           </section>
         ) : (
           <>
-            <BlueprintHeader title="fufu 管 理 后 台" subtitle="站 点 · 补 货 · 活 动" label="ADMIN CONSOLE" compact />
+            <TopActions>
+              <ThemeToggle />
+              <NavPill href="/">首页</NavPill>
+            </TopActions>
+            <BlueprintHeader title="fufu 管理后台" subtitle="站点 · 补货 · 活动" label="ADMIN CONSOLE" compact />
             {checking ? <MessageLine>正在检查登录态…</MessageLine> : <LoginPanel onLogin={login} busy={busy} />}
             <MessageLine tone={message.tone}>{message.text}</MessageLine>
           </>
         )}
-      </main>
-    </>
+    </main>
   );
 }
