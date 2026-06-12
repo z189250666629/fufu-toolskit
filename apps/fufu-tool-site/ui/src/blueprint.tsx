@@ -15,17 +15,20 @@ export function BlueprintGuideLine({ variant = 0 }: { variant?: 0 | 1 }) {
 export function BlueprintHeader({
   title,
   subtitle,
+  label = 'FUFU TOOLKIT',
   compact = false
 }: {
   title: string;
   subtitle: string;
+  label?: string;
   compact?: boolean;
 }) {
   return (
-    <header className={`blueprint-header fade-in${compact ? ' blueprint-header--compact' : ''}`}>
-      <BlueprintGuideLine />
+    <header
+      className={`blueprint-header fade-in${compact ? ' blueprint-header--compact' : ''}`}
+      data-label={label}
+    >
       <h1 className="blueprint-title">{title}</h1>
-      <BlueprintGuideLine variant={1} />
       <p className="blueprint-subtitle">{subtitle}</p>
     </header>
   );

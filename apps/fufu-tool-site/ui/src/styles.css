@@ -158,13 +158,38 @@ select {
   padding-top: 76px;
 }
 
+/* drafting title block: the heading sits inside a bordered banner with a
+   mono corner tab, floating on the graph paper */
 .blueprint-header {
-  text-align: left;
-  margin-bottom: 44px;
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 40px;
+  padding: 22px 30px 18px;
+  border: 2px solid var(--blueprint-line);
+  border-radius: var(--blueprint-radius-panel);
+  background: var(--blueprint-panel);
+  box-shadow: var(--blueprint-shadow);
+}
+
+.blueprint-header::before {
+  content: attr(data-label);
+  position: absolute;
+  top: -9px;
+  left: 20px;
+  padding: 0 8px;
+  background: var(--blueprint-canvas);
+  color: var(--blueprint-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
 }
 
 .blueprint-header--compact {
-  margin-bottom: 38px;
+  margin-bottom: 24px;
+  padding: 18px 26px 15px;
 }
 
 .blueprint-title {
@@ -185,18 +210,6 @@ select {
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-}
-
-.blueprint-guide-line {
-  display: block;
-  width: min(280px, 60vw);
-  height: 12px;
-  margin: 0 0 14px;
-  opacity: 0.7;
-}
-
-.blueprint-guide-line path {
-  stroke: var(--blueprint-text-primary);
 }
 
 .blueprint-top-actions {
@@ -460,12 +473,6 @@ select {
   text-transform: uppercase;
 }
 
-.home-footer {
-  display: flex;
-  justify-content: center;
-  margin-top: 32px;
-}
-
 .auth-panel {
   max-width: 760px;
   margin: 0 auto 18px;
@@ -631,9 +638,7 @@ select {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 18px;
-  margin: -22px 0 26px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--blueprint-grid-line-strong);
+  margin: 0 0 26px;
   font-family: var(--font-mono);
   font-size: 0.7rem;
   letter-spacing: 0.04em;

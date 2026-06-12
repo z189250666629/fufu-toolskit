@@ -542,7 +542,7 @@ export function AdminPage() {
         <NavPill href="/activity">活动</NavPill>
       </TopActions>
       <main className="blueprint-page admin-page">
-        <BlueprintHeader title="fufu 管 理 后 台" subtitle="站 点 · 补 货 · 活 动" compact />
+        <BlueprintHeader title="fufu 管 理 后 台" subtitle="站 点 · 补 货 · 活 动" label="ADMIN CONSOLE" compact />
         <div className="admin-doc-meta" aria-hidden="true">
           <span><b>ROUTE</b><span className="blueprint-route-badge">/admin</span></span>
           <span><b>SOURCE</b>SQLite · tool-config.db</span>

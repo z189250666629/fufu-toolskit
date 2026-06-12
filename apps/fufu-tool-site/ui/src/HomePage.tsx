@@ -134,11 +134,6 @@ export function HomePage() {
         <section className="tool-grid" aria-label="fufu 工具导航">
           {toolCards.map((card, index) => <NavigationCard key={card.title} card={card} index={index} />)}
         </section>
-        <div className="home-footer">
-          <a href="/status" className="blueprint-primary-button home-primary-link">
-            查看状态页
-          </a>
-        </div>
       </main>
     </>
   );
