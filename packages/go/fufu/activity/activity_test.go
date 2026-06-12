@@ -1,6 +1,40 @@
 package activity
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
+
+func TestConfigMarshalsPrizesWithLowercaseJSONKeys(t *testing.T) {
+	// The unified admin config editor renders activity.Config as JSON. Prize must
+	// serialize with lowercase type/dollars/weight so the editor surface matches
+	// /api/prizes and stays consistent across the app.
+	data, err := json.Marshal(DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(data)
+	for _, want := range []string{`"type":`, `"dollars":`, `"weight":`} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("config JSON should contain lowercase prize key %q, got %s", want, out)
+		}
+	}
+	for _, notWant := range []string{`"Type":`, `"Dollars":`, `"Weight":`} {
+		if strings.Contains(out, notWant) {
+			t.Fatalf("config JSON should not contain capitalized prize key %q, got %s", notWant, out)
+		}
+	}
+
+	// Round-trip must remain lossless and case-insensitive on input.
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("round-trip unmarshal: %v", err)
+	}
+	if len(cfg.PrizePool) != len(DefaultConfig().PrizePool) {
+		t.Fatalf("prize pool round-trip lost entries: %d", len(cfg.PrizePool))
+	}
+}
 
 func TestSpinGuaranteeForThousandCard(t *testing.T) {
 	got := Spin(1000, false, 9, 10, 0, 0, func(max int) int { return 0 })

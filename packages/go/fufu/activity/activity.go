@@ -18,9 +18,9 @@ const (
 )
 
 type Prize struct {
-	Type    string
-	Dollars int
-	Weight  int
+	Type    string `json:"type"`
+	Dollars int    `json:"dollars"`
+	Weight  int    `json:"weight"`
 }
 
 type SpinResult struct {
