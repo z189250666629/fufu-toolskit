@@ -189,7 +189,7 @@ func initRuntime(wd string) error {
 	if err := os.MkdirAll(filepath.Join(rootDir, "data"), 0755); err != nil {
 		return fmt.Errorf("create data directory: %w", err)
 	}
-	unifiedConfig = newToolConfigStore(filepath.Join(rootDir, "data", toolConfigFileName))
+	unifiedConfig = newToolConfigStore(filepath.Join(rootDir, "data", toolConfigDBName))
 	if err := unifiedConfig.Load(rootDir); err != nil {
 		return fmt.Errorf("load unified admin config: %w", err)
 	}
@@ -222,6 +222,9 @@ func shutdownRuntime() {
 	combineApp = nil
 	_ = activityapp.Close()
 	activityApp = nil
+	if unifiedConfig != nil {
+		_ = unifiedConfig.Close()
+	}
 	unifiedConfig = nil
 }
 

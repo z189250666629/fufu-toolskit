@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -62,6 +63,7 @@ type adminConfigPatch struct {
 type toolConfigStore struct {
 	mu   sync.RWMutex
 	path string
+	db   *sql.DB
 	cfg  ToolConfig
 }
 
@@ -69,25 +71,77 @@ func newToolConfigStore(path string) *toolConfigStore {
 	return &toolConfigStore{path: path}
 }
 
+// Load opens the SQLite config database and resolves the active configuration.
+// The database is the source of truth: once seeded, environment variables are
+// ignored. On first boot the store seeds itself from the legacy tool-config.json
+// (migrating existing deployments) or, failing that, from environment defaults,
+// then persists the result so future redeploys no longer depend on env.
 func (s *toolConfigStore) Load(root string) error {
-	cfg := defaultToolConfig(root)
-	raw, err := os.ReadFile(s.path)
-	if err == nil {
-		if err := json.Unmarshal(raw, &cfg); err != nil {
-			return fmt.Errorf("%s 不是有效 JSON: %w", filepath.Base(s.path), err)
-		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("%s 读取失败: %w", filepath.Base(s.path), err)
+	db, err := openToolConfigDB(s.path)
+	if err != nil {
+		return err
 	}
+	s.mu.Lock()
+	s.db = db
+	s.mu.Unlock()
+
+	stored, ok, err := readToolConfigRow(db)
+	if err != nil {
+		return fmt.Errorf("read config database: %w", err)
+	}
+
+	cfg := defaultToolConfig(root)
+	migratedFromFile := false
+	legacyPath := filepath.Join(root, "data", toolConfigFileName)
+	if ok {
+		if err := json.Unmarshal(stored, &cfg); err != nil {
+			return fmt.Errorf("%s 不是有效 JSON: %w", toolConfigDBName, err)
+		}
+	} else if raw, readErr := os.ReadFile(legacyPath); readErr == nil {
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			return fmt.Errorf("%s 不是有效 JSON: %w", toolConfigFileName, err)
+		}
+		migratedFromFile = true
+	} else if !errors.Is(readErr, os.ErrNotExist) {
+		return fmt.Errorf("%s 读取失败: %w", toolConfigFileName, readErr)
+	}
+
 	cfg, err = normalizeToolConfig(cfg, ToolConfig{})
 	if err != nil {
 		return err
 	}
+
+	if !ok {
+		data, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		if err := writeToolConfigRow(db, data); err != nil {
+			return fmt.Errorf("seed config database: %w", err)
+		}
+		if migratedFromFile {
+			// Retain the migrated file as a backup but stop reading it.
+			_ = os.Rename(legacyPath, legacyPath+".migrated")
+		}
+	}
+
 	s.mu.Lock()
 	s.cfg = cfg
 	s.mu.Unlock()
 	applyToolConfigSnapshot(cfg)
 	return nil
+}
+
+// Close releases the underlying database handle.
+func (s *toolConfigStore) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.db == nil {
+		return nil
+	}
+	err := s.db.Close()
+	s.db = nil
+	return err
 }
 
 func (s *toolConfigStore) Snapshot() ToolConfig {
@@ -125,15 +179,14 @@ func (s *toolConfigStore) SavePatch(patch adminConfigPatch) (ToolConfig, bool, e
 	if err != nil {
 		return ToolConfig{}, false, err
 	}
-	data, err := json.MarshalIndent(normalized, "", "  ")
+	data, err := json.Marshal(normalized)
 	if err != nil {
 		return ToolConfig{}, false, err
 	}
-	data = append(data, '\n')
-	if err := os.MkdirAll(filepath.Dir(s.path), 0755); err != nil {
-		return ToolConfig{}, false, err
+	if s.db == nil {
+		return ToolConfig{}, false, errors.New("config database is not initialized")
 	}
-	if err := os.WriteFile(s.path, data, 0600); err != nil {
+	if err := writeToolConfigRow(s.db, data); err != nil {
 		return ToolConfig{}, false, err
 	}
 	s.cfg = normalized

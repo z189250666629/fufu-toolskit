@@ -61,6 +61,13 @@ npm run start:all
 
 统一服务复用已有变量，不新增重复配置。
 
+> **配置持久化**：管理后台保存的 NewAPI 站点与活动配置写入 SQLite 数据库
+> `apps/fufu-tool-site/data/tool-config.db`（随 `./data` 卷持久化）。下面列出的
+> `NEWAPI_*` / `FUFU_*` / `MCY_*` 变量**仅作为首次启动的初始种子**——数据库一旦写入即成为
+> 唯一数据源，之后重新部署代码无需再次修改这些环境变量，直接在后台修改并保存即可。
+> 例外：`ADMIN_TOKEN` 始终用于后台登录鉴权，必须保留在环境变量中。旧版
+> `data/tool-config.json` 会在首次启动时自动迁移进数据库，并备份为 `tool-config.json.migrated`。
+
 ### NewAPI / 状态面板 / 合卡
 
 ```powershell

@@ -305,9 +305,9 @@ func TestAdminConfigSavesNewAPISitesForStatusAndCombine(t *testing.T) {
 		},
 	})
 
-	configPath := filepath.Join(root, "data", "tool-config.json")
+	configPath := filepath.Join(root, "data", toolConfigDBName)
 	if _, err := os.Stat(configPath); err != nil {
-		t.Fatalf("expected config file at %s: %v", configPath, err)
+		t.Fatalf("expected config database at %s: %v", configPath, err)
 	}
 
 	statusReq := httptest.NewRequest(http.MethodGet, "/api/newapi/sites", nil)
@@ -406,6 +406,59 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 	}
 	if body := prizesW.Body.String(); !strings.Contains(body, `"42"`) || !strings.Contains(body, `"dollars":7`) || !strings.Contains(body, `"weight":3`) {
 		t.Fatalf("activity prizes should reflect unified admin config, got %s", body)
+	}
+}
+
+func TestAdminConfigMigratesLegacyFileAndBecomesSourceOfTruth(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+
+	// Simulate a pre-database deployment that already saved a tool-config.json.
+	dataDir := filepath.Join(root, "data")
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := filepath.Join(dataDir, "tool-config.json")
+	legacyJSON := `{"newapi":{"sites":[{"name":"迁移站点","url":"https://migrated.example.test","token":"legacy-token","userId":"1","kind":"api","quotaUnit":500000,"currency":"$","rechargeRatio":1}]},"activity":{"startText":"2026-07-01 00:00:00","spinMap":{"7":7}}}`
+	if err := os.WriteFile(legacy, []byte(legacyJSON), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+
+	snap := unifiedConfig.Snapshot()
+	if len(snap.NewAPI.Sites) != 1 || snap.NewAPI.Sites[0].Name != "迁移站点" || snap.NewAPI.Sites[0].Token != "legacy-token" {
+		t.Fatalf("legacy sites not migrated into database: %#v", snap.NewAPI.Sites)
+	}
+	if snap.Activity.StartText != "2026-07-01 00:00:00" || snap.Activity.SpinMap[7] != 7 {
+		t.Fatalf("legacy activity not migrated: %#v", snap.Activity)
+	}
+	if _, err := os.Stat(filepath.Join(dataDir, toolConfigDBName)); err != nil {
+		t.Fatalf("expected config database after migration: %v", err)
+	}
+	if _, err := os.Stat(legacy); !os.IsNotExist(err) {
+		t.Fatalf("legacy tool-config.json should be renamed after migration, stat err=%v", err)
+	}
+	if _, err := os.Stat(legacy + ".migrated"); err != nil {
+		t.Fatalf("expected migrated legacy backup: %v", err)
+	}
+
+	// Restart with different env vars. The database must remain the source of
+	// truth, so env changes after the first boot are ignored.
+	shutdownRuntime()
+	t.Setenv("NEWAPI_API_SITE_URL", "https://env-should-be-ignored.example.test")
+	t.Setenv("NEWAPI_API_SITE_TOKEN", "env-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	snap = unifiedConfig.Snapshot()
+	if len(snap.NewAPI.Sites) != 1 || snap.NewAPI.Sites[0].Name != "迁移站点" || snap.NewAPI.Sites[0].URL != "https://migrated.example.test" {
+		t.Fatalf("database should stay source of truth over env, got %#v", snap.NewAPI.Sites)
 	}
 }
 

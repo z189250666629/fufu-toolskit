@@ -44,6 +44,9 @@ apps/**/data/*.db
 apps/**/data/*.db-*
 apps/**/data/*.sqlite
 apps/**/data/*.sqlite-*
+# Runtime config (now stored in the SQLite config DB; legacy file + migration backup)
+apps/**/data/tool-config.json
+apps/**/data/tool-config.json.migrated
 !apps/**/data/.gitkeep
 
 # Backups
