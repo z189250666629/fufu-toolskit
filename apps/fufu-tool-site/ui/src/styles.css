@@ -357,6 +357,13 @@ select {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px;
+  align-items: stretch;
+}
+
+/* anchor-wrapped cards must fill the grid row so cards in a row stay equal height */
+.tool-card-anchor {
+  display: grid;
+  text-decoration: none;
 }
 
 .tool-card,
