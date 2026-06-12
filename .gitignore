@@ -47,6 +47,8 @@ apps/**/data/*.sqlite-*
 # Runtime config (now stored in the SQLite config DB; legacy file + migration backup)
 apps/**/data/tool-config.json
 apps/**/data/tool-config.json.migrated
+# Runtime 补卡 schedule (per-deployment state)
+apps/**/data/sale-card-schedule.json
 !apps/**/data/.gitkeep
 
 # Backups

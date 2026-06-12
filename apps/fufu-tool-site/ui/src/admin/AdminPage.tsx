@@ -18,8 +18,7 @@ import type {
   PrizeConfigResponse,
   RuntimeSitesResponse,
   SaleCardConfig,
-  SaleCardJob,
-  SaleCardPlan
+  SaleCardRunResult
 } from './types';
 
 type MessageState = {
@@ -276,6 +275,29 @@ function RuntimeSites({ sites }: { sites?: RuntimeSitesResponse }) {
   return <DataTable columns={['站点', '显示地址', 'User ID', '合卡复用']} rows={rows} empty="登录后加载状态页站点。" />;
 }
 
+const SALE_SLOTS: { group: string; label: string; defaultTime: string }[] = [
+  { group: 'special55', label: '55 次混合特惠卡', defaultTime: '09:00' },
+  { group: 'month', label: '月次卡', defaultTime: '09:30' }
+];
+
+type SlotState = { time: string; enabled: boolean; jobs: Record<string, { targetStock: number; enabled: boolean }> };
+
+function buildSlotState(config?: SaleCardConfig): Record<string, SlotState> {
+  const plans = config?.plans ?? [];
+  const slots = config?.schedule?.slots ?? [];
+  const state: Record<string, SlotState> = {};
+  for (const def of SALE_SLOTS) {
+    const saved = slots.find((slot) => slot.group === def.group);
+    const jobs: Record<string, { targetStock: number; enabled: boolean }> = {};
+    for (const plan of plans.filter((p) => (p.slot || '') === def.group)) {
+      const savedJob = saved?.jobs?.find((job) => job.plan === plan.id);
+      jobs[plan.id] = { targetStock: savedJob?.targetStock ?? 0, enabled: Boolean(savedJob?.enabled) };
+    }
+    state[def.group] = { time: saved?.time || def.defaultTime, enabled: Boolean(saved?.enabled), jobs };
+  }
+  return state;
+}
+
 function SaleCardManager({
   config,
   onSave,
@@ -283,79 +305,113 @@ function SaleCardManager({
 }: {
   config?: SaleCardConfig;
   onSave: (schedule: NonNullable<SaleCardConfig['schedule']>) => Promise<void>;
-  onRun: (plan: string, count: number) => Promise<void>;
+  onRun: (plan: string, targetStock: number) => Promise<SaleCardRunResult | undefined>;
 }) {
   const plans = config?.plans ?? [];
-  const initialSchedule = config?.schedule ?? { enabled: false, time: '09:00', timezone: 'Asia/Shanghai', jobs: [] };
-  const [enabled, setEnabled] = useState(Boolean(initialSchedule.enabled));
-  const [time, setTime] = useState(initialSchedule.time || '09:00');
-  const [timezone, setTimezone] = useState(initialSchedule.timezone || 'Asia/Shanghai');
-  const [jobs, setJobs] = useState<SaleCardJob[]>(initialSchedule.jobs ?? []);
+  const [enabled, setEnabled] = useState(Boolean(config?.schedule?.enabled));
+  const [timezone, setTimezone] = useState(config?.schedule?.timezone || 'Asia/Shanghai');
+  const [slotState, setSlotState] = useState<Record<string, SlotState>>(() => buildSlotState(config));
   const [runPlan, setRunPlan] = useState(plans[0]?.id ?? '');
-  const [runCount, setRunCount] = useState(1);
+  const [runTarget, setRunTarget] = useState(50);
+  const [runResult, setRunResult] = useState<SaleCardRunResult>();
 
   useEffect(() => {
-    setEnabled(Boolean(initialSchedule.enabled));
-    setTime(initialSchedule.time || '09:00');
-    setTimezone(initialSchedule.timezone || 'Asia/Shanghai');
-    setJobs(initialSchedule.jobs ?? []);
-    setRunPlan(plans[0]?.id ?? '');
+    setEnabled(Boolean(config?.schedule?.enabled));
+    setTimezone(config?.schedule?.timezone || 'Asia/Shanghai');
+    setSlotState(buildSlotState(config));
+    setRunPlan((config?.plans ?? [])[0]?.id ?? '');
   }, [config]);
 
-  function jobFor(plan: SaleCardPlan) {
-    return jobs.find((job) => job.plan === plan.id) ?? { plan: plan.id, count: 1, enabled: false };
+  function patchSlot(group: string, patch: Partial<Omit<SlotState, 'jobs'>>) {
+    setSlotState((current) => ({ ...current, [group]: { ...current[group], ...patch } }));
+  }
+  function patchJob(group: string, planId: string, patch: Partial<{ targetStock: number; enabled: boolean }>) {
+    setSlotState((current) => {
+      const slot = current[group];
+      const job = slot.jobs[planId] ?? { targetStock: 0, enabled: false };
+      return { ...current, [group]: { ...slot, jobs: { ...slot.jobs, [planId]: { ...job, ...patch } } } };
+    });
+  }
+  function buildSchedule(): NonNullable<SaleCardConfig['schedule']> {
+    return {
+      enabled,
+      timezone,
+      slots: SALE_SLOTS.map((def) => {
+        const slot = slotState[def.group];
+        const slotPlans = plans.filter((plan) => (plan.slot || '') === def.group);
+        return {
+          group: def.group,
+          time: slot.time,
+          enabled: slot.enabled,
+          jobs: slotPlans.map((plan) => ({
+            plan: plan.id,
+            targetStock: slot.jobs[plan.id]?.targetStock ?? 0,
+            enabled: Boolean(slot.jobs[plan.id]?.enabled)
+          }))
+        };
+      })
+    };
   }
 
-  function updateJob(plan: SaleCardPlan, patch: Partial<SaleCardJob>) {
-    const next = jobFor(plan);
-    const merged = { ...next, ...patch };
-    setJobs((current) => {
-      const without = current.filter((job) => job.plan !== plan.id);
-      return [...without, merged];
-    });
+  async function runNow() {
+    const result = await onRun(runPlan, runTarget);
+    if (result) setRunResult(result);
   }
 
   return (
     <div className="business-stack">
       <div className="action-row">
-        <label className="field--inline"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /> 启用每日自动上架</label>
-        <Input className="mini-input blueprint-input" value={time} onChange={(event) => setTime(event.target.value)} aria-label="上架时间" />
+        <label className="field--inline"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /> 启用自动补卡</label>
         <Input className="mini-input blueprint-input" value={timezone} onChange={(event) => setTimezone(event.target.value)} aria-label="时区" />
-        <Button className="blueprint-button" onPress={() => onSave({ enabled, time, timezone, jobs })}>保存上架计划</Button>
+        <Button className="blueprint-primary-button" onPress={() => onSave(buildSchedule())}>保存补卡计划</Button>
       </div>
-      <DataTable
-        columns={['计划', '额度', '周期', '每日数量', '启用']}
-        rows={plans.map((plan) => {
-          const job = jobFor(plan);
-          return [
-            `${plan.name || plan.id} / ITEM ${plan.itemId || '-'} / SKU ${plan.skuId || '-'}`,
-            `$${plan.quota ?? '-'}`,
-            plan.intervalUnit || '-',
-            job.count ?? '',
-            job.enabled ? '是' : '否'
-          ];
-        })}
-        empty="暂无销售卡计划"
-      />
-      <div className="sale-job-list">
-        {plans.map((plan) => {
-          const job = jobFor(plan);
-          return (
-            <div className="sale-job-row" key={plan.id}>
-              <span>{plan.name || plan.id}</span>
-              <Input className="mini-input blueprint-input" type="number" min={1} max={100} value={String(job.count || '')} onChange={(event) => updateJob(plan, { count: Number(event.target.value) })} />
-              <label className="field--inline"><input type="checkbox" checked={Boolean(job.enabled)} onChange={(event) => updateJob(plan, { enabled: event.target.checked })} /> 启用</label>
+      <p className="inline-help">月次卡与 55 次混合特惠卡各占一个独立时段；到点按目标库存补齐（补 目标-当前）。</p>
+      {SALE_SLOTS.map((def) => {
+        const slot = slotState[def.group];
+        const slotPlans = plans.filter((plan) => (plan.slot || '') === def.group);
+        if (!slot) return null;
+        return (
+          <section key={def.group} className="bp-card sale-slot-card">
+            <header className="bp-card-titlebar">
+              <span>{def.label} 时段</span>
+              <div className="sale-slot-controls">
+                <Input className="mini-input blueprint-input" value={slot.time} placeholder="09:00" onChange={(event) => patchSlot(def.group, { time: event.target.value })} aria-label={`${def.label}补卡时间`} />
+                <label className="field--inline"><input type="checkbox" checked={slot.enabled} onChange={(event) => patchSlot(def.group, { enabled: event.target.checked })} /> 启用时段</label>
+              </div>
+            </header>
+            <div className="bp-card-body">
+              <div className="sale-job-list">
+                {slotPlans.length ? slotPlans.map((plan) => {
+                  const job = slot.jobs[plan.id] ?? { targetStock: 0, enabled: false };
+                  return (
+                    <div className="sale-job-row" key={plan.id}>
+                      <span className="sale-job-name">{plan.name || plan.id}<span className="sale-job-meta">SKU {plan.skuId || '-'} · ${plan.quota ?? '-'}</span></span>
+                      <label className="field--inline sale-job-target">补齐到<Input className="mini-input blueprint-input" type="number" min={0} max={2000} value={String(job.targetStock || '')} onChange={(event) => patchJob(def.group, plan.id, { targetStock: Number(event.target.value) })} aria-label={`${plan.name || plan.id}目标库存`} />张</label>
+                      <label className="field--inline"><input type="checkbox" checked={job.enabled} onChange={(event) => patchJob(def.group, plan.id, { enabled: event.target.checked })} /> 启用</label>
+                    </div>
+                  );
+                }) : <p className="inline-help">该时段暂无计划。</p>}
+              </div>
             </div>
-          );
-        })}
-      </div>
+          </section>
+        );
+      })}
+      <div className="config-subhead">立即补卡（手动）</div>
       <div className="action-row">
         <select className="native-select" value={runPlan} onChange={(event) => setRunPlan(event.target.value)}>
           {plans.length ? plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name || plan.id}</option>) : <option value="">暂无计划</option>}
         </select>
-        <Input className="mini-input blueprint-input" type="number" min={1} max={100} value={String(runCount)} onChange={(event) => setRunCount(Number(event.target.value))} aria-label="上架数量" />
-        <Button className="blueprint-primary-button" onPress={() => onRun(runPlan, runCount)} isDisabled={!runPlan}>立即上架</Button>
+        <label className="field--inline">补齐到<Input className="mini-input blueprint-input" type="number" min={0} max={2000} value={String(runTarget)} onChange={(event) => setRunTarget(Number(event.target.value))} aria-label="目标库存" />张</label>
+        <Button className="blueprint-primary-button" onPress={runNow} isDisabled={!runPlan}>立即补卡</Button>
       </div>
+      {runResult ? (
+        <div className="metrics sale-run-result">
+          <Metric label="当前库存" value={runResult.currentStock} />
+          <Metric label="目标库存" value={runResult.targetStock} />
+          <Metric label="本次补卡" value={runResult.toUpload} />
+          <Metric label="已上架" value={runResult.uploaded} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -566,23 +622,26 @@ export function AdminPage() {
   }
 
   async function saveSaleSchedule(schedule: NonNullable<SaleCardConfig['schedule']>) {
-    setMessage({ text: '正在保存上架计划…' });
+    setMessage({ text: '正在保存补卡计划…' });
     try {
-      const next = await sendJSON<SaleCardConfig>('/api/admin/sale-cards/config', 'POST', schedule);
+      // Backend expects the schedule wrapped: {"schedule": {...}}.
+      const next = await sendJSON<SaleCardConfig>('/api/admin/sale-cards/config', 'POST', { schedule });
       setSaleCards(next);
-      setMessage({ text: '上架计划已保存', tone: 'ok' });
+      setMessage({ text: '补卡计划已保存', tone: 'ok' });
     } catch (error) {
       setMessage({ text: messageFromError(error), tone: 'error' });
     }
   }
 
-  async function runSalePlan(plan: string, count: number) {
-    setMessage({ text: '正在执行销售卡上架…' });
+  async function runSalePlan(plan: string, targetStock: number): Promise<SaleCardRunResult | undefined> {
+    setMessage({ text: '正在执行补卡…' });
     try {
-      await sendJSON('/api/admin/sale-cards/run', 'POST', { plan, count });
-      setMessage({ text: '销售卡上架执行完成', tone: 'ok' });
+      const result = await sendJSON<SaleCardRunResult>('/api/admin/sale-cards/run', 'POST', { plan, targetStock });
+      setMessage({ text: `补卡完成：当前 ${result.currentStock ?? 0} → 目标 ${result.targetStock ?? 0}，补 ${result.toUpload ?? 0} 张`, tone: 'ok' });
+      return result;
     } catch (error) {
       setMessage({ text: messageFromError(error), tone: 'error' });
+      return undefined;
     }
   }
 
@@ -648,7 +707,7 @@ export function AdminPage() {
                     onChange={(sites) => setConfig({ ...config, newapi: { sites } })}
                   />
                 </ConfigCard>
-                <ConfigCard title="销售卡上架" description="自动补货计划复用当前 NewAPI 主站生成卡密，再推送到活动商城。">
+                <ConfigCard title="自动补卡" description="按时段把库存补齐到目标：查询 NewAPI 当前库存，补 目标-当前 张并推送到活动商城。月次卡与 55 次混合特惠卡各一个独立时段。">
                   <SaleCardManager config={saleCards} onSave={saveSaleSchedule} onRun={runSalePlan} />
                 </ConfigCard>
               </Tabs.Panel>

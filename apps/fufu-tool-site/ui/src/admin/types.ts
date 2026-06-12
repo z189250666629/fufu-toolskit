@@ -71,24 +71,43 @@ export type SaleCardPlan = {
   itemId?: string;
   skuId?: string;
   group?: string;
+  slot?: string;
 };
 
 export type SaleCardJob = {
   plan: string;
-  count?: number;
+  targetStock?: number;
   enabled?: boolean;
+};
+
+export type SaleCardSlot = {
+  group: string;
+  label?: string;
+  time?: string;
+  enabled?: boolean;
+  jobs?: SaleCardJob[];
 };
 
 export type SaleCardSchedule = {
   enabled?: boolean;
-  time?: string;
   timezone?: string;
-  jobs?: SaleCardJob[];
+  slots?: SaleCardSlot[];
 };
 
 export type SaleCardConfig = {
   plans?: SaleCardPlan[];
   schedule?: SaleCardSchedule;
+};
+
+export type SaleCardRunResult = {
+  planId?: string;
+  planName?: string;
+  currentStock?: number;
+  targetStock?: number;
+  toUpload?: number;
+  uploaded?: number;
+  generated?: number;
+  keys?: string[];
 };
 
 export type PrizeConfigResponse = ActivityConfig;

@@ -971,6 +971,45 @@ tr:last-child td {
   border-bottom: 1px dashed var(--blueprint-grid-line-strong);
 }
 
+.sale-slot-card {
+  margin-top: 6px;
+}
+
+.sale-slot-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sale-slot-card .sale-job-row {
+  grid-template-columns: minmax(150px, 1fr) auto auto;
+}
+
+.sale-job-row:last-child {
+  border-bottom: 0;
+}
+
+.sale-job-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sale-job-meta {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: var(--blueprint-text-secondary);
+}
+
+.sale-job-target .mini-input {
+  width: 72px;
+}
+
+.sale-run-result {
+  margin-top: 4px;
+}
+
 .fade-in {
   opacity: 0;
   transform: translateY(8px);
