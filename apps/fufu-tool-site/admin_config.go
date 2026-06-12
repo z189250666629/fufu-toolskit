@@ -41,6 +41,7 @@ type NewAPIAdminConfig struct {
 
 type ManagedAPISiteConfig struct {
 	Name                string  `json:"name"`
+	Category            string  `json:"category,omitempty"`
 	URL                 string  `json:"url"`
 	Token               string  `json:"token,omitempty"`
 	UserID              string  `json:"userId"`
@@ -222,6 +223,7 @@ func managedSiteConfigsFromSites(sites []newapi.Site) []ManagedAPISiteConfig {
 	for _, site := range sites {
 		out = append(out, ManagedAPISiteConfig{
 			Name:                site.Name,
+			Category:            site.Category,
 			URL:                 site.URL,
 			Token:               site.Token,
 			UserID:              site.UserID,
@@ -249,6 +251,17 @@ func normalizeManagedAPISiteConfigs(sites, previous []ManagedAPISiteConfig) ([]M
 		site.Currency = strings.TrimSpace(site.Currency)
 		site.ChannelListEndpoint = strings.TrimSpace(site.ChannelListEndpoint)
 		site.Note = strings.TrimSpace(site.Note)
+		site.Category = strings.ToLower(strings.TrimSpace(site.Category))
+		if site.Category == "" {
+			if strings.Contains(strings.ToLower(site.Name), "token") {
+				site.Category = "token"
+			} else {
+				site.Category = "api"
+			}
+		}
+		if site.Category != "api" && site.Category != "token" {
+			return nil, fmt.Errorf("第 %d 个站点类别不支持（只能 api 或 token）: %s", i+1, site.Category)
+		}
 		if site.Token == "" {
 			site.Token = matchingSiteToken(site, previous)
 		}
@@ -314,6 +327,7 @@ func isSupportedAdminSiteKind(kind string) bool {
 func (site ManagedAPISiteConfig) toNewAPISite() newapi.Site {
 	return newapi.Site{
 		Name:                site.Name,
+		Category:            site.Category,
 		URL:                 site.URL,
 		Token:               site.Token,
 		UserID:              site.UserID,
@@ -341,6 +355,11 @@ func managedSitesForRuntime() ([]newapi.Site, string) {
 
 func primarySiteForCombine() (newapi.Site, error) {
 	sites, msg := managedSitesForRuntime()
+	for _, site := range sites {
+		if strings.EqualFold(site.Category, "api") {
+			return site, nil
+		}
+	}
 	if len(sites) > 0 {
 		return sites[0], nil
 	}
@@ -552,6 +571,7 @@ func adminSiteResponses(sites []ManagedAPISiteConfig) []map[string]any {
 	for _, site := range sites {
 		out = append(out, map[string]any{
 			"name":                site.Name,
+			"category":            site.Category,
 			"url":                 site.URL,
 			"userId":              site.UserID,
 			"kind":                site.Kind,

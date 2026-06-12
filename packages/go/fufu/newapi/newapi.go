@@ -14,6 +14,7 @@ const maxResponseBodyBytes int64 = 16 << 20
 
 type Site struct {
 	Name                string  `json:"name"`
+	Category            string  `json:"category,omitempty"`
 	URL                 string  `json:"url"`
 	Token               string  `json:"-"`
 	UserID              string  `json:"userId"`
@@ -28,6 +29,7 @@ type Site struct {
 
 type PublicSite struct {
 	Name           string  `json:"name"`
+	Category       string  `json:"category,omitempty"`
 	URL            string  `json:"url,omitempty"`
 	DisplayURL     string  `json:"displayUrl"`
 	UserID         string  `json:"userId"`
@@ -39,7 +41,7 @@ type PublicSite struct {
 }
 
 func (s Site) Public() PublicSite {
-	return PublicSite{Name: s.Name, DisplayURL: "地址已隐藏", UserID: s.UserID, Kind: s.Kind, SkipUserHeader: s.SkipUserHeader, QuotaUnit: s.QuotaUnit, Currency: s.Currency, RechargeRatio: s.RechargeRatio}
+	return PublicSite{Name: s.Name, Category: s.Category, DisplayURL: "地址已隐藏", UserID: s.UserID, Kind: s.Kind, SkipUserHeader: s.SkipUserHeader, QuotaUnit: s.QuotaUnit, Currency: s.Currency, RechargeRatio: s.RechargeRatio}
 }
 
 type Client struct {

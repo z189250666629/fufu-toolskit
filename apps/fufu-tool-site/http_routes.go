@@ -170,6 +170,22 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 			status = 500
 		}
 		writeJSON(w, status, map[string]any{"configured": len(sites) > 0, "error": publicMsg, "sites": publics})
+	case "/api/nav/lines":
+		sites, _ := managedSitesForRuntime()
+		apiLines := []map[string]any{}
+		tokenLines := []map[string]any{}
+		for _, s := range sites {
+			line := map[string]any{"name": s.Name, "url": s.URL}
+			if strings.EqualFold(s.Category, "token") {
+				tokenLines = append(tokenLines, line)
+			} else {
+				apiLines = append(apiLines, line)
+			}
+		}
+		writeJSON(w, 200, map[string]any{"categories": []map[string]any{
+			{"kind": "api", "name": "API 次数站", "lines": apiLines},
+			{"kind": "token", "name": "Token 站", "lines": tokenLines},
+		}})
 	case "/api/newapi/model-status":
 		force := r.URL.Query().Get("refresh") == "1"
 		status := getModelStatus(r.Context(), force)
