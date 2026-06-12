@@ -210,16 +210,6 @@ function SiteEditor({
                     <label className="field">名称<Input className="blueprint-input" value={site.name || ''} onChange={(event) => updateSite(index, { name: event.target.value })} /></label>
                     <label className="field">base_url<Input className="blueprint-input" value={site.url || ''} placeholder="https://api.example.com" onChange={(event) => updateSite(index, { url: event.target.value })} /></label>
                     <label className="field">access token<Input className="blueprint-input" type="password" value={site.token || ''} placeholder={site.tokenMasked || '留空不变'} onChange={(event) => updateSite(index, { token: event.target.value })} /></label>
-                    <label className="field">User ID<Input className="blueprint-input" value={site.userId || '1'} onChange={(event) => updateSite(index, { userId: event.target.value })} /></label>
-                    <label className="field">Quota Unit<Input className="blueprint-input" type="number" value={String(site.quotaUnit || 500000)} onChange={(event) => updateSite(index, { quotaUnit: Number(event.target.value) })} /></label>
-                    <label className="field">Currency<Input className="blueprint-input" value={site.currency || '$'} onChange={(event) => updateSite(index, { currency: event.target.value })} /></label>
-                    <label className="field">Recharge Ratio<Input className="blueprint-input" type="number" step="0.0001" value={String(site.rechargeRatio || 1)} onChange={(event) => updateSite(index, { rechargeRatio: Number(event.target.value) })} /></label>
-                    <label className="field">Channel Endpoint<Input className="blueprint-input" value={site.channelListEndpoint || ''} onChange={(event) => updateSite(index, { channelListEndpoint: event.target.value })} /></label>
-                    <label className="field">Note<Input className="blueprint-input" value={site.note || ''} onChange={(event) => updateSite(index, { note: event.target.value })} /></label>
-                    <label className="field field--inline">
-                      <input type="checkbox" checked={Boolean(site.skipUserHeader)} onChange={(event) => updateSite(index, { skipUserHeader: event.target.checked })} />
-                      Skip User Header
-                    </label>
                   </div>
                 </div>
               ))}
