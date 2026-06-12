@@ -23,6 +23,7 @@ type SaleCardPlan struct {
 	ID            string  `json:"id,omitempty"`
 	Name          string  `json:"name,omitempty"`
 	Count         int     `json:"count"`
+	TargetStock   int     `json:"targetStock,omitempty"`
 	Quota         float64 `json:"quota"`
 	Group         string  `json:"group,omitempty"`
 	IntervalUnit  int     `json:"intervalUnit"`
@@ -38,9 +39,12 @@ type SaleCardListingResult struct {
 	PlanName  string   `json:"planName,omitempty"`
 	ItemID    int      `json:"itemId"`
 	SKUID     int      `json:"skuId"`
-	Generated int      `json:"generated"`
-	Uploaded  int      `json:"uploaded"`
-	Keys      []string `json:"keys"`
+	Generated    int      `json:"generated"`
+	Uploaded     int      `json:"uploaded"`
+	CurrentStock int      `json:"currentStock"`
+	TargetStock  int      `json:"targetStock"`
+	ToUpload     int      `json:"toUpload"`
+	Keys         []string `json:"keys"`
 }
 
 func saleCardPlanTemplates() map[string]SaleCardPlan {
@@ -96,8 +100,27 @@ func generateAndUploadSaleCards(ctx context.Context, svc *tokens.Service, plan S
 		return result, fmt.Errorf("%w: token service is not configured", ErrSaleCardGenerationFailed)
 	}
 
+	// 补卡：若设了目标库存，先查 MCY 当前可用卡数，补齐到目标（补 target-current）。
+	uploadCount := plan.Count
+	if plan.TargetStock > 0 {
+		current, err := queryMCYUsableStock(ctx, plan.ItemID, plan.SKUID)
+		if err != nil {
+			return result, err
+		}
+		result.CurrentStock = current
+		result.TargetStock = plan.TargetStock
+		uploadCount = plan.TargetStock - current
+		if uploadCount < 0 {
+			uploadCount = 0
+		}
+	}
+	result.ToUpload = uploadCount
+	if uploadCount <= 0 {
+		return result, nil
+	}
+
 	createBody := buildSaleTokenCreateBody(saleCardTokenName(plan), svc.DollarsToQuota(plan.Quota), plan.Group, plan.IntervalUnit)
-	res, data, err := svc.CreateTokens(ctx, plan.Count, createBody)
+	res, data, err := svc.CreateTokens(ctx, uploadCount, createBody)
 	if err != nil {
 		return result, fmt.Errorf("%w: %v", ErrSaleCardGenerationFailed, err)
 	}
@@ -108,8 +131,8 @@ func generateAndUploadSaleCards(ctx context.Context, svc *tokens.Service, plan S
 		return result, fmt.Errorf("%w: %s", ErrSaleCardGenerationFailed, newapi.ErrorMessage(data, res.StatusCode, "NewAPI 创建卡密失败"))
 	}
 	keys := extractCreatedSaleCardKeys(data)
-	if len(keys) != plan.Count {
-		return result, fmt.Errorf("%w: NewAPI returned %d keys for %d requested cards", ErrSaleCardGenerationFailed, len(keys), plan.Count)
+	if len(keys) != uploadCount {
+		return result, fmt.Errorf("%w: NewAPI returned %d keys for %d requested cards", ErrSaleCardGenerationFailed, len(keys), uploadCount)
 	}
 	result.Keys = keys
 	result.Generated = len(keys)
