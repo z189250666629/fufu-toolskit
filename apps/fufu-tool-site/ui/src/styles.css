@@ -813,39 +813,43 @@ select {
   gap: 14px;
 }
 
-/* site config grouped into 次数站 / token 站, each with multiple lines */
+/* site config: 2 categories (次数站 / token 站), each one site = 1 token + many base_urls */
 .site-groups {
   display: grid;
   gap: 16px;
 }
 
-.site-line {
-  padding: 14px 0;
-  border-bottom: 1px dashed var(--blueprint-grid-line-strong);
+.site-token-field {
+  margin-bottom: 14px;
 }
 
-.site-line:first-child {
-  padding-top: 2px;
+.site-url-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
 }
 
-.site-line:last-child {
-  border-bottom: 0;
-  padding-bottom: 2px;
-}
-
-.site-line-head {
+.site-url-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 10px;
 }
 
-.site-line-name {
+.site-url-row .blueprint-input {
+  flex: 1 1 auto;
+}
+
+.site-url-tag {
+  flex: 0 0 auto;
+  min-width: 44px;
+  padding: 4px 8px;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   letter-spacing: 0.04em;
+  text-align: center;
   color: var(--blueprint-text-secondary);
+  background: var(--blueprint-fill-block);
+  border: 1px solid var(--blueprint-line-soft);
 }
 
 .site-card {

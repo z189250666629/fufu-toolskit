@@ -339,6 +339,59 @@ func TestAdminConfigSavesNewAPISitesForStatusAndCombine(t *testing.T) {
 	}
 }
 
+func TestAdminConfigSharesOneTokenAcrossSiteURLs(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	// Configure the 次数站 token once on its first base_url line.
+	saveAdminConfig(t, map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{"name": "线路 1", "category": "api", "url": "https://api-1.example.test", "token": "shared-token-1"},
+			},
+		},
+	})
+
+	// Add a second base_url line with a blank token (the UI never re-sends the
+	// masked token). Both lines must end up on the one shared site token.
+	saveAdminConfig(t, map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{"name": "线路 1", "category": "api", "url": "https://api-1.example.test"},
+				{"name": "线路 2", "category": "api", "url": "https://api-2.example.test"},
+			},
+		},
+	})
+
+	snap := unifiedConfig.Snapshot()
+	if len(snap.NewAPI.Sites) != 2 {
+		t.Fatalf("expected 2 base_url lines, got %#v", snap.NewAPI.Sites)
+	}
+	for _, site := range snap.NewAPI.Sites {
+		if site.Token != "shared-token-1" {
+			t.Fatalf("line %q should inherit the one site token, got token=%q", site.Name, site.Token)
+		}
+	}
+
+	// "线路 1" can coexist under both categories without a duplicate-name error.
+	saveAdminConfig(t, map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{"name": "线路 1", "category": "api", "url": "https://api-1.example.test", "token": "shared-token-1"},
+				{"name": "线路 1", "category": "token", "url": "https://token-1.example.test", "token": "shared-token-2"},
+			},
+		},
+	})
+	if got := unifiedConfig.Snapshot().NewAPI.Sites; len(got) != 2 {
+		t.Fatalf("same line name across categories should be allowed, got %#v", got)
+	}
+}
+
 func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 	root := t.TempDir()
 	writeToolSiteFixture(t, root)

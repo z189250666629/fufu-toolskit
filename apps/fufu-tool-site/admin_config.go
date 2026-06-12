@@ -268,8 +268,12 @@ func normalizeManagedAPISiteConfigs(sites, previous []ManagedAPISiteConfig) ([]M
 		if site.Name == "" {
 			return nil, fmt.Errorf("第 %d 个 NewAPI 站点缺少名称", i+1)
 		}
-		if seen[site.Name] {
-			return nil, fmt.Errorf("NewAPI 站点名称重复: %s", site.Name)
+		// One site (category) holds many base_url lines, so line names only need
+		// to be unique within their category — "线路 1" may exist under both 次数站
+		// and token 站.
+		nameKey := site.Category + "\x00" + site.Name
+		if seen[nameKey] {
+			return nil, fmt.Errorf("%s 类站点线路名称重复: %s", site.Category, site.Name)
 		}
 		if site.URL == "" {
 			return nil, fmt.Errorf("第 %d 个 NewAPI 站点 base_url 无效", i+1)
@@ -295,21 +299,37 @@ func normalizeManagedAPISiteConfigs(sites, previous []ManagedAPISiteConfig) ([]M
 		if site.RechargeRatio <= 0 {
 			site.RechargeRatio = 1
 		}
-		seen[site.Name] = true
+		seen[nameKey] = true
 		out = append(out, site)
 	}
 	return out, nil
 }
 
+// matchingSiteToken resolves the token for a line whose token was submitted
+// blank ("沿用原值"). It prefers an exact name+url match, then the same name,
+// and finally any line in the same category — because a site configures its
+// access token once and shares it across every base_url line, a freshly added
+// URL inherits the category token without the admin re-entering it.
 func matchingSiteToken(site ManagedAPISiteConfig, previous []ManagedAPISiteConfig) string {
 	for _, candidate := range previous {
 		if strings.TrimSpace(candidate.Name) == site.Name && config.NormalizeBaseURL(candidate.URL) == site.URL {
-			return strings.TrimSpace(candidate.Token)
+			if token := strings.TrimSpace(candidate.Token); token != "" {
+				return token
+			}
 		}
 	}
 	for _, candidate := range previous {
 		if strings.TrimSpace(candidate.Name) == site.Name {
-			return strings.TrimSpace(candidate.Token)
+			if token := strings.TrimSpace(candidate.Token); token != "" {
+				return token
+			}
+		}
+	}
+	for _, candidate := range previous {
+		if strings.EqualFold(strings.TrimSpace(candidate.Category), site.Category) {
+			if token := strings.TrimSpace(candidate.Token); token != "" {
+				return token
+			}
 		}
 	}
 	return ""
