@@ -8,7 +8,7 @@ import {
   Tabs
 } from '@heroui/react';
 import { fetchJSON, messageFromError, sendJSON } from '../api';
-import { formatNumber, MessageLine, NavPill, ThemeToggle, TopActions, BlueprintHeader, BlueprintStamp } from '../blueprint';
+import { formatNumber, MessageLine, NavPill, ThemeToggle, TopActions, BlueprintHeader } from '../blueprint';
 import type {
   ActivityConfig,
   ActivityStats,
@@ -555,11 +555,9 @@ export function AdminPage() {
               <div className="admin-toolbar-row">
                 <Tabs.List className="admin-tab-list">
                   <Tabs.Tab id="site-replenish" className="admin-tab-card">
-                    <BlueprintStamp>站点</BlueprintStamp>
                     <span className="admin-tab-title">状态页 / 合卡 / 自动补货</span>
                   </Tabs.Tab>
                   <Tabs.Tab id="activity" className="admin-tab-card">
-                    <BlueprintStamp>活动</BlueprintStamp>
                     <span className="admin-tab-title">活动统计 / 奖池 / 期望值</span>
                   </Tabs.Tab>
                 </Tabs.List>

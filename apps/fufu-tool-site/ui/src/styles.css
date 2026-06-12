@@ -562,40 +562,56 @@ select {
   font-size: 0.7rem !important;
 }
 
+/* horizontal text tabs with an underline cursor — the blueprint-design way
+   (heroui-overrides tabPresetContentWidth), not card-shaped tabs */
 .admin-tab-list {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex !important;
+  flex-wrap: wrap;
   align-items: stretch !important;
-  gap: 10px;
+  gap: 0 !important;
+  height: auto !important;
   padding: 0 !important;
-  border-radius: var(--blueprint-radius-panel) !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
 .admin-tab-card {
-  --card-accent: var(--blueprint-accent);
-  display: flex !important;
-  min-height: 64px;
-  padding: 13px 18px !important;
-  flex-direction: column;
-  align-items: flex-start !important;
+  display: inline-flex !important;
+  width: fit-content !important;
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  align-items: center;
   justify-content: center;
-  gap: 7px;
-  border: 1.5px solid var(--blueprint-line) !important;
-  border-left: 4px solid var(--card-accent, var(--blueprint-accent)) !important;
-  border-radius: var(--blueprint-radius-panel) !important;
-  background: var(--blueprint-panel) !important;
-  box-shadow: var(--blueprint-shadow-sm) !important;
+  gap: 8px;
+  padding: 8px 18px !important;
+  margin-bottom: -1.5px;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: var(--blueprint-radius-stamp) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--blueprint-text-muted) !important;
+  white-space: nowrap !important;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.admin-tab-card:hover {
   color: var(--blueprint-text-primary) !important;
-  text-align: left !important;
-  white-space: normal !important;
-  transition: transform 120ms ease, box-shadow 120ms ease, background 200ms ease;
 }
 
 .admin-tab-card[data-selected="true"] {
-  background: color-mix(in srgb, var(--card-accent, var(--blueprint-accent)) 10%, var(--blueprint-panel)) !important;
-  box-shadow: var(--blueprint-shadow) !important;
+  color: var(--blueprint-text-primary) !important;
+  border-bottom-color: var(--blueprint-accent) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.admin-tab-title {
+  font-family: var(--font-mono) !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.02em;
+  margin: 0 !important;
 }
 
 .hero-chip {
