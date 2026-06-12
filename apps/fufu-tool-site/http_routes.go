@@ -175,7 +175,11 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		apiLines := []map[string]any{}
 		tokenLines := []map[string]any{}
 		for _, s := range sites {
-			line := map[string]any{"name": s.Name, "url": s.URL}
+			lineName := s.LineName
+			if strings.TrimSpace(lineName) == "" {
+				lineName = s.Name
+			}
+			line := map[string]any{"name": lineName, "url": s.URL}
 			if strings.EqualFold(s.Category, "token") {
 				tokenLines = append(tokenLines, line)
 			} else {

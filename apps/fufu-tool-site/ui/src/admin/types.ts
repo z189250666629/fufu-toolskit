@@ -2,10 +2,16 @@ export type AdminSession = {
   authenticated: boolean;
 };
 
+export type ManagedSiteURL = {
+  name?: string;
+  url: string;
+};
+
 export type ManagedSite = {
   name: string;
   category?: string;
-  url: string;
+  urls: ManagedSiteURL[];
+  url?: string;
   token?: string;
   tokenMasked?: string;
   tokenSet?: boolean;

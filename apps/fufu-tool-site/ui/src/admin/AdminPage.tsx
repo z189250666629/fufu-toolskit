@@ -15,6 +15,7 @@ import type {
   AdminConfig,
   AdminSession,
   ManagedSite,
+  ManagedSiteURL,
   PrizeConfigResponse,
   RuntimeSitesResponse,
   SaleCardConfig,
@@ -34,7 +35,7 @@ const emptyConfig: AdminConfig = {
 const defaultSite: ManagedSite = {
   name: '',
   category: 'api',
-  url: '',
+  urls: [],
   token: '',
   userId: '1',
   kind: 'api',
@@ -173,52 +174,43 @@ function SiteEditor({
   onChange: (sites: ManagedSite[]) => void;
 }) {
   const categoryOf = (site: ManagedSite) => site.category || 'api';
-  const linesOf = (category: string) =>
-    sites.map((site, index) => ({ site, index })).filter(({ site }) => categoryOf(site) === category);
-  const firstOf = (category: string) => sites.find((site) => categoryOf(site) === category);
+  const indexOf = (category: string) => sites.findIndex((site) => categoryOf(site) === category);
+  const siteFor = (category: string) => sites.find((site) => categoryOf(site) === category);
 
-  function setCategoryToken(category: string, value: string) {
-    if (!sites.some((site) => categoryOf(site) === category)) {
-      onChange([...sites, { ...defaultSite, category, name: '线路 1', token: value }]);
-      return;
-    }
-    onChange(sites.map((site) => (categoryOf(site) === category ? { ...site, token: value } : site)));
+  // Ensure exactly one site exists for a category, returning the working list +
+  // its index. A site = one token + a list of base_url lines.
+  function ensureSite(category: string): [ManagedSite[], number] {
+    const idx = indexOf(category);
+    if (idx >= 0) return [sites, idx];
+    const name = category === 'token' ? 'token-fufu' : '次数fufu';
+    const next = [...sites, { ...defaultSite, category, name, urls: [] }];
+    return [next, next.length - 1];
   }
-  function updateUrl(index: number, url: string) {
-    onChange(sites.map((site, siteIndex) => (siteIndex === index ? { ...site, url } : site)));
+  function setCategoryToken(category: string, value: string) {
+    const [base, idx] = ensureSite(category);
+    onChange(base.map((site, i) => (i === idx ? { ...site, token: value } : site)));
   }
   function addUrl(category: string) {
-    const existing = linesOf(category);
-    const template = existing[0]?.site ?? defaultSite;
-    onChange([
-      ...sites,
-      {
-        ...defaultSite,
-        // A site shares one upstream config across its base_url lines: inherit
-        // the category's NewAPI fields + token from the first line.
-        userId: template.userId,
-        kind: template.kind,
-        skipUserHeader: template.skipUserHeader,
-        quotaUnit: template.quotaUnit,
-        currency: template.currency,
-        rechargeRatio: template.rechargeRatio,
-        channelListEndpoint: template.channelListEndpoint,
-        note: template.note,
-        token: template === defaultSite ? '' : template.token || '',
-        category,
-        name: `线路 ${existing.length + 1}`
-      }
-    ]);
+    const [base, idx] = ensureSite(category);
+    const urls = base[idx].urls ?? [];
+    onChange(base.map((site, i) => (i === idx ? { ...site, urls: [...urls, { name: `线路 ${urls.length + 1}`, url: '' }] } : site)));
   }
-  function removeUrl(index: number) {
-    onChange(sites.filter((_, siteIndex) => siteIndex !== index));
+  function updateUrl(category: string, urlIndex: number, patch: Partial<ManagedSiteURL>) {
+    const idx = indexOf(category);
+    if (idx < 0) return;
+    onChange(sites.map((site, i) => (i === idx ? { ...site, urls: (site.urls ?? []).map((u, ui) => (ui === urlIndex ? { ...u, ...patch } : u)) } : site)));
+  }
+  function removeUrl(category: string, urlIndex: number) {
+    const idx = indexOf(category);
+    if (idx < 0) return;
+    onChange(sites.map((site, i) => (i === idx ? { ...site, urls: (site.urls ?? []).filter((_, ui) => ui !== urlIndex) } : site)));
   }
 
   return (
     <div className="site-groups">
       {SITE_GROUPS.map((group) => {
-        const lines = linesOf(group.category);
-        const first = firstOf(group.category);
+        const site = siteFor(group.category);
+        const urls = site?.urls ?? [];
         return (
           <section key={group.category} className="bp-card">
             <header className="bp-card-titlebar">
@@ -232,27 +224,33 @@ function SiteEditor({
                 <Input
                   className="blueprint-input"
                   type="password"
-                  value={first?.token || ''}
-                  placeholder={first?.tokenMasked || '留空表示沿用原 token'}
+                  value={site?.token || ''}
+                  placeholder={site?.tokenMasked || '留空表示沿用原 token'}
                   onChange={(event) => setCategoryToken(group.category, event.target.value)}
                 />
               </label>
               <div className="config-subhead">base_url 线路</div>
-              {lines.length === 0 ? <p className="inline-help">还没有 base_url，点“新增 URL”添加。</p> : null}
+              {urls.length === 0 ? <p className="inline-help">还没有 base_url，点“新增 URL”添加。</p> : null}
               <div className="site-url-list">
-                {lines.map(({ site, index }, lineIdx) => (
-                  <div key={index} className="site-url-row">
+                {urls.map((line, urlIndex) => (
+                  <div key={urlIndex} className="site-url-row">
                     <span className="site-url-tag">
-                      {lineIdx + 1}
-                      {group.category === 'api' && lineIdx === 0 ? ' · 合卡' : ''}
+                      {urlIndex + 1}
+                      {group.category === 'api' && urlIndex === 0 ? ' · 合卡' : ''}
                     </span>
                     <Input
-                      className="blueprint-input"
-                      value={site.url || ''}
-                      placeholder="https://api.example.com"
-                      onChange={(event) => updateUrl(index, event.target.value)}
+                      className="blueprint-input site-url-name"
+                      value={line.name || ''}
+                      placeholder={`线路 ${urlIndex + 1}`}
+                      onChange={(event) => updateUrl(group.category, urlIndex, { name: event.target.value })}
                     />
-                    <Button className="blueprint-danger-button" onPress={() => removeUrl(index)}>删除</Button>
+                    <Input
+                      className="blueprint-input"
+                      value={line.url || ''}
+                      placeholder="https://api.example.com"
+                      onChange={(event) => updateUrl(group.category, urlIndex, { url: event.target.value })}
+                    />
+                    <Button className="blueprint-danger-button" onPress={() => removeUrl(group.category, urlIndex)}>删除</Button>
                   </div>
                 ))}
               </div>
@@ -260,7 +258,7 @@ function SiteEditor({
           </section>
         );
       })}
-      <p className="inline-help">每个站点仅配置一次 access token，可添加多条 base_url；首页只明文展示 URL，token 仅后台可见。Token 留空表示沿用原值。</p>
+      <p className="inline-help">每个站点仅配置一次 access token，可添加多条 base_url（线路名用于首页展示）；首页只明文展示 URL，token 仅后台可见。Token 留空表示沿用原值。</p>
     </div>
   );
 }
@@ -607,8 +605,13 @@ export function AdminPage() {
     setBusy(true);
     setMessage({ text: '正在保存全部配置…' });
     try {
+      // Drop incomplete sites (no base_url) and blank url lines so emptying one
+      // category never blocks saving the other (backend requires ≥1 base_url).
+      const sites = config.newapi.sites
+        .map((site) => ({ ...site, urls: (site.urls ?? []).filter((u) => (u.url ?? '').trim() !== '') }))
+        .filter((site) => site.urls.length > 0);
       const next = await sendJSON<AdminConfig>('/api/admin/config', 'PUT', {
-        newapi: { sites: config.newapi.sites },
+        newapi: { sites },
         activity: config.activity
       });
       setConfig(next);

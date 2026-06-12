@@ -339,7 +339,7 @@ func TestAdminConfigSavesNewAPISitesForStatusAndCombine(t *testing.T) {
 	}
 }
 
-func TestAdminConfigSharesOneTokenAcrossSiteURLs(t *testing.T) {
+func TestAdminConfigSiteHoldsOneTokenAndManyURLs(t *testing.T) {
 	root := t.TempDir()
 	writeToolSiteFixture(t, root)
 	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
@@ -348,47 +348,138 @@ func TestAdminConfigSharesOneTokenAcrossSiteURLs(t *testing.T) {
 	}
 	t.Cleanup(shutdownRuntime)
 
-	// Configure the 次数站 token once on its first base_url line.
+	// A token 站 configured ONCE with one token + two base_urls. This previously
+	// failed with "第 2 个 NewAPI 站点缺少 token" because every url demanded its own
+	// token; now a site carries one token shared across its urls.
 	saveAdminConfig(t, map[string]any{
 		"newapi": map[string]any{
 			"sites": []map[string]any{
-				{"name": "线路 1", "category": "api", "url": "https://api-1.example.test", "token": "shared-token-1"},
-			},
-		},
-	})
-
-	// Add a second base_url line with a blank token (the UI never re-sends the
-	// masked token). Both lines must end up on the one shared site token.
-	saveAdminConfig(t, map[string]any{
-		"newapi": map[string]any{
-			"sites": []map[string]any{
-				{"name": "线路 1", "category": "api", "url": "https://api-1.example.test"},
-				{"name": "线路 2", "category": "api", "url": "https://api-2.example.test"},
+				{"name": "token 站", "category": "token", "token": "tok-shared", "urls": []map[string]any{
+					{"name": "线路 一", "url": "https://t1.example.test"},
+					{"name": "线路 二", "url": "https://t2.example.test"},
+				}},
 			},
 		},
 	})
 
 	snap := unifiedConfig.Snapshot()
-	if len(snap.NewAPI.Sites) != 2 {
-		t.Fatalf("expected 2 base_url lines, got %#v", snap.NewAPI.Sites)
+	if len(snap.NewAPI.Sites) != 1 {
+		t.Fatalf("token 站 should persist as ONE site, got %#v", snap.NewAPI.Sites)
 	}
-	for _, site := range snap.NewAPI.Sites {
-		if site.Token != "shared-token-1" {
-			t.Fatalf("line %q should inherit the one site token, got token=%q", site.Name, site.Token)
-		}
+	site := snap.NewAPI.Sites[0]
+	if site.Token != "tok-shared" || len(site.URLs) != 2 {
+		t.Fatalf("site should hold one token + two urls, got %#v", site)
 	}
 
-	// "线路 1" can coexist under both categories without a duplicate-name error.
+	// Runtime expansion: one grouped site -> two flat newapi.Site, both sharing
+	// the single token, both category token, each carrying its line name.
+	runtime := unifiedConfig.ManagedSites()
+	if len(runtime) != 2 {
+		t.Fatalf("expected 2 expanded runtime sites, got %#v", runtime)
+	}
+	for _, s := range runtime {
+		if s.Token != "tok-shared" || s.Category != "token" {
+			t.Fatalf("expanded site %q lost token/category: %#v", s.LineName, s)
+		}
+	}
+	if runtime[0].URL != "https://t1.example.test" || runtime[0].LineName != "线路 一" {
+		t.Fatalf("first expanded url/line wrong: %#v", runtime[0])
+	}
+
+	// Re-save with a BLANK token (UI never re-sends the masked token) and a third
+	// url. The site must keep its one token — no "缺少 token" error.
 	saveAdminConfig(t, map[string]any{
 		"newapi": map[string]any{
 			"sites": []map[string]any{
-				{"name": "线路 1", "category": "api", "url": "https://api-1.example.test", "token": "shared-token-1"},
-				{"name": "线路 1", "category": "token", "url": "https://token-1.example.test", "token": "shared-token-2"},
+				{"name": "token 站", "category": "token", "urls": []map[string]any{
+					{"name": "线路 一", "url": "https://t1.example.test"},
+					{"name": "线路 二", "url": "https://t2.example.test"},
+					{"name": "线路 三", "url": "https://t3.example.test"},
+				}},
 			},
 		},
 	})
-	if got := unifiedConfig.Snapshot().NewAPI.Sites; len(got) != 2 {
-		t.Fatalf("same line name across categories should be allowed, got %#v", got)
+	resaved := unifiedConfig.Snapshot().NewAPI.Sites
+	if len(resaved) != 1 || resaved[0].Token != "tok-shared" || len(resaved[0].URLs) != 3 {
+		t.Fatalf("blank-token re-save must keep the one token + grow urls, got %#v", resaved)
+	}
+}
+
+func TestAdminConfigBlankTokenInheritsOnlyBySameSiteName(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	saveAdminConfig(t, map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{"name": "次数fufu", "category": "api", "token": "secret-token", "urls": []map[string]any{{"url": "https://api-1.example.test"}}},
+			},
+		},
+	})
+
+	// A DIFFERENTLY-named site in the same category with a blank token must NOT
+	// silently inherit the existing site's token — it is rejected.
+	req := authorizedJSONRequest(t, http.MethodPut, "/api/admin/config", map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{"name": "rogue", "category": "api", "urls": []map[string]any{{"url": "https://rogue.example.test"}}},
+			},
+		},
+	})
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "缺少 token") {
+		t.Fatalf("blank-token rogue site should be rejected, got code=%d body=%s", w.Code, w.Body.String())
+	}
+
+	// The same-named site re-saving with a blank token DOES inherit its token.
+	saveAdminConfig(t, map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{"name": "次数fufu", "category": "api", "urls": []map[string]any{
+					{"url": "https://api-1.example.test"},
+					{"url": "https://api-2.example.test"},
+				}},
+			},
+		},
+	})
+	sites := unifiedConfig.Snapshot().NewAPI.Sites
+	if len(sites) != 1 || sites[0].Token != "secret-token" || len(sites[0].URLs) != 2 {
+		t.Fatalf("same-name blank re-save should inherit token + grow urls, got %#v", sites)
+	}
+}
+
+func TestAdminConfigMergesLegacyPerLineSitesIntoOneSitePerToken(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	// Legacy per-line shape (singular "url"), two api lines sharing one token.
+	// These must collapse into ONE grouped site with two urls.
+	saveAdminConfig(t, map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{"name": "次数fufu", "category": "api", "url": "https://api-1.example.test", "token": "api-token"},
+				{"name": "线路 2", "category": "api", "url": "https://api-2.example.test", "token": "api-token"},
+			},
+		},
+	})
+
+	sites := unifiedConfig.Snapshot().NewAPI.Sites
+	if len(sites) != 1 {
+		t.Fatalf("same-token api lines should merge into one site, got %#v", sites)
+	}
+	if sites[0].Token != "api-token" || len(sites[0].URLs) != 2 || sites[0].URL != "https://api-1.example.test" {
+		t.Fatalf("merged site should keep token + both urls + mirror primary url: %#v", sites[0])
 	}
 }
 

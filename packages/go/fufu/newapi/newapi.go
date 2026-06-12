@@ -13,8 +13,12 @@ const DefaultQuotaUnit int64 = 500000
 const maxResponseBodyBytes int64 = 16 << 20
 
 type Site struct {
-	Name                string  `json:"name"`
-	Category            string  `json:"category,omitempty"`
+	Name     string `json:"name"`
+	Category string `json:"category,omitempty"`
+	// LineName is the per-URL display label used for homepage nav. A managed
+	// site holds one token across many base_urls; each url expands to its own
+	// flat Site carrying its line label here while Name stays the site name.
+	LineName            string  `json:"lineName,omitempty"`
 	URL                 string  `json:"url"`
 	Token               string  `json:"-"`
 	UserID              string  `json:"userId"`

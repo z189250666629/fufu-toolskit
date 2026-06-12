@@ -39,19 +39,30 @@ type NewAPIAdminConfig struct {
 	Sites []ManagedAPISiteConfig `json:"sites"`
 }
 
+// ManagedSiteURL is one base_url line of a site, with an optional display name
+// shown on the homepage nav.
+type ManagedSiteURL struct {
+	Name string `json:"name,omitempty"`
+	URL  string `json:"url"`
+}
+
+// ManagedAPISiteConfig is one site: a single access token shared across one or
+// more base_urls. URL mirrors URLs[0] for backward compatibility with readers
+// and legacy single-url payloads/configs.
 type ManagedAPISiteConfig struct {
-	Name                string  `json:"name"`
-	Category            string  `json:"category,omitempty"`
-	URL                 string  `json:"url"`
-	Token               string  `json:"token,omitempty"`
-	UserID              string  `json:"userId"`
-	Kind                string  `json:"kind,omitempty"`
-	SkipUserHeader      bool    `json:"skipUserHeader,omitempty"`
-	QuotaUnit           int64   `json:"quotaUnit"`
-	Currency            string  `json:"currency"`
-	RechargeRatio       float64 `json:"rechargeRatio"`
-	ChannelListEndpoint string  `json:"channelListEndpoint,omitempty"`
-	Note                string  `json:"note,omitempty"`
+	Name                string           `json:"name"`
+	Category            string           `json:"category,omitempty"`
+	URLs                []ManagedSiteURL `json:"urls"`
+	URL                 string           `json:"url,omitempty"`
+	Token               string           `json:"token,omitempty"`
+	UserID              string           `json:"userId"`
+	Kind                string           `json:"kind,omitempty"`
+	SkipUserHeader      bool             `json:"skipUserHeader,omitempty"`
+	QuotaUnit           int64            `json:"quotaUnit"`
+	Currency            string           `json:"currency"`
+	RechargeRatio       float64          `json:"rechargeRatio"`
+	ChannelListEndpoint string           `json:"channelListEndpoint,omitempty"`
+	Note                string           `json:"note,omitempty"`
 }
 
 type adminConfigPatch struct {
@@ -95,10 +106,15 @@ func (s *toolConfigStore) Load(root string) error {
 	migratedFromFile := false
 	legacyPath := filepath.Join(root, "data", toolConfigFileName)
 	if ok {
+		// Decode into a clean Sites slice so json never reuses a default site's
+		// backing struct (fields absent in the stored JSON, e.g. urls, would
+		// otherwise leak across entries). The default Sites only seed fresh boots.
+		cfg.NewAPI.Sites = nil
 		if err := json.Unmarshal(stored, &cfg); err != nil {
 			return fmt.Errorf("%s 不是有效 JSON: %w", toolConfigDBName, err)
 		}
 	} else if raw, readErr := os.ReadFile(legacyPath); readErr == nil {
+		cfg.NewAPI.Sites = nil
 		if err := json.Unmarshal(raw, &cfg); err != nil {
 			return fmt.Errorf("%s 不是有效 JSON: %w", toolConfigFileName, err)
 		}
@@ -155,7 +171,7 @@ func (s *toolConfigStore) ManagedSites() []newapi.Site {
 	cfg := s.Snapshot()
 	sites := make([]newapi.Site, 0, len(cfg.NewAPI.Sites))
 	for _, site := range cfg.NewAPI.Sites {
-		sites = append(sites, site.toNewAPISite())
+		sites = append(sites, site.toNewAPISites()...)
 	}
 	return sites
 }
@@ -214,16 +230,45 @@ func normalizeToolConfig(cfg ToolConfig, previous ToolConfig) (ToolConfig, error
 
 func cloneToolConfig(cfg ToolConfig) ToolConfig {
 	out := ToolConfig{Activity: activity.CloneConfig(cfg.Activity)}
-	out.NewAPI.Sites = append([]ManagedAPISiteConfig(nil), cfg.NewAPI.Sites...)
+	out.NewAPI.Sites = make([]ManagedAPISiteConfig, len(cfg.NewAPI.Sites))
+	for i, site := range cfg.NewAPI.Sites {
+		site.URLs = append([]ManagedSiteURL(nil), site.URLs...)
+		out.NewAPI.Sites[i] = site
+	}
 	return out
 }
 
+// managedSiteConfigsFromSites groups flat newapi.Site entries (e.g. from env
+// seed) into the grouped one-token-per-site config: sites sharing a
+// (category, token) collapse into one record with a url per line.
 func managedSiteConfigsFromSites(sites []newapi.Site) []ManagedAPISiteConfig {
-	out := make([]ManagedAPISiteConfig, 0, len(sites))
+	out := []ManagedAPISiteConfig{}
+	index := map[string]int{}
 	for _, site := range sites {
+		category := strings.ToLower(strings.TrimSpace(site.Category))
+		if category == "" {
+			if strings.Contains(strings.ToLower(site.Name), "token") {
+				category = "token"
+			} else {
+				category = "api"
+			}
+		}
+		lineName := site.LineName
+		if strings.TrimSpace(lineName) == "" {
+			lineName = site.Name
+		}
+		url := ManagedSiteURL{Name: lineName, URL: site.URL}
+		key := category + "\x00" + site.Token
+		if at, ok := index[key]; ok {
+			out[at].URLs = append(out[at].URLs, url)
+			out[at].URL = out[at].URLs[0].URL
+			continue
+		}
+		index[key] = len(out)
 		out = append(out, ManagedAPISiteConfig{
 			Name:                site.Name,
-			Category:            site.Category,
+			Category:            category,
+			URLs:                []ManagedSiteURL{url},
 			URL:                 site.URL,
 			Token:               site.Token,
 			UserID:              site.UserID,
@@ -240,11 +285,9 @@ func managedSiteConfigsFromSites(sites []newapi.Site) []ManagedAPISiteConfig {
 }
 
 func normalizeManagedAPISiteConfigs(sites, previous []ManagedAPISiteConfig) ([]ManagedAPISiteConfig, error) {
-	out := []ManagedAPISiteConfig{}
-	seen := map[string]bool{}
+	normalized := []ManagedAPISiteConfig{}
 	for i, site := range sites {
 		site.Name = strings.TrimSpace(site.Name)
-		site.URL = config.NormalizeBaseURL(site.URL)
 		site.Token = strings.TrimSpace(site.Token)
 		site.UserID = strings.TrimSpace(site.UserID)
 		site.Kind = strings.TrimSpace(site.Kind)
@@ -262,21 +305,21 @@ func normalizeManagedAPISiteConfigs(sites, previous []ManagedAPISiteConfig) ([]M
 		if site.Category != "api" && site.Category != "token" {
 			return nil, fmt.Errorf("第 %d 个站点类别不支持（只能 api 或 token）: %s", i+1, site.Category)
 		}
+
+		// A site holds one token across many base_urls. Accept the legacy singular
+		// "url" by folding it in, then normalize the url list.
+		urls := normalizeManagedSiteURLs(site.URLs, site.URL)
+		if len(urls) == 0 {
+			return nil, fmt.Errorf("第 %d 个 NewAPI 站点至少需要一个 base_url", i+1)
+		}
+		site.URLs = urls
+		site.URL = urls[0].URL // mirror primary for backward-compatible readers
+
 		if site.Token == "" {
 			site.Token = matchingSiteToken(site, previous)
 		}
 		if site.Name == "" {
 			return nil, fmt.Errorf("第 %d 个 NewAPI 站点缺少名称", i+1)
-		}
-		// One site (category) holds many base_url lines, so line names only need
-		// to be unique within their category — "线路 1" may exist under both 次数站
-		// and token 站.
-		nameKey := site.Category + "\x00" + site.Name
-		if seen[nameKey] {
-			return nil, fmt.Errorf("%s 类站点线路名称重复: %s", site.Category, site.Name)
-		}
-		if site.URL == "" {
-			return nil, fmt.Errorf("第 %d 个 NewAPI 站点 base_url 无效", i+1)
 		}
 		if site.Token == "" {
 			return nil, fmt.Errorf("第 %d 个 NewAPI 站点缺少 token", i+1)
@@ -299,34 +342,94 @@ func normalizeManagedAPISiteConfigs(sites, previous []ManagedAPISiteConfig) ([]M
 		if site.RechargeRatio <= 0 {
 			site.RechargeRatio = 1
 		}
-		seen[nameKey] = true
-		out = append(out, site)
+		normalized = append(normalized, site)
 	}
-	return out, nil
+
+	// Collapse legacy per-line records (and any same-token duplicates) into one
+	// site per (category, token): the urls merge, the single token stays.
+	merged := mergeManagedSiteConfigsByToken(normalized)
+
+	seen := map[string]bool{}
+	for _, site := range merged {
+		// Line/site names only need to be unique within a category — "线路 1"
+		// may exist under both 次数站 and token 站.
+		nameKey := site.Category + "\x00" + site.Name
+		if seen[nameKey] {
+			return nil, fmt.Errorf("%s 类站点名称重复: %s", site.Category, site.Name)
+		}
+		seen[nameKey] = true
+	}
+	return merged, nil
 }
 
-// matchingSiteToken resolves the token for a line whose token was submitted
-// blank ("沿用原值"). It prefers an exact name+url match, then the same name,
-// and finally any line in the same category — because a site configures its
-// access token once and shares it across every base_url line, a freshly added
-// URL inherits the category token without the admin re-entering it.
+// normalizeManagedSiteURLs cleans a site's url list: it folds in the legacy
+// singular url, drops blanks, dedupes, and labels each line ("线路 N" default).
+func normalizeManagedSiteURLs(urls []ManagedSiteURL, legacyURL string) []ManagedSiteURL {
+	combined := append([]ManagedSiteURL(nil), urls...)
+	if strings.TrimSpace(legacyURL) != "" {
+		combined = append(combined, ManagedSiteURL{URL: legacyURL})
+	}
+	out := []ManagedSiteURL{}
+	seen := map[string]bool{}
+	for _, entry := range combined {
+		url := config.NormalizeBaseURL(entry.URL)
+		if url == "" || seen[url] {
+			continue
+		}
+		seen[url] = true
+		name := strings.TrimSpace(entry.Name)
+		if name == "" {
+			name = fmt.Sprintf("线路 %d", len(out)+1)
+		}
+		out = append(out, ManagedSiteURL{Name: name, URL: url})
+	}
+	return out
+}
+
+// mergeManagedSiteConfigsByToken merges sites that share a (category, token) into
+// a single site, concatenating their url lists (deduped). Distinct tokens stay
+// separate, so different upstreams are never conflated.
+func mergeManagedSiteConfigsByToken(sites []ManagedAPISiteConfig) []ManagedAPISiteConfig {
+	out := []ManagedAPISiteConfig{}
+	index := map[string]int{}
+	for _, site := range sites {
+		key := site.Category + "\x00" + site.Token
+		if at, ok := index[key]; ok {
+			out[at].URLs = mergeManagedSiteURLs(out[at].URLs, site.URLs)
+			out[at].URL = out[at].URLs[0].URL
+			continue
+		}
+		index[key] = len(out)
+		out = append(out, site)
+	}
+	return out
+}
+
+func mergeManagedSiteURLs(existing, extra []ManagedSiteURL) []ManagedSiteURL {
+	seen := map[string]bool{}
+	for _, entry := range existing {
+		seen[entry.URL] = true
+	}
+	for _, entry := range extra {
+		if seen[entry.URL] {
+			continue
+		}
+		seen[entry.URL] = true
+		existing = append(existing, entry)
+	}
+	return existing
+}
+
+// matchingSiteToken resolves the token for a site whose token was submitted
+// blank ("沿用原值", because the UI only ever holds the masked token). A site
+// configures its access token once and the UI never renames it, so a re-save —
+// even one that adds a url — matches its stored token by (name, category). A
+// brand-new site with a blank token has no match and is correctly rejected
+// (its token must be entered); the match is deliberately scoped to the same
+// name to avoid silently pulling an unrelated site's token.
 func matchingSiteToken(site ManagedAPISiteConfig, previous []ManagedAPISiteConfig) string {
 	for _, candidate := range previous {
-		if strings.TrimSpace(candidate.Name) == site.Name && config.NormalizeBaseURL(candidate.URL) == site.URL {
-			if token := strings.TrimSpace(candidate.Token); token != "" {
-				return token
-			}
-		}
-	}
-	for _, candidate := range previous {
-		if strings.TrimSpace(candidate.Name) == site.Name {
-			if token := strings.TrimSpace(candidate.Token); token != "" {
-				return token
-			}
-		}
-	}
-	for _, candidate := range previous {
-		if strings.EqualFold(strings.TrimSpace(candidate.Category), site.Category) {
+		if strings.TrimSpace(candidate.Name) == site.Name && strings.EqualFold(strings.TrimSpace(candidate.Category), site.Category) {
 			if token := strings.TrimSpace(candidate.Token); token != "" {
 				return token
 			}
@@ -344,21 +447,30 @@ func isSupportedAdminSiteKind(kind string) bool {
 	}
 }
 
-func (site ManagedAPISiteConfig) toNewAPISite() newapi.Site {
-	return newapi.Site{
-		Name:                site.Name,
-		Category:            site.Category,
-		URL:                 site.URL,
-		Token:               site.Token,
-		UserID:              site.UserID,
-		Kind:                site.Kind,
-		SkipUserHeader:      site.SkipUserHeader,
-		QuotaUnit:           site.QuotaUnit,
-		Currency:            site.Currency,
-		RechargeRatio:       site.RechargeRatio,
-		ChannelListEndpoint: site.ChannelListEndpoint,
-		Note:                site.Note,
+// toNewAPISites expands one grouped site (one token, many urls) into the flat
+// []newapi.Site the runtime consumers (combine, status, connectivity, nav) read
+// — one entry per base_url, all sharing the site token, each carrying its line
+// name for homepage display.
+func (site ManagedAPISiteConfig) toNewAPISites() []newapi.Site {
+	out := make([]newapi.Site, 0, len(site.URLs))
+	for _, u := range site.URLs {
+		out = append(out, newapi.Site{
+			Name:                site.Name,
+			Category:            site.Category,
+			LineName:            u.Name,
+			URL:                 u.URL,
+			Token:               site.Token,
+			UserID:              site.UserID,
+			Kind:                site.Kind,
+			SkipUserHeader:      site.SkipUserHeader,
+			QuotaUnit:           site.QuotaUnit,
+			Currency:            site.Currency,
+			RechargeRatio:       site.RechargeRatio,
+			ChannelListEndpoint: site.ChannelListEndpoint,
+			Note:                site.Note,
+		})
 	}
+	return out
 }
 
 func applyToolConfigSnapshot(cfg ToolConfig) {
@@ -589,9 +701,14 @@ func adminConfigResponse(cfg ToolConfig) map[string]any {
 func adminSiteResponses(sites []ManagedAPISiteConfig) []map[string]any {
 	out := make([]map[string]any, 0, len(sites))
 	for _, site := range sites {
+		urls := make([]map[string]any, 0, len(site.URLs))
+		for _, u := range site.URLs {
+			urls = append(urls, map[string]any{"name": u.Name, "url": u.URL})
+		}
 		out = append(out, map[string]any{
 			"name":                site.Name,
 			"category":            site.Category,
+			"urls":                urls,
 			"url":                 site.URL,
 			"userId":              site.UserID,
 			"kind":                site.Kind,

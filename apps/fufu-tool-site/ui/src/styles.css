@@ -839,6 +839,11 @@ select {
   flex: 1 1 auto;
 }
 
+.site-url-row .site-url-name {
+  flex: 0 1 120px;
+  min-width: 80px;
+}
+
 .site-url-tag {
   flex: 0 0 auto;
   min-width: 44px;
