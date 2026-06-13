@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 func TestHandleAdminSaleCardsConfigReturnsPlansAndDefaultSchedule(t *testing.T) {
@@ -185,13 +184,20 @@ func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
 			t.Fatalf("stock query should only hit MCY card/get, got %s", r.URL.Path)
 		}
 		stockHits.Add(1)
-		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
-		// 55卡 (item 29 sku 66) reports 7; every other SKU reports 3.
-		total := 3
-		if int(payload["item_id"].(float64)) == 29 && int(payload["sku_id"].(float64)) == 66 {
-			total = 7
+		// One scan of the global card list: 7 unsold 55卡 (item29/sku66) + 3 unsold
+		// month-100 (item28/sku65). The shop ignores filters, so the handler counts
+		// these by item:sku itself.
+		list := []any{}
+		for range 7 {
+			list = append(list, mcyTestCard(29, 66, 0))
 		}
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": total, "list": []any{}}})
+		for range 3 {
+			list = append(list, mcyTestCard(28, 65, 0))
+		}
+		testWriteEncryptedMCYResponse(t, w, map[string]any{
+			"code": 200, "card_usable_count": 10,
+			"data": map[string]any{"total": 10, "list": list},
+		})
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
@@ -217,34 +223,44 @@ func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
 	if len(body.Stock) < 6 {
 		t.Fatalf("expected stock for all plans, got %#v", body.Stock)
 	}
-	var special, month100 int = -1, -1
+	var special, month100, month500 int = -1, -1, -1
 	for _, s := range body.Stock {
-		if s.PlanID == "fufu-mix-special-55" {
+		switch s.PlanID {
+		case "fufu-mix-special-55":
 			special = s.CurrentStock
 			if s.Slot != "special55" {
 				t.Fatalf("special slot=%q", s.Slot)
 			}
-		}
-		if s.PlanID == "fufu-mix-month-100" {
+		case "fufu-mix-month-100":
 			month100 = s.CurrentStock
+		case "fufu-mix-month-500":
+			month500 = s.CurrentStock
 		}
 	}
 	if special != 7 || month100 != 3 {
 		t.Fatalf("per-plan stock wrong: special=%d month100=%d", special, month100)
 	}
-	if stockHits.Load() < 6 {
-		t.Fatalf("each plan should be queried against MCY, hits=%d", stockHits.Load())
+	// A SKU absent from the scan must read 0, not the global total.
+	if month500 != 0 {
+		t.Fatalf("month500 (no unsold cards) stock=%d, want 0", month500)
 	}
 }
 
-func TestHandleAdminSaleCardsStockQueriesPlansConcurrently(t *testing.T) {
+// TestHandleAdminSaleCardsStockScansOnceNotPerPlan proves the refresh is a single
+// sequential scan (the shop rejects concurrent session requests with 登录已过期),
+// not one query per plan.
+func TestHandleAdminSaleCardsStockScansOnceNotPerPlan(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "test-admin-token")
 	setMCYCookieForTest(t, "manage_token=test")
 
-	const perCall = 80 * time.Millisecond
+	var stockHits atomic.Int32
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(perCall)
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 1, "list": []any{}}})
+		stockHits.Add(1)
+		// All unsold cards fit on one page → the scan stops after a single request.
+		testWriteEncryptedMCYResponse(t, w, map[string]any{
+			"code": 200, "card_usable_count": 1,
+			"data": map[string]any{"total": 1, "list": []any{mcyTestCard(29, 66, 0)}},
+		})
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
@@ -253,18 +269,13 @@ func TestHandleAdminSaleCardsStockQueriesPlansConcurrently(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
 	req.Header.Set("Authorization", "Bearer test-admin-token")
 	w := httptest.NewRecorder()
-
-	start := time.Now()
 	apiRoute(w, req)
-	elapsed := time.Since(start)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
-	// Serial would be planCount*perCall; concurrent should be ~perCall. Use a
-	// generous ceiling (half the serial time) to stay non-flaky.
-	if serial := time.Duration(planCount) * perCall; elapsed >= serial/2 {
-		t.Fatalf("stock queries look serial: %d plans took %s (serial≈%s)", planCount, elapsed, serial)
+	if got := stockHits.Load(); int(got) >= planCount {
+		t.Fatalf("stock should be one scan, not per-plan: %d hits for %d plans", got, planCount)
 	}
 }
 

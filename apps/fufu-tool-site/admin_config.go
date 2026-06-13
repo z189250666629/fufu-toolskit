@@ -15,6 +15,7 @@ import (
 	"fufu/config"
 	"fufu/newapi"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -272,8 +273,29 @@ func normalizeToolConfig(cfg ToolConfig, previous ToolConfig) (ToolConfig, error
 // normalizeMCYConfig trims the MCY config and, like site tokens, keeps the
 // previous password when the submitted one is blank (the UI never re-sends the
 // masked password).
+// normalizeMCYBaseURL reduces a shop URL to scheme://host and forces https. The
+// MCY encrypted-POST protocol can't survive an http→https 301 (Go turns the POST
+// into a GET and drops the body), and the admin URL users paste usually carries
+// a path (…/admin) that would otherwise be appended to the login endpoint
+// (…/admin/admin/login). So keep only scheme+host, upgrade http→https, and
+// default a scheme-less host to https.
+func normalizeMCYBaseURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return strings.TrimRight(raw, "/")
+	}
+	return "https://" + u.Host
+}
+
 func normalizeMCYConfig(c, previous MCYAdminConfig) MCYAdminConfig {
-	c.BaseURL = strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
+	c.BaseURL = normalizeMCYBaseURL(c.BaseURL)
 	c.Username = strings.TrimSpace(c.Username)
 	c.Password = strings.TrimSpace(c.Password)
 	c.Cookie = strings.TrimSpace(c.Cookie)

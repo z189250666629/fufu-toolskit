@@ -483,6 +483,34 @@ func TestAdminConfigMergesLegacyPerLineSitesIntoOneSitePerToken(t *testing.T) {
 	}
 }
 
+func TestNormalizeMCYBaseURL(t *testing.T) {
+	cases := []struct{ in, want string }{
+		// The admin URL users paste carries http + an /admin path; both break the
+		// encrypted POST (http 301 drops the body; /admin would double to
+		// /admin/admin/login). Reduce to https://host.
+		{"http://shop.fufuapi.top/admin", "https://shop.fufuapi.top"},
+		{"https://shop.fufuapi.top/admin/", "https://shop.fufuapi.top"},
+		{"https://shop.fufuapi.top", "https://shop.fufuapi.top"},
+		{"shop.fufuapi.top", "https://shop.fufuapi.top"},
+		{"http://shop.fufuapi.top", "https://shop.fufuapi.top"},
+		{"  https://shop.fufuapi.top/x/y?z=1  ", "https://shop.fufuapi.top"},
+		{"http://127.0.0.1:8099/admin", "https://127.0.0.1:8099"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := normalizeMCYBaseURL(c.in); got != c.want {
+			t.Fatalf("normalizeMCYBaseURL(%q)=%q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestNormalizeMCYConfigCleansBaseURL(t *testing.T) {
+	got := normalizeMCYConfig(MCYAdminConfig{BaseURL: "http://shop.fufuapi.top/admin"}, MCYAdminConfig{})
+	if got.BaseURL != "https://shop.fufuapi.top" {
+		t.Fatalf("normalizeMCYConfig base=%q, want https://shop.fufuapi.top", got.BaseURL)
+	}
+}
+
 func TestAdminConfigSavesMCYCredentialsMaskedAndInherited(t *testing.T) {
 	root := t.TempDir()
 	writeToolSiteFixture(t, root)

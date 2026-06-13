@@ -207,7 +207,13 @@ func TestFindShopPurchaseConcurrentAuthRefreshIsRaceFree(t *testing.T) {
 	}
 }
 
-func TestQueryMCYUsableStockReadsEncryptedCardGetTotal(t *testing.T) {
+// mcyTestCard builds a card record as the shop returns it (flat item_id/sku_id/
+// status fields, status 0 = unsold).
+func mcyTestCard(itemID, skuID, status int) map[string]any {
+	return map[string]any{"item_id": itemID, "sku_id": skuID, "status": status}
+}
+
+func TestQueryMCYUsableStockScansAndCountsUsableBySKU(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=test")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -220,25 +226,140 @@ func TestQueryMCYUsableStockReadsEncryptedCardGetTotal(t *testing.T) {
 		if len(secret) < 16 || r.Header.Get("Signature") == "" {
 			t.Fatalf("stock query must use encrypted MCY protocol: Secret=%q Signature=%q", secret, r.Header.Get("Signature"))
 		}
-		payload := testDecodeMCYRequest(t, r.Body, secret)
-		if got, want := int(payload["item_id"].(float64)), 29; got != want {
-			t.Fatalf("item_id=%d, want %d", got, want)
-		}
-		if got, want := int(payload["sku_id"].(float64)), 66; got != want {
-			t.Fatalf("sku_id=%d, want %d", got, want)
-		}
-		if got, want := int(payload["status"].(float64)), 0; got != want {
-			t.Fatalf("status=%d, want 0 (unsold)", got)
-		}
-		// Real card/get shape: the per-SKU usable count lives in data.total.
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 42, "list": []any{}}})
+		// The shop IGNORES card/get's item_id/sku_id/status filters (every query
+		// returns the global list + global total), so the scan pages the list and
+		// counts unsold cards by item:sku itself.
+		testWriteEncryptedMCYResponse(t, w, map[string]any{
+			"code":              200,
+			"card_usable_count": 3,
+			"data": map[string]any{"total": 100, "list": []any{
+				mcyTestCard(29, 66, 0), // usable, our sku
+				mcyTestCard(29, 66, 1), // sold, ignored
+				mcyTestCard(28, 65, 0), // usable, a different sku
+				mcyTestCard(29, 66, 0), // usable, our sku
+			}},
+		})
 	}))
 	t.Cleanup(srv.Close)
 	t.Setenv("MCY_BASE_URL", srv.URL)
 
 	got, err := queryMCYUsableStock(context.Background(), 29, 66)
-	if err != nil || got != 42 {
-		t.Fatalf("queryMCYUsableStock = %d, err=%v; want 42", got, err)
+	if err != nil || got != 2 {
+		t.Fatalf("queryMCYUsableStock(29,66) = %d, err=%v; want 2 usable", got, err)
+	}
+}
+
+// TestMCYUsableStockScanStopsAtGlobalUsableCount proves the scan early-exits once
+// it has seen card_usable_count unsold cards, instead of paging the entire
+// (20k+) card history.
+func TestMCYUsableStockScanStopsAtGlobalUsableCount(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=test")
+
+	var pages atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pages.Add(1)
+		// Page 1 already holds every unsold card (== card_usable_count). Even though
+		// the page is full (== page size), the scan must stop here.
+		list := make([]any, 0, mcyStockScanPageSize)
+		for range mcyStockScanPageSize {
+			list = append(list, mcyTestCard(28, 62, 0))
+		}
+		testWriteEncryptedMCYResponse(t, w, map[string]any{
+			"code":              200,
+			"card_usable_count": mcyStockScanPageSize,
+			"data":              map[string]any{"total": 99999, "list": list},
+		})
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	counts, err := mcyUsableStockBySKU(context.Background())
+	if err != nil {
+		t.Fatalf("scan err=%v", err)
+	}
+	if got := counts[skuStockKey(28, 62)]; got != mcyStockScanPageSize {
+		t.Fatalf("sku 28:62 usable=%d, want %d", got, mcyStockScanPageSize)
+	}
+	if pages.Load() != 1 {
+		t.Fatalf("scan should early-exit after 1 page at card_usable_count, hit %d pages", pages.Load())
+	}
+}
+
+// TestMCYUsableStockScanRelogsInOnExpiredPayload proves a body-level
+// "登录已过期" (HTTP 200 + code!=200) triggers a re-login + retry, not a hard fail.
+func TestMCYUsableStockScanRelogsInOnExpiredPayload(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=stale")
+
+	var loginHits, getHits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/admin/login":
+			loginHits.Add(1)
+			http.SetCookie(w, &http.Cookie{Name: "manage_token", Value: "fresh"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case "/plugin/virtual-card-ship/card/get":
+			getHits.Add(1)
+			if r.Header.Get("Cookie") == "manage_token=stale" {
+				testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 0, "msg": "登录已过期"})
+				return
+			}
+			testWriteEncryptedMCYResponse(t, w, map[string]any{
+				"code": 200, "card_usable_count": 1,
+				"data": map[string]any{"list": []any{mcyTestCard(29, 66, 0)}},
+			})
+		default:
+			t.Fatalf("unexpected MCY request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "p")
+
+	counts, err := mcyUsableStockBySKU(context.Background())
+	if err != nil {
+		t.Fatalf("scan err=%v", err)
+	}
+	if got := counts[skuStockKey(29, 66)]; got != 1 {
+		t.Fatalf("sku 29:66 usable=%d, want 1 after re-login", got)
+	}
+	if loginHits.Load() != 1 || getHits.Load() != 2 {
+		t.Fatalf("expected 1 re-login + 2 card/get (stale fail, fresh ok), got login=%d get=%d", loginHits.Load(), getHits.Load())
+	}
+}
+
+func TestTallyUsableBySKUCountsOnlyUnsold(t *testing.T) {
+	counts := map[string]int{}
+	added := tallyUsableBySKU([]any{
+		mcyTestCard(28, 60, 0),
+		mcyTestCard(28, 60, 0),
+		mcyTestCard(28, 60, 1), // sold
+		mcyTestCard(29, 66, 0),
+		"junk",                 // non-map entries ignored
+	}, counts)
+	if added != 3 {
+		t.Fatalf("added=%d, want 3 unsold", added)
+	}
+	if counts[skuStockKey(28, 60)] != 2 || counts[skuStockKey(29, 66)] != 1 {
+		t.Fatalf("counts=%v, want 28:60=2 29:66=1", counts)
+	}
+}
+
+func TestMCYGlobalUsableCountReadsCardUsableCount(t *testing.T) {
+	if got := mcyGlobalUsableCount(map[string]any{"card_usable_count": 998}); got != 998 {
+		t.Fatalf("card_usable_count=%d, want 998", got)
+	}
+	if got := mcyGlobalUsableCount(map[string]any{}); got != -1 {
+		t.Fatalf("missing card_usable_count=%d, want -1 (unknown)", got)
+	}
+}
+
+func TestMCYIsSessionExpiredDetectsExpiryMarkers(t *testing.T) {
+	if !mcyIsSessionExpired(map[string]any{"msg": "登录已过期"}) {
+		t.Fatal("登录已过期 should be detected as expired")
+	}
+	if mcyIsSessionExpired(map[string]any{"msg": "库存不足"}) {
+		t.Fatal("unrelated message must not be treated as expiry")
 	}
 }
 

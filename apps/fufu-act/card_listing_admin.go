@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -151,55 +150,39 @@ type saleCardStockEntry struct {
 	CurrentStock int    `json:"currentStock"`
 }
 
-// saleCardStockTimeout bounds the whole multi-plan stock lookup so a slow or
-// unreachable NewAPI can't hang the admin refresh.
-var saleCardStockTimeout = 15 * time.Second
+// saleCardStockTimeout bounds the whole stock scan so a slow or unreachable MCY
+// shop can't hang the admin refresh.
+var saleCardStockTimeout = 30 * time.Second
 
-// handleAdminSaleCardsStock reports the current NewAPI stock for every plan so
-// the admin can see live counts before deciding restock targets. Each plan is a
-// separate name query; they run concurrently so the refresh takes one round-trip,
-// not one per plan.
+// handleAdminSaleCardsStock reports the current MCY shop stock for every plan so
+// the admin can see live counts before deciding restock targets. The shop
+// ignores per-SKU card/get filters and rejects concurrent session requests, so
+// this is ONE sequential scan of the card list (mcyUsableStockBySKU) that yields
+// every SKU's unsold count at once — not one query per plan.
 func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")
 		return
 	}
-	plans := saleCardPlanList()
-	out := make([]saleCardStockEntry, len(plans))
 	ctx, cancel := context.WithTimeout(r.Context(), saleCardStockTimeout)
 	defer cancel()
-	errCh := make(chan error, len(plans))
-	var wg sync.WaitGroup
-	for i := range plans {
-		plan := plans[i]
-		out[i] = saleCardStockEntry{PlanID: plan.ID, PlanName: plan.Name, Slot: plan.Slot}
-		wg.Add(1)
-		go func(idx int, plan SaleCardPlan) {
-			defer wg.Done()
-			current, err := queryMCYUsableStock(ctx, plan.ItemID, plan.SKUID)
-			if err != nil {
-				errCh <- err
-				cancel() // fail fast: abort the other in-flight queries
-				return
-			}
-			out[idx].CurrentStock = current
-		}(i, plan)
-	}
-	wg.Wait()
-	close(errCh)
-	// Prefer a real failure over the "context canceled" the fail-fast triggers in
-	// the sibling queries, and surface the actual MCY reason (admin-only) instead
-	// of a useless generic message so the failure is diagnosable.
-	var firstErr error
-	for e := range errCh {
-		if firstErr == nil || errors.Is(firstErr, context.Canceled) {
-			firstErr = e
-		}
-	}
-	if firstErr != nil {
-		fmt.Printf("[sale-card] stock query failed: %v\n", firstErr)
-		writeJSONError(w, http.StatusBadGateway, "查询库存失败: "+firstErr.Error())
+	counts, err := mcyUsableStockBySKU(ctx)
+	if err != nil {
+		// Surface the actual MCY reason (admin-only) instead of a generic message so
+		// the failure is diagnosable.
+		fmt.Printf("[sale-card] stock query failed: %v\n", err)
+		writeJSONError(w, http.StatusBadGateway, "查询库存失败: "+err.Error())
 		return
+	}
+	plans := saleCardPlanList()
+	out := make([]saleCardStockEntry, len(plans))
+	for i, plan := range plans {
+		out[i] = saleCardStockEntry{
+			PlanID:       plan.ID,
+			PlanName:     plan.Name,
+			Slot:         plan.Slot,
+			CurrentStock: counts[skuStockKey(plan.ItemID, plan.SKUID)],
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"stock": out})
 }
