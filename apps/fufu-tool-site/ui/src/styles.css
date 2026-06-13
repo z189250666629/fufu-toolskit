@@ -997,6 +997,68 @@ tr:last-child td {
   font-weight: 600;
 }
 
+/* visual activity-config editors (prize pools / spin map / tiers / scratch) */
+.prize-editor {
+  display: grid;
+  gap: 6px;
+}
+
+.prize-row {
+  display: grid;
+  grid-template-columns: 120px 110px 110px 72px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.spin-row {
+  display: grid;
+  grid-template-columns: 140px 140px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.prize-row--head,
+.spin-row--head {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blueprint-text-secondary);
+}
+
+.prize-prob {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--blueprint-text-secondary);
+  text-align: right;
+}
+
+.tier-pools {
+  display: grid;
+  gap: 12px;
+}
+
+.tier-card .bp-card-titlebar {
+  gap: 12px;
+}
+
+.scratch-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.scratch-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scratch-chip .mini-input {
+  width: 80px;
+}
+
 .sale-job-list {
   display: grid;
   gap: 8px;

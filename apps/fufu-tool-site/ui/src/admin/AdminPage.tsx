@@ -1,10 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Card,
   Input,
   Table,
-  TextArea as Textarea,
   Tabs
 } from '@heroui/react';
 import { fetchJSON, messageFromError, sendJSON } from '../api';
@@ -18,6 +17,7 @@ import type {
   ManagedSiteURL,
   MCYConfig,
   PrizeConfigResponse,
+  PrizeRow,
   RuntimeSitesResponse,
   SaleCardConfig,
   SaleCardRunResult,
@@ -49,20 +49,6 @@ const defaultSite: ManagedSite = {
   channelListEndpoint: '',
   note: ''
 };
-
-function jsonPretty(value: unknown) {
-  return JSON.stringify(value ?? {}, null, 2);
-}
-
-function parseJSONField<T>(value: string, fallback: T, label: string): T {
-  const trimmed = value.trim();
-  if (!trimmed) return fallback;
-  try {
-    return JSON.parse(trimmed) as T;
-  } catch (error) {
-    throw new Error(`${label} 不是有效 JSON：${error instanceof Error ? error.message : '格式错误'}`);
-  }
-}
 
 function Metric({ label, value }: { label: string; value: unknown }) {
   return (
@@ -509,6 +495,66 @@ function CurrentPrizePanel({ prizes }: { prizes?: PrizeConfigResponse }) {
   );
 }
 
+type ActivityPrize = { type: string; dollars: number; weight: number };
+
+const PRIZE_TYPES: { value: string; label: string }[] = [
+  { value: 'win', label: '中奖' },
+  { value: 'miss', label: '未中奖' },
+  { value: 'retry', label: '再来一次' }
+];
+
+function normalizePrize(row: { type?: string; dollars?: unknown; weight?: unknown }): ActivityPrize {
+  return { type: row.type || 'win', dollars: Number(row.dollars) || 0, weight: Number(row.weight) || 0 };
+}
+
+function buildSpinMap(entries: [string, number][]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [key, value] of entries) {
+    const k = key.trim();
+    if (k !== '') out[k] = Number(value) || 0;
+  }
+  return out;
+}
+
+type TierEntry = { tier: string; pool: ActivityPrize[] };
+
+function tierEntriesFrom(tierPools?: Record<string, PrizeRow[]>): TierEntry[] {
+  return Object.entries(tierPools ?? {}).map(([tier, pool]) => ({ tier, pool: (pool ?? []).map(normalizePrize) }));
+}
+
+function buildTierPools(entries: TierEntry[]): Record<string, ActivityPrize[]> {
+  const out: Record<string, ActivityPrize[]> = {};
+  for (const { tier, pool } of entries) {
+    const k = tier.trim();
+    if (k !== '') out[k] = pool;
+  }
+  return out;
+}
+
+// PrizePoolEditor edits a weighted prize list with live probability per row.
+function PrizePoolEditor({ rows, onChange }: { rows: ActivityPrize[]; onChange: (rows: ActivityPrize[]) => void }) {
+  const total = rows.reduce((sum, row) => sum + (Number(row.weight) || 0), 0);
+  const update = (index: number, patch: Partial<ActivityPrize>) => onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  return (
+    <div className="prize-editor">
+      <div className="prize-row prize-row--head"><span>类型</span><span>金额 $</span><span>权重</span><span>概率</span><span /></div>
+      {rows.length === 0 ? <p className="inline-help">暂无奖项，点“新增奖项”。</p> : null}
+      {rows.map((row, index) => (
+        <div className="prize-row" key={index}>
+          <select className="native-select" value={row.type} onChange={(event) => update(index, { type: event.target.value })}>
+            {PRIZE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+          <Input className="mini-input blueprint-input" type="number" min={0} value={String(row.dollars)} isDisabled={row.type !== 'win'} onChange={(event) => update(index, { dollars: Number(event.target.value) })} />
+          <Input className="mini-input blueprint-input" type="number" min={0} value={String(row.weight)} onChange={(event) => update(index, { weight: Number(event.target.value) })} />
+          <span className="prize-prob">{total > 0 ? `${((row.weight / total) * 100).toFixed(2)}%` : '—'}</span>
+          <Button className="blueprint-danger-button" onPress={() => onChange(rows.filter((_, i) => i !== index))}>删除</Button>
+        </div>
+      ))}
+      <Button className="blueprint-button" onPress={() => onChange([...rows, { type: 'win', dollars: 0, weight: 100 }])}>新增奖项</Button>
+    </div>
+  );
+}
+
 function ActivityConfigEditor({
   activity,
   onChange
@@ -516,33 +562,34 @@ function ActivityConfigEditor({
   activity: ActivityConfig;
   onChange: (activity: ActivityConfig) => void;
 }) {
-  const [spinMap, setSpinMap] = useState(jsonPretty(activity.spinMap ?? {}));
-  const [prizePool, setPrizePool] = useState(jsonPretty(activity.prizePool ?? []));
-  const [tierPools, setTierPools] = useState(jsonPretty(activity.tierPools ?? {}));
-  const [postJackpotPrizes, setPostJackpotPrizes] = useState(jsonPretty(activity.postJackpotPrizes ?? []));
-  const [scratchRewards, setScratchRewards] = useState(jsonPretty(activity.scratchRewards ?? []));
+  const [spinEntries, setSpinEntries] = useState<[string, number][]>(() => Object.entries(activity.spinMap ?? {}));
+  const [prizePool, setPrizePool] = useState<ActivityPrize[]>(() => (activity.prizePool ?? []).map(normalizePrize));
+  const [tierEntries, setTierEntries] = useState<TierEntry[]>(() => tierEntriesFrom(activity.tierPools));
+  const [postJackpot, setPostJackpot] = useState<ActivityPrize[]>(() => (activity.postJackpotPrizes ?? []).map(normalizePrize));
+  const [scratch, setScratch] = useState<number[]>(() => (activity.scratchRewards ?? []).map(Number));
+  const pushedRef = useRef<ActivityConfig | null>(null);
 
+  // Re-seed local editor state only on external changes (load/reload), never on
+  // our own push — otherwise live edits would be clobbered each keystroke.
   useEffect(() => {
-    setSpinMap(jsonPretty(activity.spinMap ?? {}));
-    setPrizePool(jsonPretty(activity.prizePool ?? []));
-    setTierPools(jsonPretty(activity.tierPools ?? {}));
-    setPostJackpotPrizes(jsonPretty(activity.postJackpotPrizes ?? []));
-    setScratchRewards(jsonPretty(activity.scratchRewards ?? []));
+    if (activity === pushedRef.current) return;
+    setSpinEntries(Object.entries(activity.spinMap ?? {}));
+    setPrizePool((activity.prizePool ?? []).map(normalizePrize));
+    setTierEntries(tierEntriesFrom(activity.tierPools));
+    setPostJackpot((activity.postJackpotPrizes ?? []).map(normalizePrize));
+    setScratch((activity.scratchRewards ?? []).map(Number));
   }, [activity]);
 
-  function update(patch: ActivityConfig) {
-    onChange({ ...activity, ...patch });
+  function emit(next: ActivityConfig) {
+    pushedRef.current = next;
+    onChange(next);
   }
-
-  function applyJSON() {
-    update({
-      spinMap: parseJSONField<Record<string, number>>(spinMap, {}, '额度 → 抽奖次数'),
-      prizePool: parseJSONField(prizePool, [], '普通奖池权重（调整中奖率）'),
-      tierPools: parseJSONField(tierPools, {}, '分额度奖池权重'),
-      postJackpotPrizes: parseJSONField(postJackpotPrizes, [], '中大奖后奖池权重'),
-      scratchRewards: parseJSONField(scratchRewards, [], '刮刮卡奖励')
-    });
-  }
+  const emitSpin = (entries: [string, number][]) => { setSpinEntries(entries); emit({ ...activity, spinMap: buildSpinMap(entries) }); };
+  const emitPrize = (rows: ActivityPrize[]) => { setPrizePool(rows); emit({ ...activity, prizePool: rows }); };
+  const emitTiers = (entries: TierEntry[]) => { setTierEntries(entries); emit({ ...activity, tierPools: buildTierPools(entries) }); };
+  const emitPost = (rows: ActivityPrize[]) => { setPostJackpot(rows); emit({ ...activity, postJackpotPrizes: rows }); };
+  const emitScratch = (values: number[]) => { setScratch(values); emit({ ...activity, scratchRewards: values }); };
+  const updateWindow = (patch: ActivityConfig) => emit({ ...activity, ...patch });
 
   return (
     <div className="business-stack">
@@ -552,21 +599,60 @@ function ActivityConfigEditor({
       </div>
       <div className="config-subhead">活动窗口与整体期望值</div>
       <div className="field-grid">
-        <label className="field">开始时间文本<Input className="blueprint-input" value={activity.startText || ''} placeholder="2026-06-01 00:00:00" onChange={(event) => update({ startText: event.target.value })} /></label>
-        <label className="field">结束时间文本<Input className="blueprint-input" value={activity.endText || ''} placeholder="2026-06-30 23:59:59" onChange={(event) => update({ endText: event.target.value })} /></label>
-        <label className="field">开始时间戳<Input className="blueprint-input" type="number" min={1} value={String(activity.startTS ?? '')} onChange={(event) => update({ startTS: Number(event.target.value) })} /></label>
-        <label className="field">结束时间戳<Input className="blueprint-input" type="number" min={1} value={String(activity.endTS ?? '')} onChange={(event) => update({ endTS: Number(event.target.value) })} /></label>
-        <label className="field">整体数学期望值<Input className="blueprint-input" type="number" step="0.0001" min={0} value={String(activity.targetExpectedValue ?? '')} onChange={(event) => update({ targetExpectedValue: Number(event.target.value) })} /></label>
+        <label className="field">开始时间文本<Input className="blueprint-input" value={activity.startText || ''} placeholder="2026-06-01 00:00:00" onChange={(event) => updateWindow({ startText: event.target.value })} /></label>
+        <label className="field">结束时间文本<Input className="blueprint-input" value={activity.endText || ''} placeholder="2026-06-30 23:59:59" onChange={(event) => updateWindow({ endText: event.target.value })} /></label>
+        <label className="field">开始时间戳<Input className="blueprint-input" type="number" min={1} value={String(activity.startTS ?? '')} onChange={(event) => updateWindow({ startTS: Number(event.target.value) })} /></label>
+        <label className="field">结束时间戳<Input className="blueprint-input" type="number" min={1} value={String(activity.endTS ?? '')} onChange={(event) => updateWindow({ endTS: Number(event.target.value) })} /></label>
+        <label className="field">整体数学期望值<Input className="blueprint-input" type="number" step="0.0001" min={0} value={String(activity.targetExpectedValue ?? '')} onChange={(event) => updateWindow({ targetExpectedValue: Number(event.target.value) })} /></label>
       </div>
-      <div className="config-subhead">奖池权重配置 · JSON</div>
-      <div className="json-grid">
-        <label className="field">额度 → 抽奖次数<Textarea className="blueprint-textarea" value={spinMap} onChange={(event) => setSpinMap(event.target.value)} /></label>
-        <label className="field">普通奖池权重（调整中奖率）<Textarea className="blueprint-textarea" value={prizePool} onChange={(event) => setPrizePool(event.target.value)} /></label>
-        <label className="field">分额度奖池权重<Textarea className="blueprint-textarea" value={tierPools} onChange={(event) => setTierPools(event.target.value)} /></label>
-        <label className="field">中大奖后奖池权重<Textarea className="blueprint-textarea" value={postJackpotPrizes} onChange={(event) => setPostJackpotPrizes(event.target.value)} /></label>
-        <label className="field">刮刮卡奖励<Textarea className="blueprint-textarea" value={scratchRewards} onChange={(event) => setScratchRewards(event.target.value)} /></label>
+
+      <div className="config-subhead">额度 → 抽奖次数</div>
+      <div className="prize-editor">
+        <div className="spin-row spin-row--head"><span>额度 $</span><span>抽奖次数</span><span /></div>
+        {spinEntries.length === 0 ? <p className="inline-help">暂无映射，点“新增额度档”。</p> : null}
+        {spinEntries.map(([dollars, spins], index) => (
+          <div className="spin-row" key={index}>
+            <Input className="mini-input blueprint-input" type="number" step="0.01" min={0} value={dollars} onChange={(event) => emitSpin(spinEntries.map((entry, i) => (i === index ? [event.target.value, entry[1]] : entry)))} />
+            <Input className="mini-input blueprint-input" type="number" min={0} value={String(spins)} onChange={(event) => emitSpin(spinEntries.map((entry, i) => (i === index ? [entry[0], Number(event.target.value)] : entry)))} />
+            <Button className="blueprint-danger-button" onPress={() => emitSpin(spinEntries.filter((_, i) => i !== index))}>删除</Button>
+          </div>
+        ))}
+        <Button className="blueprint-button" onPress={() => emitSpin([...spinEntries, ['', 1]])}>新增额度档</Button>
       </div>
-      <Button className="blueprint-button" onPress={applyJSON}>应用 JSON 到待保存配置</Button>
+
+      <div className="config-subhead">普通奖池（调整中奖率）</div>
+      <PrizePoolEditor rows={prizePool} onChange={emitPrize} />
+
+      <div className="config-subhead">分额度奖池</div>
+      <div className="tier-pools">
+        {tierEntries.length === 0 ? <p className="inline-help">暂无分额度奖池，点“新增额度档”。</p> : null}
+        {tierEntries.map((entry, index) => (
+          <section className="bp-card tier-card" key={index}>
+            <header className="bp-card-titlebar">
+              <label className="field--inline">额度 $<Input className="mini-input blueprint-input" type="number" min={0} value={entry.tier} onChange={(event) => emitTiers(tierEntries.map((t, i) => (i === index ? { ...t, tier: event.target.value } : t)))} /></label>
+              <Button className="blueprint-danger-button" onPress={() => emitTiers(tierEntries.filter((_, i) => i !== index))}>删除该档</Button>
+            </header>
+            <div className="bp-card-body">
+              <PrizePoolEditor rows={entry.pool} onChange={(rows) => emitTiers(tierEntries.map((t, i) => (i === index ? { ...t, pool: rows } : t)))} />
+            </div>
+          </section>
+        ))}
+        <Button className="blueprint-button" onPress={() => emitTiers([...tierEntries, { tier: '', pool: [] }])}>新增额度档</Button>
+      </div>
+
+      <div className="config-subhead">中大奖后奖池</div>
+      <PrizePoolEditor rows={postJackpot} onChange={emitPost} />
+
+      <div className="config-subhead">刮刮卡奖励（$）</div>
+      <div className="scratch-editor">
+        {scratch.map((value, index) => (
+          <div className="scratch-chip" key={index}>
+            <Input className="mini-input blueprint-input" type="number" min={0} value={String(value)} onChange={(event) => emitScratch(scratch.map((v, i) => (i === index ? Number(event.target.value) : v)))} />
+            <Button className="blueprint-danger-button" onPress={() => emitScratch(scratch.filter((_, i) => i !== index))}>×</Button>
+          </div>
+        ))}
+        <Button className="blueprint-button" onPress={() => emitScratch([...scratch, 0])}>新增奖励</Button>
+      </div>
     </div>
   );
 }

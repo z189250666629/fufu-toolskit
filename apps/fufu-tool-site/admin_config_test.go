@@ -231,7 +231,6 @@ func TestProductionAdminShellUsesHeroUIComponentsForControls(t *testing.T) {
 		"<Card",
 		"<Tabs",
 		"<Input",
-		"<Textarea",
 		"<Table",
 		"<Chip",
 	} {
