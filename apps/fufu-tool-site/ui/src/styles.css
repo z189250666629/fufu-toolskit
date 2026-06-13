@@ -972,7 +972,9 @@ tr:last-child td {
 }
 
 .sale-time-input {
-  max-width: 116px;
+  width: 150px;
+  max-width: none !important;
+  padding-right: 6px;
 }
 
 .field--inline-tz {

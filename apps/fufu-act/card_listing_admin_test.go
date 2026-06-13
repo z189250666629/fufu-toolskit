@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"fufu/newapi"
 	"fufu/tokens"
@@ -238,6 +239,40 @@ func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
 	}
 	if searchHits.Load() < 6 {
 		t.Fatalf("each plan should be queried, hits=%d", searchHits.Load())
+	}
+}
+
+func TestHandleAdminSaleCardsStockQueriesPlansConcurrently(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+
+	const perCall = 80 * time.Millisecond
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(perCall)
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"items": []any{}, "total": json.Number("1")}})
+	}))
+	t.Cleanup(tokenSrv.Close)
+
+	oldSvc, oldErr := tokenSvc, tokenConfigErr
+	t.Cleanup(func() { tokenSvc, tokenConfigErr = oldSvc, oldErr })
+	tokenConfigErr = nil
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "t", UserID: "1", QuotaUnit: 1000}))
+
+	planCount := len(saleCardPlanList())
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
+	req.Header.Set("Authorization", "Bearer test-admin-token")
+	w := httptest.NewRecorder()
+
+	start := time.Now()
+	apiRoute(w, req)
+	elapsed := time.Since(start)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	// Serial would be planCount*perCall; concurrent should be ~perCall. Use a
+	// generous ceiling (half the serial time) to stay non-flaky.
+	if serial := time.Duration(planCount) * perCall; elapsed >= serial/2 {
+		t.Fatalf("stock queries look serial: %d plans took %s (serial≈%s)", planCount, elapsed, serial)
 	}
 }
 

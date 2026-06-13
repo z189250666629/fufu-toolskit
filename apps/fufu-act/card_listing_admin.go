@@ -1,6 +1,7 @@
 package activityapp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fufu/auth"
@@ -10,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -148,8 +150,14 @@ type saleCardStockEntry struct {
 	CurrentStock int    `json:"currentStock"`
 }
 
+// saleCardStockTimeout bounds the whole multi-plan stock lookup so a slow or
+// unreachable NewAPI can't hang the admin refresh.
+var saleCardStockTimeout = 15 * time.Second
+
 // handleAdminSaleCardsStock reports the current NewAPI stock for every plan so
-// the admin can see live counts before deciding restock targets.
+// the admin can see live counts before deciding restock targets. Each plan is a
+// separate name query; they run concurrently so the refresh takes one round-trip,
+// not one per plan.
 func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")
@@ -160,15 +168,31 @@ func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	plans := saleCardPlanList()
-	out := make([]saleCardStockEntry, 0, len(plans))
-	for _, plan := range plans {
-		plan = normalizeSaleCardPlan(plan)
-		current, err := tokenSvc.CountTokensByName(r.Context(), saleCardStockKeyword(plan))
-		if err != nil {
-			writeJSONError(w, http.StatusBadGateway, "查询库存失败")
-			return
-		}
-		out = append(out, saleCardStockEntry{PlanID: plan.ID, PlanName: plan.Name, Slot: plan.Slot, CurrentStock: current})
+	out := make([]saleCardStockEntry, len(plans))
+	ctx, cancel := context.WithTimeout(r.Context(), saleCardStockTimeout)
+	defer cancel()
+	errCh := make(chan error, len(plans))
+	var wg sync.WaitGroup
+	for i := range plans {
+		plan := normalizeSaleCardPlan(plans[i])
+		out[i] = saleCardStockEntry{PlanID: plan.ID, PlanName: plan.Name, Slot: plan.Slot}
+		wg.Add(1)
+		go func(idx int, plan SaleCardPlan) {
+			defer wg.Done()
+			current, err := tokenSvc.CountTokensByName(ctx, saleCardStockKeyword(plan))
+			if err != nil {
+				errCh <- err
+				cancel() // fail fast: abort the other in-flight queries
+				return
+			}
+			out[idx].CurrentStock = current
+		}(i, plan)
+	}
+	wg.Wait()
+	close(errCh)
+	if err := <-errCh; err != nil {
+		writeJSONError(w, http.StatusBadGateway, "查询库存失败")
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"stock": out})
 }
