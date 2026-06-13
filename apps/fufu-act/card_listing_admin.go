@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"fufu/auth"
 	"net/http"
 	"os"
@@ -186,8 +187,18 @@ func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 	}
 	wg.Wait()
 	close(errCh)
-	if err := <-errCh; err != nil {
-		writeJSONError(w, http.StatusBadGateway, "查询库存失败")
+	// Prefer a real failure over the "context canceled" the fail-fast triggers in
+	// the sibling queries, and surface the actual MCY reason (admin-only) instead
+	// of a useless generic message so the failure is diagnosable.
+	var firstErr error
+	for e := range errCh {
+		if firstErr == nil || errors.Is(firstErr, context.Canceled) {
+			firstErr = e
+		}
+	}
+	if firstErr != nil {
+		fmt.Printf("[sale-card] stock query failed: %v\n", firstErr)
+		writeJSONError(w, http.StatusBadGateway, "查询库存失败: "+firstErr.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"stock": out})

@@ -315,6 +315,7 @@ function SaleCardManager({
   const [runResult, setRunResult] = useState<SaleCardRunResult>();
   const [stock, setStock] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [stockError, setStockError] = useState('');
 
   useEffect(() => {
     setEnabled(Boolean(config?.schedule?.enabled));
@@ -325,13 +326,14 @@ function SaleCardManager({
 
   async function refreshStock() {
     setRefreshing(true);
+    setStockError('');
     try {
       const data = await fetchJSON<SaleCardStockResponse>('/api/admin/sale-cards/stock');
       const map: Record<string, number> = {};
       for (const entry of data.stock ?? []) map[entry.planId] = entry.currentStock;
       setStock(map);
-    } catch {
-      // leave previous counts; admin can retry
+    } catch (error) {
+      setStockError(messageFromError(error, '查询库存失败'));
     } finally {
       setRefreshing(false);
     }
@@ -382,7 +384,8 @@ function SaleCardManager({
         <Button className="blueprint-button" onPress={refreshStock} isDisabled={refreshing}>{refreshing ? '刷新中…' : '刷新当前库存'}</Button>
         <Button className="blueprint-primary-button" onPress={() => onSave(buildSchedule())}>保存补卡计划</Button>
       </div>
-      <p className="inline-help">月次卡与 55 次混合特惠卡各占一个独立时段；到点按目标库存补齐（补 目标-当前）。点“刷新当前库存”查询 NewAPI 实时卡量。</p>
+      <p className="inline-help">月次卡与 55 次混合特惠卡各占一个独立时段；到点按目标库存补齐（补 目标-当前）。点“刷新当前库存”查询 MCY 商城实时可用卡量。</p>
+      {stockError ? <MessageLine tone="error">{stockError}</MessageLine> : null}
       {SALE_SLOTS.map((def) => {
         const slot = slotState[def.group];
         const slotPlans = plans.filter((plan) => (plan.slot || '') === def.group);
