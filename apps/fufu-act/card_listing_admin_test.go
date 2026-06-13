@@ -10,9 +10,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"fufu/newapi"
-	"fufu/tokens"
 )
 
 func TestHandleAdminSaleCardsConfigReturnsPlansAndDefaultSchedule(t *testing.T) {
@@ -180,26 +177,24 @@ func TestHandleAdminSaleCardsConfigRejectsUnknownSchedulePlan(t *testing.T) {
 
 func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+	setMCYCookieForTest(t, "manage_token=test")
 
-	var searchHits atomic.Int32
-	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/token/search" {
-			t.Fatalf("stock query should only hit token search, got %s", r.URL.Path)
+	var stockHits atomic.Int32
+	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+			t.Fatalf("stock query should only hit MCY card/get, got %s", r.URL.Path)
 		}
-		searchHits.Add(1)
-		// special55 keyword reports 7, every other plan reports 3.
-		total := "3"
-		if strings.Contains(r.URL.Query().Get("keyword"), "fufu-mix-special-55-") {
-			total = "7"
+		stockHits.Add(1)
+		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
+		// 55卡 (item 29 sku 66) reports 7; every other SKU reports 3.
+		total := 3
+		if int(payload["item_id"].(float64)) == 29 && int(payload["sku_id"].(float64)) == 66 {
+			total = 7
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"items": []any{}, "total": json.Number(total)}})
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": total, "list": []any{}}})
 	}))
-	t.Cleanup(tokenSrv.Close)
-
-	oldSvc, oldErr := tokenSvc, tokenConfigErr
-	t.Cleanup(func() { tokenSvc, tokenConfigErr = oldSvc, oldErr })
-	tokenConfigErr = nil
-	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+	t.Cleanup(mcySrv.Close)
+	t.Setenv("MCY_BASE_URL", mcySrv.URL)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
 	req.Header.Set("Authorization", "Bearer test-admin-token")
@@ -237,25 +232,22 @@ func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
 	if special != 7 || month100 != 3 {
 		t.Fatalf("per-plan stock wrong: special=%d month100=%d", special, month100)
 	}
-	if searchHits.Load() < 6 {
-		t.Fatalf("each plan should be queried, hits=%d", searchHits.Load())
+	if stockHits.Load() < 6 {
+		t.Fatalf("each plan should be queried against MCY, hits=%d", stockHits.Load())
 	}
 }
 
 func TestHandleAdminSaleCardsStockQueriesPlansConcurrently(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+	setMCYCookieForTest(t, "manage_token=test")
 
 	const perCall = 80 * time.Millisecond
-	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(perCall)
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"items": []any{}, "total": json.Number("1")}})
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 1, "list": []any{}}})
 	}))
-	t.Cleanup(tokenSrv.Close)
-
-	oldSvc, oldErr := tokenSvc, tokenConfigErr
-	t.Cleanup(func() { tokenSvc, tokenConfigErr = oldSvc, oldErr })
-	tokenConfigErr = nil
-	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "t", UserID: "1", QuotaUnit: 1000}))
+	t.Cleanup(mcySrv.Close)
+	t.Setenv("MCY_BASE_URL", mcySrv.URL)
 
 	planCount := len(saleCardPlanList())
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)

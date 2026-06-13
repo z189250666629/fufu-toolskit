@@ -163,10 +163,6 @@ func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")
 		return
 	}
-	if tokenConfigErr != nil || tokenSvc == nil {
-		writeJSONError(w, http.StatusServiceUnavailable, "次数 fufu 未配置")
-		return
-	}
 	plans := saleCardPlanList()
 	out := make([]saleCardStockEntry, len(plans))
 	ctx, cancel := context.WithTimeout(r.Context(), saleCardStockTimeout)
@@ -174,12 +170,12 @@ func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 	errCh := make(chan error, len(plans))
 	var wg sync.WaitGroup
 	for i := range plans {
-		plan := normalizeSaleCardPlan(plans[i])
+		plan := plans[i]
 		out[i] = saleCardStockEntry{PlanID: plan.ID, PlanName: plan.Name, Slot: plan.Slot}
 		wg.Add(1)
 		go func(idx int, plan SaleCardPlan) {
 			defer wg.Done()
-			current, err := tokenSvc.CountTokensByName(ctx, saleCardStockKeyword(plan))
+			current, err := queryMCYUsableStock(ctx, plan.ItemID, plan.SKUID)
 			if err != nil {
 				errCh <- err
 				cancel() // fail fast: abort the other in-flight queries

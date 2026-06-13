@@ -68,38 +68,6 @@ func (s *Service) SearchTokenByName(ctx context.Context, name string) (*Token, e
 	return nil, nil
 }
 
-// CountTokensByName reports how many tokens currently match the given name on
-// the NewAPI site. NewAPI's /api/token/search applies a LIKE filter on the
-// token name and returns the precise count in the paginated payload's total
-// field, so a single size=1 request yields the stock without walking pages.
-// Used by 补卡 to compute how many cards to top up (target − current).
-func (s *Service) CountTokensByName(ctx context.Context, name string) (int, error) {
-	if s == nil || s.Client == nil {
-		return 0, fmt.Errorf("token service is not configured")
-	}
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return 0, nil
-	}
-	endpoint := "/api/token/search?keyword=" + url.QueryEscape(name) + "&p=0&size=1"
-	res, data, err := s.Client.Request(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return 0, err
-	}
-	if !res.OK() {
-		return 0, fmt.Errorf("查询 token 名称 %q 库存失败", name)
-	}
-	if !newapi.IsSuccess(data) {
-		return 0, errors.New(newapi.ErrorMessage(data, res.StatusCode, fmt.Sprintf("查询 token 名称 %q 库存失败", name)))
-	}
-	if total, ok := payloadTotal(data); ok {
-		return total, nil
-	}
-	// Older flat {data:[...]} payloads carry no total; fall back to the page
-	// length (callers request size=1, so this only fires on tiny inventories).
-	return len(DataList(data)), nil
-}
-
 type SearchResult struct {
 	Key   string
 	Found *Token

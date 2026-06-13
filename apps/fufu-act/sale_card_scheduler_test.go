@@ -20,44 +20,48 @@ func resetSaleCardFiredGuard(t *testing.T) {
 	saleCardFiredGuard.Unlock()
 }
 
-// restockBackend wires a NewAPI stub (search returns total=0 so any target
-// uploads, create returns N keys) plus an MCY upload stub, and points tokenSvc
-// at it. The returned counters track how often each leg is hit.
-func restockBackend(t *testing.T) (*atomic.Int32, *atomic.Int32, *atomic.Int32) {
+// restockBackend wires the real restock dependencies: an MCY stub answering the
+// encrypted card/get (stock = stockTotal) and card/add (upload), plus a NewAPI
+// stub that mints N token keys. The returned counters track stock queries,
+// token creations and MCY uploads.
+func restockBackend(t *testing.T, stockTotal int) (*atomic.Int32, *atomic.Int32, *atomic.Int32) {
 	t.Helper()
 	setMCYCookieForTest(t, "manage_token=test")
-	var search, create, upload atomic.Int32
+	var stockQ, create, upload atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/token/search":
-			search.Add(1)
-			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"items": []any{}, "total": json.Number("0")}})
-		case "/api/token/tokens":
-			create.Add(1)
-			n := 1
-			if c := r.URL.Query().Get("tokenCount"); c != "" {
-				fmt.Sscanf(c, "%d", &n)
-			}
-			items := make([]any, 0, n)
-			for i := range n {
-				items = append(items, map[string]any{"id": i + 1, "key": fmt.Sprintf("key-%d", i)})
-			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
-		default:
+		if r.URL.Path != "/api/token/tokens" {
 			t.Fatalf("unexpected NewAPI request %s", r.URL.Path)
 		}
+		create.Add(1)
+		n := 1
+		if c := r.URL.Query().Get("tokenCount"); c != "" {
+			fmt.Sscanf(c, "%d", &n)
+		}
+		items := make([]any, 0, n)
+		for i := range n {
+			items = append(items, map[string]any{"id": i + 1, "key": fmt.Sprintf("key-%d", i)})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
 	}))
 	t.Cleanup(tokenSrv.Close)
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upload.Add(1)
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+		switch r.URL.Path {
+		case "/plugin/virtual-card-ship/card/get":
+			stockQ.Add(1)
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": stockTotal, "list": []any{}}})
+		case "/plugin/virtual-card-ship/card/add":
+			upload.Add(1)
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+		default:
+			t.Fatalf("unexpected MCY request %s", r.URL.Path)
+		}
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
 	oldSvc := tokenSvc
 	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
 	t.Cleanup(func() { tokenSvc = oldSvc })
-	return &search, &create, &upload
+	return &stockQ, &create, &upload
 }
 
 func TestRunSaleCardSlotSkipsNonRunnableJobs(t *testing.T) {
@@ -74,9 +78,9 @@ func TestRunSaleCardSlotSkipsNonRunnableJobs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			search, _, _ := restockBackend(t)
+			stockQ, _, _ := restockBackend(t, 0)
 			runSaleCardSlot(SaleCardScheduleSlot{Group: "special55", Jobs: c.jobs})
-			if got := search.Load(); got != c.runs {
+			if got := stockQ.Load(); got != c.runs {
 				t.Fatalf("restock runs=%d, want %d", got, c.runs)
 			}
 		})
@@ -105,7 +109,7 @@ func TestSaleCardScheduleLocationLoadsOrFallsBack(t *testing.T) {
 func TestRunDueSaleCardSlotsFiresSlotsIndependently(t *testing.T) {
 	setupSaleCardConfigTestRoot(t)
 	resetSaleCardFiredGuard(t)
-	search, _, _ := restockBackend(t)
+	stockQ, _, _ := restockBackend(t, 0)
 
 	schedule := SaleCardScheduleConfig{
 		Enabled:  true,
@@ -120,56 +124,60 @@ func TestRunDueSaleCardSlotsFiresSlotsIndependently(t *testing.T) {
 	}
 
 	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 0, 0, 0, time.UTC)) // only special55
-	if search.Load() != 1 {
-		t.Fatalf("after 08:00 only special55 should fire, search=%d", search.Load())
+	if stockQ.Load() != 1 {
+		t.Fatalf("after 08:00 only special55 should fire, stockQueries=%d", stockQ.Load())
 	}
 	runDueSaleCardSlots(time.Date(2026, 6, 13, 9, 0, 0, 0, time.UTC)) // only month
-	if search.Load() != 2 {
-		t.Fatalf("after 09:00 month should also fire, search=%d", search.Load())
+	if stockQ.Load() != 2 {
+		t.Fatalf("after 09:00 month should also fire, stockQueries=%d", stockQ.Load())
 	}
 	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 0, 0, 0, time.UTC)) // same-day dedup
-	if search.Load() != 2 {
-		t.Fatalf("same-day re-run must not refire, search=%d", search.Load())
+	if stockQ.Load() != 2 {
+		t.Fatalf("same-day re-run must not refire, stockQueries=%d", stockQ.Load())
 	}
 	runDueSaleCardSlots(time.Date(2026, 6, 14, 8, 0, 0, 0, time.UTC)) // next day special55 again
-	if search.Load() != 3 {
-		t.Fatalf("next-day special55 should fire again, search=%d", search.Load())
+	if stockQ.Load() != 3 {
+		t.Fatalf("next-day special55 should fire again, stockQueries=%d", stockQ.Load())
 	}
 }
 
 // TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime exercises the full scheduler
 // path: the 55卡 slot fires only at its configured minute, restocks to target
-// via the real NewAPI name query, and refuses to re-run the same day.
+// (MCY reports 8 in stock, target 20 → create 12), and refuses to re-run the
+// same day.
 func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 	setupSaleCardConfigTestRoot(t)
 	resetSaleCardFiredGuard(t)
 	setMCYCookieForTest(t, "manage_token=test")
 
-	var searchHits, createHits, uploadHits atomic.Int32
+	var stockHits, createHits, uploadHits atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/api/token/search":
-			searchHits.Add(1)
-			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"items": []any{}, "total": json.Number("8")}})
-		case "/api/token/tokens":
-			createHits.Add(1)
-			if got := r.URL.Query().Get("tokenCount"); got != "12" {
-				t.Fatalf("tokenCount=%q, want 12 (target 20 - current 8)", got)
-			}
-			items := make([]any, 0, 12)
-			for i := range 12 {
-				items = append(items, map[string]any{"id": i + 1, "key": "scheduled-key"})
-			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
-		default:
+		if r.URL.Path != "/api/token/tokens" {
 			t.Fatalf("unexpected NewAPI request %s", r.URL.Path)
 		}
+		createHits.Add(1)
+		if got := r.URL.Query().Get("tokenCount"); got != "12" {
+			t.Fatalf("tokenCount=%q, want 12 (target 20 - current 8)", got)
+		}
+		items := make([]any, 0, 12)
+		for i := range 12 {
+			items = append(items, map[string]any{"id": i + 1, "key": "scheduled-key"})
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
 	}))
 	t.Cleanup(tokenSrv.Close)
 
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		uploadHits.Add(1)
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+		switch r.URL.Path {
+		case "/plugin/virtual-card-ship/card/get":
+			stockHits.Add(1)
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 8, "list": []any{}}})
+		case "/plugin/virtual-card-ship/card/add":
+			uploadHits.Add(1)
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+		default:
+			t.Fatalf("unexpected MCY request %s", r.URL.Path)
+		}
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
@@ -196,20 +204,20 @@ func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 
 	// Wrong minute → nothing fires.
 	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 29, 0, 0, time.UTC))
-	if searchHits.Load() != 0 || uploadHits.Load() != 0 {
-		t.Fatalf("slot fired off-schedule: search=%d upload=%d", searchHits.Load(), uploadHits.Load())
+	if stockHits.Load() != 0 || uploadHits.Load() != 0 {
+		t.Fatalf("slot fired off-schedule: search=%d upload=%d", stockHits.Load(), uploadHits.Load())
 	}
 
 	// Matching minute → the 55卡 slot fires once and restocks 20-8=12.
 	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 30, 30, 0, time.UTC))
-	if searchHits.Load() != 1 || createHits.Load() != 1 || uploadHits.Load() != 1 {
-		t.Fatalf("expected one restock: search=%d create=%d upload=%d", searchHits.Load(), createHits.Load(), uploadHits.Load())
+	if stockHits.Load() != 1 || createHits.Load() != 1 || uploadHits.Load() != 1 {
+		t.Fatalf("expected one restock: search=%d create=%d upload=%d", stockHits.Load(), createHits.Load(), uploadHits.Load())
 	}
 
 	// Same day, same minute → dedup guard blocks a second run.
 	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 30, 45, 0, time.UTC))
-	if searchHits.Load() != 1 {
-		t.Fatalf("slot should fire at most once per day, search=%d", searchHits.Load())
+	if stockHits.Load() != 1 {
+		t.Fatalf("slot should fire at most once per day, search=%d", stockHits.Load())
 	}
 }
 

@@ -121,14 +121,13 @@ func generateAndUploadSaleCards(ctx context.Context, svc *tokens.Service, plan S
 		return result, fmt.Errorf("%w: token service is not configured", ErrSaleCardGenerationFailed)
 	}
 
-	// 补卡：设了目标库存时，先按卡密命名精准查询 NewAPI 当前库存，补齐到目标
-	// （补 target-current）。NewAPI /api/token/search 以名称 LIKE 命中并直接返回
-	// total，无需分页。
+	// 补卡：设了目标库存时，先查 MCY 商城当前可用（未售, status:0）卡量，补齐到
+	// 目标（补 target-current）。库存来源是商城真实在售数，不是 NewAPI 令牌数。
 	uploadCount := plan.Count
 	if plan.TargetStock > 0 {
-		current, err := svc.CountTokensByName(ctx, saleCardStockKeyword(plan))
+		current, err := queryMCYUsableStock(ctx, plan.ItemID, plan.SKUID)
 		if err != nil {
-			return result, fmt.Errorf("%w: %v", ErrSaleCardGenerationFailed, err)
+			return result, err
 		}
 		result.CurrentStock = current
 		result.TargetStock = plan.TargetStock
@@ -226,13 +225,6 @@ func saleCardSlugPrefix(plan SaleCardPlan) string {
 		slug = "sale-card"
 	}
 	return slug + "-"
-}
-
-// saleCardStockKeyword is the NewAPI name keyword that matches every batch of a
-// plan's cards. The trailing dash keeps the LIKE match precise so the keyword
-// for "fufu-mix-month-100" does not also count "fufu-mix-month-1000" tokens.
-func saleCardStockKeyword(plan SaleCardPlan) string {
-	return saleCardSlugPrefix(plan)
 }
 
 func sanitizeSaleCardSlug(value string) string {

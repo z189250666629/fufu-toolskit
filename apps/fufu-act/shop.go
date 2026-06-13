@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"fufu/config"
+	"fufu/rawconv"
 	"fufu/webutil"
 	"io"
 	"net/http"
@@ -61,6 +62,50 @@ func findShopPurchase(ctx context.Context, cardKey string) (ShopPurchaseLookup, 
 		return lookup, nil
 	}
 	return lookup, ErrShopInvalidResponse
+}
+
+// queryMCYUsableStock returns how many cards of (itemID, skuID) are currently
+// usable (status:0 — unsold) on the MCY shop. This is the real shop inventory
+// 补卡 tops up against. It uses the encrypted card/get protocol (matching the
+// fufu-shop tool and the card/add upload path); the per-SKU usable count is the
+// data.total of the status:0-filtered query.
+func queryMCYUsableStock(ctx context.Context, itemID, skuID int) (int, error) {
+	if config.Env("MCY_BASE_URL") == "" && config.Env("SHOP_BASE_URL") == "" {
+		return 0, fmt.Errorf("%w: MCY 未配置", ErrShopRequestFailed)
+	}
+	if err := ensureMCYCookie(ctx); err != nil {
+		return 0, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
+	}
+	payload := map[string]any{"item_id": itemID, "sku_id": skuID, "status": 0, "page": 1, "limit": 1}
+	staleCookie := getMCYCookie()
+	data, err := mcyEncryptedPost(ctx, "/plugin/virtual-card-ship/card/get", payload)
+	if err != nil {
+		if !isMCYAuthError(err) {
+			return 0, classifyShopRequestError(err)
+		}
+		if err := refreshMCYCookie(ctx, staleCookie); err != nil {
+			return 0, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
+		}
+		data, err = mcyEncryptedPost(ctx, "/plugin/virtual-card-ship/card/get", payload)
+		if err != nil {
+			return 0, classifyShopRequestError(err)
+		}
+	}
+	if !mcyPayloadOK(data) {
+		return 0, fmt.Errorf("%w: %s", ErrShopRequestFailed, mcyPayloadMessage(data, "MCY 库存查询失败"))
+	}
+	return mcyUsableCount(data), nil
+}
+
+// mcyUsableCount reads the per-SKU usable count from a card/get response. The
+// status:0 filter makes data.total the count of unsold cards for that SKU.
+func mcyUsableCount(data map[string]any) int {
+	if d, ok := data["data"].(map[string]any); ok {
+		if total, ok := d["total"]; ok {
+			return rawconv.Int(total)
+		}
+	}
+	return 0
 }
 
 func classifyShopRequestError(err error) error {

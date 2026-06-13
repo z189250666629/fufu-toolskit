@@ -207,6 +207,54 @@ func TestFindShopPurchaseConcurrentAuthRefreshIsRaceFree(t *testing.T) {
 	}
 }
 
+func TestQueryMCYUsableStockReadsEncryptedCardGetTotal(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=test")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+			t.Fatalf("unexpected MCY request %s %s", r.Method, r.URL.String())
+		}
+		// Must be the encrypted shop protocol (Secret/Signature headers), like the
+		// real fufu-shop tool — not a plain JSON post.
+		secret := r.Header.Get("Secret")
+		if len(secret) < 16 || r.Header.Get("Signature") == "" {
+			t.Fatalf("stock query must use encrypted MCY protocol: Secret=%q Signature=%q", secret, r.Header.Get("Signature"))
+		}
+		payload := testDecodeMCYRequest(t, r.Body, secret)
+		if got, want := int(payload["item_id"].(float64)), 29; got != want {
+			t.Fatalf("item_id=%d, want %d", got, want)
+		}
+		if got, want := int(payload["sku_id"].(float64)), 66; got != want {
+			t.Fatalf("sku_id=%d, want %d", got, want)
+		}
+		if got, want := int(payload["status"].(float64)), 0; got != want {
+			t.Fatalf("status=%d, want 0 (unsold)", got)
+		}
+		// Real card/get shape: the per-SKU usable count lives in data.total.
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 42, "list": []any{}}})
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	got, err := queryMCYUsableStock(context.Background(), 29, 66)
+	if err != nil || got != 42 {
+		t.Fatalf("queryMCYUsableStock = %d, err=%v; want 42", got, err)
+	}
+}
+
+func TestQueryMCYUsableStockReportsShopErrorPayload(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=test")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 500, "msg": "shop boom"})
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	if _, err := queryMCYUsableStock(context.Background(), 29, 66); err == nil || !strings.Contains(err.Error(), "shop boom") {
+		t.Fatalf("err=%v, want shop error payload", err)
+	}
+}
+
 func TestMCYPostReturnsErrorForInvalidRequestURL(t *testing.T) {
 	oldCookie := mcyCookie
 	t.Cleanup(func() { mcyCookie = oldCookie })

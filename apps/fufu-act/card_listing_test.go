@@ -111,47 +111,46 @@ func TestGenerateAndUploadSaleCardsCreatesTokensAndUploadsEncryptedMCY(t *testin
 	}
 }
 
-func TestGenerateAndUploadSaleCardsRestockTopsUpToTargetByName(t *testing.T) {
+func TestGenerateAndUploadSaleCardsRestockTopsUpToTargetByMCYStock(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=test")
 
-	var searchHits, createHits atomic.Int32
+	var createHits, stockHits, uploadHits atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
-			searchHits.Add(1)
-			if got := r.URL.Query().Get("keyword"); got != "restock-plan-" {
-				t.Fatalf("stock keyword=%q, want restock-plan-", got)
-			}
-			// Current stock = 2 cards already live for this plan name.
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"success": true,
-				"data":    map[string]any{"items": []any{}, "total": json.Number("2")},
-			})
-		case r.Method == http.MethodPost && r.URL.Path == "/api/token/tokens":
-			createHits.Add(1)
-			if got := r.URL.Query().Get("tokenCount"); got != "3" {
-				t.Fatalf("tokenCount=%q, want 3 (target 5 - current 2)", got)
-			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
-				map[string]any{"id": 1, "key": "restock-a"},
-				map[string]any{"id": 2, "key": "restock-b"},
-				map[string]any{"id": 3, "key": "restock-c"},
-			}})
-		default:
-			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
+		if r.URL.Path != "/api/token/tokens" {
+			t.Fatalf("unexpected NewAPI request %s", r.URL.Path)
 		}
+		createHits.Add(1)
+		if got := r.URL.Query().Get("tokenCount"); got != "3" {
+			t.Fatalf("tokenCount=%q, want 3 (target 5 - MCY stock 2)", got)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+			map[string]any{"id": 1, "key": "restock-a"},
+			map[string]any{"id": 2, "key": "restock-b"},
+			map[string]any{"id": 3, "key": "restock-c"},
+		}})
 	}))
 	t.Cleanup(tokenSrv.Close)
 
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/plugin/virtual-card-ship/card/get" {
-			t.Fatalf("restock must not query MCY card/get for stock")
+		switch r.URL.Path {
+		case "/plugin/virtual-card-ship/card/get":
+			// Real shop stock: 2 unsold cards for this item/sku.
+			stockHits.Add(1)
+			payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
+			if int(payload["item_id"].(float64)) != 29 || int(payload["sku_id"].(float64)) != 66 || int(payload["status"].(float64)) != 0 {
+				t.Fatalf("stock query payload=%#v", payload)
+			}
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 2, "list": []any{}}})
+		case "/plugin/virtual-card-ship/card/add":
+			uploadHits.Add(1)
+			payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
+			if got := payload["card"]; got != "sk-restock-a\nsk-restock-b\nsk-restock-c" {
+				t.Fatalf("uploaded card=%q", got)
+			}
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+		default:
+			t.Fatalf("unexpected MCY request %s", r.URL.Path)
 		}
-		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
-		if got := payload["card"]; got != "sk-restock-a\nsk-restock-b\nsk-restock-c" {
-			t.Fatalf("uploaded card=%q", got)
-		}
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
@@ -175,28 +174,25 @@ func TestGenerateAndUploadSaleCardsRestockTopsUpToTargetByName(t *testing.T) {
 	if result.CurrentStock != 2 || result.TargetStock != 5 || result.ToUpload != 3 || result.Uploaded != 3 {
 		t.Fatalf("restock result=%#v, want current=2 target=5 toUpload=3 uploaded=3", result)
 	}
-	if searchHits.Load() != 1 || createHits.Load() != 1 {
-		t.Fatalf("searchHits=%d createHits=%d, want 1/1", searchHits.Load(), createHits.Load())
+	if stockHits.Load() != 1 || createHits.Load() != 1 || uploadHits.Load() != 1 {
+		t.Fatalf("stockHits=%d createHits=%d uploadHits=%d, want 1/1/1", stockHits.Load(), createHits.Load(), uploadHits.Load())
 	}
 }
 
-func TestGenerateAndUploadSaleCardsRestockSkipsWhenStockMeetsTarget(t *testing.T) {
+func TestGenerateAndUploadSaleCardsRestockSkipsWhenMCYStockMeetsTarget(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=test")
 
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/api/token/search" {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"success": true,
-				"data":    map[string]any{"items": []any{}, "total": json.Number("9")},
-			})
-			return
-		}
-		t.Fatalf("no tokens should be created when stock already meets target: %s %s", r.Method, r.URL.String())
+		t.Fatalf("no tokens should be created when stock already meets target: %s", r.URL.Path)
 	}))
 	t.Cleanup(tokenSrv.Close)
 
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("MCY upload must not run when nothing needs restocking: %s", r.URL.Path)
+		if r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+			t.Fatalf("only stock should be queried when nothing needs restocking: %s", r.URL.Path)
+		}
+		// MCY already holds 9 unsold cards; target 5 → nothing to upload.
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 9, "list": []any{}}})
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
