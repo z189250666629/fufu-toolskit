@@ -105,6 +105,17 @@ export type SaleCardConfig = {
   schedule?: SaleCardSchedule;
 };
 
+export type SaleCardStockEntry = {
+  planId: string;
+  planName?: string;
+  slot?: string;
+  currentStock: number;
+};
+
+export type SaleCardStockResponse = {
+  stock: SaleCardStockEntry[];
+};
+
 export type SaleCardRunResult = {
   planId?: string;
   planName?: string;

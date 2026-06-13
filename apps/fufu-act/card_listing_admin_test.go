@@ -7,7 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+
+	"fufu/newapi"
+	"fufu/tokens"
 )
 
 func TestHandleAdminSaleCardsConfigReturnsPlansAndDefaultSchedule(t *testing.T) {
@@ -170,6 +174,80 @@ func TestHandleAdminSaleCardsConfigRejectsUnknownSchedulePlan(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "未知上架计划") {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+
+	var searchHits atomic.Int32
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/token/search" {
+			t.Fatalf("stock query should only hit token search, got %s", r.URL.Path)
+		}
+		searchHits.Add(1)
+		// special55 keyword reports 7, every other plan reports 3.
+		total := "3"
+		if strings.Contains(r.URL.Query().Get("keyword"), "fufu-mix-special-55-") {
+			total = "7"
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"items": []any{}, "total": json.Number(total)}})
+	}))
+	t.Cleanup(tokenSrv.Close)
+
+	oldSvc, oldErr := tokenSvc, tokenConfigErr
+	t.Cleanup(func() { tokenSvc, tokenConfigErr = oldSvc, oldErr })
+	tokenConfigErr = nil
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
+	req.Header.Set("Authorization", "Bearer test-admin-token")
+	w := httptest.NewRecorder()
+	apiRoute(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Stock []struct {
+			PlanID       string `json:"planId"`
+			Slot         string `json:"slot"`
+			CurrentStock int    `json:"currentStock"`
+		} `json:"stock"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v; body=%s", err, w.Body.String())
+	}
+	if len(body.Stock) < 6 {
+		t.Fatalf("expected stock for all plans, got %#v", body.Stock)
+	}
+	var special, month100 int = -1, -1
+	for _, s := range body.Stock {
+		if s.PlanID == "fufu-mix-special-55" {
+			special = s.CurrentStock
+			if s.Slot != "special55" {
+				t.Fatalf("special slot=%q", s.Slot)
+			}
+		}
+		if s.PlanID == "fufu-mix-month-100" {
+			month100 = s.CurrentStock
+		}
+	}
+	if special != 7 || month100 != 3 {
+		t.Fatalf("per-plan stock wrong: special=%d month100=%d", special, month100)
+	}
+	if searchHits.Load() < 6 {
+		t.Fatalf("each plan should be queried, hits=%d", searchHits.Load())
+	}
+}
+
+func TestHandleAdminSaleCardsStockRequiresAdminToken(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
+	w := httptest.NewRecorder()
+	apiRoute(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized stock query should be 401, got %d", w.Code)
 	}
 }
 

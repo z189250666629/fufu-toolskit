@@ -962,6 +962,39 @@ tr:last-child td {
   max-width: 140px;
 }
 
+/* Keep every control the same height: HeroUI v3 puts the class on the <input>
+   itself, so text/number/time inputs and native selects all lock to one row
+   height (explicit height + border-box, else padding pushes time/number taller). */
+.blueprint-input,
+.native-select {
+  height: 38px !important;
+  box-sizing: border-box;
+}
+
+.sale-time-input {
+  max-width: 116px;
+}
+
+.field--inline-tz {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.03em;
+  color: var(--blueprint-text-secondary);
+}
+
+.sale-job-current {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: var(--blueprint-text-secondary);
+  white-space: nowrap;
+}
+
+.sale-job-current b {
+  color: var(--blueprint-text-primary);
+  font-weight: 600;
+}
+
 .sale-job-list {
   display: grid;
   gap: 8px;
@@ -987,7 +1020,7 @@ tr:last-child td {
 }
 
 .sale-slot-card .sale-job-row {
-  grid-template-columns: minmax(150px, 1fr) auto auto;
+  grid-template-columns: minmax(150px, 1fr) auto auto auto;
 }
 
 .sale-job-row:last-child {

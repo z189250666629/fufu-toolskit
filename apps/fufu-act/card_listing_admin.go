@@ -141,6 +141,38 @@ func handleAdminSaleCardsConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type saleCardStockEntry struct {
+	PlanID       string `json:"planId"`
+	PlanName     string `json:"planName"`
+	Slot         string `json:"slot"`
+	CurrentStock int    `json:"currentStock"`
+}
+
+// handleAdminSaleCardsStock reports the current NewAPI stock for every plan so
+// the admin can see live counts before deciding restock targets.
+func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
+	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
+		writeJSONError(w, http.StatusUnauthorized, "未授权")
+		return
+	}
+	if tokenConfigErr != nil || tokenSvc == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "次数 fufu 未配置")
+		return
+	}
+	plans := saleCardPlanList()
+	out := make([]saleCardStockEntry, 0, len(plans))
+	for _, plan := range plans {
+		plan = normalizeSaleCardPlan(plan)
+		current, err := tokenSvc.CountTokensByName(r.Context(), saleCardStockKeyword(plan))
+		if err != nil {
+			writeJSONError(w, http.StatusBadGateway, "查询库存失败")
+			return
+		}
+		out = append(out, saleCardStockEntry{PlanID: plan.ID, PlanName: plan.Name, Slot: plan.Slot, CurrentStock: current})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"stock": out})
+}
+
 func saleCardPlanFromRunRequest(req saleCardRunRequest) (SaleCardPlan, error) {
 	plan := SaleCardPlan{}
 	planID := strings.TrimSpace(req.Plan)

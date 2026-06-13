@@ -19,7 +19,8 @@ import type {
   PrizeConfigResponse,
   RuntimeSitesResponse,
   SaleCardConfig,
-  SaleCardRunResult
+  SaleCardRunResult,
+  SaleCardStockResponse
 } from './types';
 
 type MessageState = {
@@ -312,6 +313,8 @@ function SaleCardManager({
   const [runPlan, setRunPlan] = useState(plans[0]?.id ?? '');
   const [runTarget, setRunTarget] = useState(50);
   const [runResult, setRunResult] = useState<SaleCardRunResult>();
+  const [stock, setStock] = useState<Record<string, number>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     setEnabled(Boolean(config?.schedule?.enabled));
@@ -319,6 +322,21 @@ function SaleCardManager({
     setSlotState(buildSlotState(config));
     setRunPlan((config?.plans ?? [])[0]?.id ?? '');
   }, [config]);
+
+  async function refreshStock() {
+    setRefreshing(true);
+    try {
+      const data = await fetchJSON<SaleCardStockResponse>('/api/admin/sale-cards/stock');
+      const map: Record<string, number> = {};
+      for (const entry of data.stock ?? []) map[entry.planId] = entry.currentStock;
+      setStock(map);
+    } catch {
+      // leave previous counts; admin can retry
+    } finally {
+      setRefreshing(false);
+    }
+  }
+  const stockText = (planId: string) => (planId in stock ? String(stock[planId]) : '—');
 
   function patchSlot(group: string, patch: Partial<Omit<SlotState, 'jobs'>>) {
     setSlotState((current) => ({ ...current, [group]: { ...current[group], ...patch } }));
@@ -360,10 +378,11 @@ function SaleCardManager({
     <div className="business-stack">
       <div className="action-row">
         <label className="field--inline"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /> 启用自动补卡</label>
-        <Input className="mini-input blueprint-input" value={timezone} onChange={(event) => setTimezone(event.target.value)} aria-label="时区" />
+        <label className="field--inline field--inline-tz">时区<Input className="mini-input blueprint-input" value={timezone} onChange={(event) => setTimezone(event.target.value)} aria-label="时区" /></label>
+        <Button className="blueprint-button" onPress={refreshStock} isDisabled={refreshing}>{refreshing ? '刷新中…' : '刷新当前库存'}</Button>
         <Button className="blueprint-primary-button" onPress={() => onSave(buildSchedule())}>保存补卡计划</Button>
       </div>
-      <p className="inline-help">月次卡与 55 次混合特惠卡各占一个独立时段；到点按目标库存补齐（补 目标-当前）。</p>
+      <p className="inline-help">月次卡与 55 次混合特惠卡各占一个独立时段；到点按目标库存补齐（补 目标-当前）。点“刷新当前库存”查询 NewAPI 实时卡量。</p>
       {SALE_SLOTS.map((def) => {
         const slot = slotState[def.group];
         const slotPlans = plans.filter((plan) => (plan.slot || '') === def.group);
@@ -373,7 +392,7 @@ function SaleCardManager({
             <header className="bp-card-titlebar">
               <span>{def.label} 时段</span>
               <div className="sale-slot-controls">
-                <Input className="mini-input blueprint-input" value={slot.time} placeholder="09:00" onChange={(event) => patchSlot(def.group, { time: event.target.value })} aria-label={`${def.label}补卡时间`} />
+                <Input className="mini-input blueprint-input sale-time-input" type="time" value={slot.time} onChange={(event) => patchSlot(def.group, { time: event.target.value })} aria-label={`${def.label}补卡时间`} />
                 <label className="field--inline"><input type="checkbox" checked={slot.enabled} onChange={(event) => patchSlot(def.group, { enabled: event.target.checked })} /> 启用时段</label>
               </div>
             </header>
@@ -384,6 +403,7 @@ function SaleCardManager({
                   return (
                     <div className="sale-job-row" key={plan.id}>
                       <span className="sale-job-name">{plan.name || plan.id}<span className="sale-job-meta">SKU {plan.skuId || '-'} · ${plan.quota ?? '-'}</span></span>
+                      <span className="sale-job-current">当前 <b>{stockText(plan.id)}</b></span>
                       <label className="field--inline sale-job-target">补齐到<Input className="mini-input blueprint-input" type="number" min={0} max={2000} value={String(job.targetStock || '')} onChange={(event) => patchJob(def.group, plan.id, { targetStock: Number(event.target.value) })} aria-label={`${plan.name || plan.id}目标库存`} />张</label>
                       <label className="field--inline"><input type="checkbox" checked={job.enabled} onChange={(event) => patchJob(def.group, plan.id, { enabled: event.target.checked })} /> 启用</label>
                     </div>
@@ -399,6 +419,7 @@ function SaleCardManager({
         <select className="native-select" value={runPlan} onChange={(event) => setRunPlan(event.target.value)}>
           {plans.length ? plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name || plan.id}</option>) : <option value="">暂无计划</option>}
         </select>
+        <span className="sale-job-current">当前 <b>{stockText(runPlan)}</b></span>
         <label className="field--inline">补齐到<Input className="mini-input blueprint-input" type="number" min={0} max={2000} value={String(runTarget)} onChange={(event) => setRunTarget(Number(event.target.value))} aria-label="目标库存" />张</label>
         <Button className="blueprint-primary-button" onPress={runNow} isDisabled={!runPlan}>立即补卡</Button>
       </div>
