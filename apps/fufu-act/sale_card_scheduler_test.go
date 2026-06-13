@@ -21,9 +21,9 @@ func resetSaleCardFiredGuard(t *testing.T) {
 }
 
 // restockBackend wires the real restock dependencies: an MCY stub answering the
-// encrypted card/get (the scan finds stockTotal unsold 55卡 — item29/sku66) and
-// card/add (upload), plus a NewAPI stub that mints N token keys. The returned
-// counters track stock queries, token creations and MCY uploads.
+// encrypted card/get (reports stockTotal as data.total) and card/add (upload),
+// plus a NewAPI stub that mints N token keys. The returned counters track stock
+// queries, token creations and MCY uploads.
 func restockBackend(t *testing.T, stockTotal int) (*atomic.Int32, *atomic.Int32, *atomic.Int32) {
 	t.Helper()
 	setMCYCookieForTest(t, "manage_token=test")
@@ -48,14 +48,7 @@ func restockBackend(t *testing.T, stockTotal int) (*atomic.Int32, *atomic.Int32,
 		switch r.URL.Path {
 		case "/plugin/virtual-card-ship/card/get":
 			stockQ.Add(1)
-			list := make([]any, 0, stockTotal)
-			for range stockTotal {
-				list = append(list, mcyTestCard(29, 66, 0))
-			}
-			testWriteEncryptedMCYResponse(t, w, map[string]any{
-				"code": 200, "card_usable_count": stockTotal,
-				"data": map[string]any{"total": stockTotal, "list": list},
-			})
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": stockTotal, "list": []any{}}})
 		case "/plugin/virtual-card-ship/card/add":
 			upload.Add(1)
 			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
@@ -178,15 +171,8 @@ func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 		switch r.URL.Path {
 		case "/plugin/virtual-card-ship/card/get":
 			stockHits.Add(1)
-			// Scan finds 8 unsold 55卡 (item29/sku66); target 20 → create 12.
-			list := make([]any, 0, 8)
-			for range 8 {
-				list = append(list, mcyTestCard(29, 66, 0))
-			}
-			testWriteEncryptedMCYResponse(t, w, map[string]any{
-				"code": 200, "card_usable_count": 8,
-				"data": map[string]any{"total": 8, "list": list},
-			})
+			// Shop reports 8 unsold 55卡 (equal-* → data.total); target 20 → create 12.
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 8, "list": []any{}}})
 		case "/plugin/virtual-card-ship/card/add":
 			uploadHits.Add(1)
 			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})

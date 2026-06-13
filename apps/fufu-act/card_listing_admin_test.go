@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestHandleAdminSaleCardsConfigReturnsPlansAndDefaultSchedule(t *testing.T) {
@@ -184,20 +185,20 @@ func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
 			t.Fatalf("stock query should only hit MCY card/get, got %s", r.URL.Path)
 		}
 		stockHits.Add(1)
-		// One scan of the global card list: 7 unsold 55卡 (item29/sku66) + 3 unsold
-		// month-100 (item28/sku65). The shop ignores filters, so the handler counts
-		// these by item:sku itself.
-		list := []any{}
-		for range 7 {
-			list = append(list, mcyTestCard(29, 66, 0))
+		// Each plan is a precise equal-* query; the shop narrows data.total per sku.
+		// 55卡 (sku66) reports 7; month-100 (sku65) reports 3; every other sku 0.
+		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
+		if int(payload["equal-status"].(float64)) != 0 {
+			t.Fatalf("stock query must filter equal-status=0, got %v", payload["equal-status"])
 		}
-		for range 3 {
-			list = append(list, mcyTestCard(28, 65, 0))
+		total := 0
+		switch int(payload["equal-sku_id"].(float64)) {
+		case 66:
+			total = 7
+		case 65:
+			total = 3
 		}
-		testWriteEncryptedMCYResponse(t, w, map[string]any{
-			"code": 200, "card_usable_count": 10,
-			"data": map[string]any{"total": 10, "list": list},
-		})
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": total, "list": []any{}}})
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
@@ -240,32 +241,38 @@ func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
 	if special != 7 || month100 != 3 {
 		t.Fatalf("per-plan stock wrong: special=%d month100=%d", special, month100)
 	}
-	// A SKU absent from the scan must read 0, not the global total.
+	// A SKU with no unsold cards must read 0, not the global total.
 	if month500 != 0 {
 		t.Fatalf("month500 (no unsold cards) stock=%d, want 0", month500)
 	}
+	if got, want := int(stockHits.Load()), len(saleCardPlanList()); got != want {
+		t.Fatalf("expected one precise query per plan: %d hits for %d plans", got, want)
+	}
 }
 
-// TestHandleAdminSaleCardsStockScansOnceNotPerPlan proves the refresh is a single
-// sequential scan (the shop rejects concurrent session requests with 登录已过期),
-// not one query per plan.
-func TestHandleAdminSaleCardsStockScansOnceNotPerPlan(t *testing.T) {
+// TestHandleAdminSaleCardsStockQueriesSequentially proves the per-plan stock
+// queries run one at a time — the shop rejects concurrent requests on a single
+// session with 登录已过期.
+func TestHandleAdminSaleCardsStockQueriesSequentially(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "test-admin-token")
 	setMCYCookieForTest(t, "manage_token=test")
 
-	var stockHits atomic.Int32
+	var inFlight, maxInFlight atomic.Int32
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		stockHits.Add(1)
-		// All unsold cards fit on one page → the scan stops after a single request.
-		testWriteEncryptedMCYResponse(t, w, map[string]any{
-			"code": 200, "card_usable_count": 1,
-			"data": map[string]any{"total": 1, "list": []any{mcyTestCard(29, 66, 0)}},
-		})
+		cur := inFlight.Add(1)
+		for {
+			m := maxInFlight.Load()
+			if cur <= m || maxInFlight.CompareAndSwap(m, cur) {
+				break
+			}
+		}
+		time.Sleep(15 * time.Millisecond) // hold the request so any overlap is observable
+		inFlight.Add(-1)
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 1, "list": []any{}}})
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
 
-	planCount := len(saleCardPlanList())
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
 	req.Header.Set("Authorization", "Bearer test-admin-token")
 	w := httptest.NewRecorder()
@@ -274,8 +281,8 @@ func TestHandleAdminSaleCardsStockScansOnceNotPerPlan(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
-	if got := stockHits.Load(); int(got) >= planCount {
-		t.Fatalf("stock should be one scan, not per-plan: %d hits for %d plans", got, planCount)
+	if got := maxInFlight.Load(); got != 1 {
+		t.Fatalf("stock queries must be sequential (shop rejects concurrency), max concurrent=%d", got)
 	}
 }
 

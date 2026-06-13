@@ -134,14 +134,9 @@ func TestGenerateAndUploadSaleCardsRestockTopsUpToTargetByMCYStock(t *testing.T)
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/plugin/virtual-card-ship/card/get":
-			// Real shop stock: the scan finds 2 unsold cards for this item/sku.
+			// Real shop stock: 2 unsold cards for this item/sku (equal-* → data.total).
 			stockHits.Add(1)
-			testWriteEncryptedMCYResponse(t, w, map[string]any{
-				"code": 200, "card_usable_count": 2,
-				"data": map[string]any{"total": 2, "list": []any{
-					mcyTestCard(29, 66, 0), mcyTestCard(29, 66, 0),
-				}},
-			})
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 2, "list": []any{}}})
 		case "/plugin/virtual-card-ship/card/add":
 			uploadHits.Add(1)
 			payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
@@ -192,15 +187,8 @@ func TestGenerateAndUploadSaleCardsRestockSkipsWhenMCYStockMeetsTarget(t *testin
 		if r.URL.Path != "/plugin/virtual-card-ship/card/get" {
 			t.Fatalf("only stock should be queried when nothing needs restocking: %s", r.URL.Path)
 		}
-		// MCY already holds 9 unsold cards for this sku; target 5 → nothing to upload.
-		list := []any{}
-		for range 9 {
-			list = append(list, mcyTestCard(29, 66, 0))
-		}
-		testWriteEncryptedMCYResponse(t, w, map[string]any{
-			"code": 200, "card_usable_count": 9,
-			"data": map[string]any{"total": 9, "list": list},
-		})
+		// MCY already holds 9 unsold cards; target 5 → nothing to upload.
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 9, "list": []any{}}})
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)

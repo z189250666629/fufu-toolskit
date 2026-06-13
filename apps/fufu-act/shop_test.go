@@ -207,13 +207,10 @@ func TestFindShopPurchaseConcurrentAuthRefreshIsRaceFree(t *testing.T) {
 	}
 }
 
-// mcyTestCard builds a card record as the shop returns it (flat item_id/sku_id/
-// status fields, status 0 = unsold).
-func mcyTestCard(itemID, skuID, status int) map[string]any {
-	return map[string]any{"item_id": itemID, "sku_id": skuID, "status": status}
-}
-
-func TestQueryMCYUsableStockScansAndCountsUsableBySKU(t *testing.T) {
+// TestQueryMCYUsableStockUsesEqualFilterTotal proves the per-SKU stock query
+// uses the precise equal-<field> filter (the only one the shop honors) and reads
+// the resulting data.total — no full-list scan.
+func TestQueryMCYUsableStockUsesEqualFilterTotal(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=test")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -226,68 +223,31 @@ func TestQueryMCYUsableStockScansAndCountsUsableBySKU(t *testing.T) {
 		if len(secret) < 16 || r.Header.Get("Signature") == "" {
 			t.Fatalf("stock query must use encrypted MCY protocol: Secret=%q Signature=%q", secret, r.Header.Get("Signature"))
 		}
-		// The shop IGNORES card/get's item_id/sku_id/status filters (every query
-		// returns the global list + global total), so the scan pages the list and
-		// counts unsold cards by item:sku itself.
-		testWriteEncryptedMCYResponse(t, w, map[string]any{
-			"code":              200,
-			"card_usable_count": 3,
-			"data": map[string]any{"total": 100, "list": []any{
-				mcyTestCard(29, 66, 0), // usable, our sku
-				mcyTestCard(29, 66, 1), // sold, ignored
-				mcyTestCard(28, 65, 0), // usable, a different sku
-				mcyTestCard(29, 66, 0), // usable, our sku
-			}},
-		})
+		payload := testDecodeMCYRequest(t, r.Body, secret)
+		if got := int(payload["equal-item_id"].(float64)); got != 29 {
+			t.Fatalf("equal-item_id=%d, want 29", got)
+		}
+		if got := int(payload["equal-sku_id"].(float64)); got != 66 {
+			t.Fatalf("equal-sku_id=%d, want 66", got)
+		}
+		if got := int(payload["equal-status"].(float64)); got != 0 {
+			t.Fatalf("equal-status=%d, want 0 (unsold)", got)
+		}
+		// With the equal-* filter the shop narrows data.total to the per-SKU count.
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 42, "list": []any{}}})
 	}))
 	t.Cleanup(srv.Close)
 	t.Setenv("MCY_BASE_URL", srv.URL)
 
 	got, err := queryMCYUsableStock(context.Background(), 29, 66)
-	if err != nil || got != 2 {
-		t.Fatalf("queryMCYUsableStock(29,66) = %d, err=%v; want 2 usable", got, err)
+	if err != nil || got != 42 {
+		t.Fatalf("queryMCYUsableStock(29,66) = %d, err=%v; want 42", got, err)
 	}
 }
 
-// TestMCYUsableStockScanStopsAtGlobalUsableCount proves the scan early-exits once
-// it has seen card_usable_count unsold cards, instead of paging the entire
-// (20k+) card history.
-func TestMCYUsableStockScanStopsAtGlobalUsableCount(t *testing.T) {
-	setMCYCookieForTest(t, "manage_token=test")
-
-	var pages atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pages.Add(1)
-		// Page 1 already holds every unsold card (== card_usable_count). Even though
-		// the page is full (== page size), the scan must stop here.
-		list := make([]any, 0, mcyStockScanPageSize)
-		for range mcyStockScanPageSize {
-			list = append(list, mcyTestCard(28, 62, 0))
-		}
-		testWriteEncryptedMCYResponse(t, w, map[string]any{
-			"code":              200,
-			"card_usable_count": mcyStockScanPageSize,
-			"data":              map[string]any{"total": 99999, "list": list},
-		})
-	}))
-	t.Cleanup(srv.Close)
-	t.Setenv("MCY_BASE_URL", srv.URL)
-
-	counts, err := mcyUsableStockBySKU(context.Background())
-	if err != nil {
-		t.Fatalf("scan err=%v", err)
-	}
-	if got := counts[skuStockKey(28, 62)]; got != mcyStockScanPageSize {
-		t.Fatalf("sku 28:62 usable=%d, want %d", got, mcyStockScanPageSize)
-	}
-	if pages.Load() != 1 {
-		t.Fatalf("scan should early-exit after 1 page at card_usable_count, hit %d pages", pages.Load())
-	}
-}
-
-// TestMCYUsableStockScanRelogsInOnExpiredPayload proves a body-level
-// "登录已过期" (HTTP 200 + code!=200) triggers a re-login + retry, not a hard fail.
-func TestMCYUsableStockScanRelogsInOnExpiredPayload(t *testing.T) {
+// TestQueryMCYUsableStockRelogsInOnExpiredPayload proves a body-level 登录已过期
+// (HTTP 200 + code!=200) triggers a re-login + retry, not a hard failure.
+func TestQueryMCYUsableStockRelogsInOnExpiredPayload(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=stale")
 
 	var loginHits, getHits atomic.Int32
@@ -303,10 +263,7 @@ func TestMCYUsableStockScanRelogsInOnExpiredPayload(t *testing.T) {
 				testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 0, "msg": "登录已过期"})
 				return
 			}
-			testWriteEncryptedMCYResponse(t, w, map[string]any{
-				"code": 200, "card_usable_count": 1,
-				"data": map[string]any{"list": []any{mcyTestCard(29, 66, 0)}},
-			})
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 7, "list": []any{}}})
 		default:
 			t.Fatalf("unexpected MCY request %s %s", r.Method, r.URL.String())
 		}
@@ -316,41 +273,21 @@ func TestMCYUsableStockScanRelogsInOnExpiredPayload(t *testing.T) {
 	t.Setenv("MCY_USERNAME", "u")
 	t.Setenv("MCY_PASSWORD", "p")
 
-	counts, err := mcyUsableStockBySKU(context.Background())
-	if err != nil {
-		t.Fatalf("scan err=%v", err)
-	}
-	if got := counts[skuStockKey(29, 66)]; got != 1 {
-		t.Fatalf("sku 29:66 usable=%d, want 1 after re-login", got)
+	got, err := queryMCYUsableStock(context.Background(), 29, 66)
+	if err != nil || got != 7 {
+		t.Fatalf("queryMCYUsableStock = %d, err=%v; want 7 after re-login", got, err)
 	}
 	if loginHits.Load() != 1 || getHits.Load() != 2 {
 		t.Fatalf("expected 1 re-login + 2 card/get (stale fail, fresh ok), got login=%d get=%d", loginHits.Load(), getHits.Load())
 	}
 }
 
-func TestTallyUsableBySKUCountsOnlyUnsold(t *testing.T) {
-	counts := map[string]int{}
-	added := tallyUsableBySKU([]any{
-		mcyTestCard(28, 60, 0),
-		mcyTestCard(28, 60, 0),
-		mcyTestCard(28, 60, 1), // sold
-		mcyTestCard(29, 66, 0),
-		"junk",                 // non-map entries ignored
-	}, counts)
-	if added != 3 {
-		t.Fatalf("added=%d, want 3 unsold", added)
+func TestMCYCardGetTotalReadsDataTotal(t *testing.T) {
+	if got := mcyCardGetTotal(map[string]any{"data": map[string]any{"total": 200}}); got != 200 {
+		t.Fatalf("data.total=%d, want 200", got)
 	}
-	if counts[skuStockKey(28, 60)] != 2 || counts[skuStockKey(29, 66)] != 1 {
-		t.Fatalf("counts=%v, want 28:60=2 29:66=1", counts)
-	}
-}
-
-func TestMCYGlobalUsableCountReadsCardUsableCount(t *testing.T) {
-	if got := mcyGlobalUsableCount(map[string]any{"card_usable_count": 998}); got != 998 {
-		t.Fatalf("card_usable_count=%d, want 998", got)
-	}
-	if got := mcyGlobalUsableCount(map[string]any{}); got != -1 {
-		t.Fatalf("missing card_usable_count=%d, want -1 (unknown)", got)
+	if got := mcyCardGetTotal(map[string]any{}); got != 0 {
+		t.Fatalf("missing data.total=%d, want 0", got)
 	}
 }
 

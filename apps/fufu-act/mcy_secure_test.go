@@ -94,3 +94,20 @@ func testPKCS7Unpad(input []byte, blockSize int) ([]byte, error) {
 	}
 	return input[:len(input)-padding], nil
 }
+
+// TestMCYSignatureValueIncludesIntZero pins a subtle but load-bearing detail: the
+// stock filter sends equal-status:0, and the shop only honors a filter whose key
+// is part of the signed string. An int 0 must therefore be SIGNED as "0", not
+// dropped (the JS reference keeps 0; only ''/undefined/object/NaN are skipped).
+// If 0 were skipped, equal-status:0 would fall out of the signature and the shop
+// would reject or ignore the filter, silently returning the global ~21k total.
+func TestMCYSignatureValueIncludesIntZero(t *testing.T) {
+	value, ok := mcySignatureValue(0)
+	if !ok || value != "0" {
+		t.Fatalf("mcySignatureValue(0) = (%q, %v), want (\"0\", true)", value, ok)
+	}
+	// Blank/whitespace strings are still skipped, as the reference does.
+	if _, ok := mcySignatureValue("  "); ok {
+		t.Fatalf("blank string should be skipped from the signature")
+	}
+}

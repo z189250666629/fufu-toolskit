@@ -64,71 +64,44 @@ func findShopPurchase(ctx context.Context, cardKey string) (ShopPurchaseLookup, 
 	return lookup, ErrShopInvalidResponse
 }
 
-const (
-	mcyCardGetEndpoint   = "/plugin/virtual-card-ship/card/get"
-	mcyStockScanPageSize = 200
-	// mcyStockScanMaxPages caps the scan so a shop that never reports a usable
-	// count can't make the refresh page through the entire (20k+) card history.
-	mcyStockScanMaxPages = 400
-)
+const mcyCardGetEndpoint = "/plugin/virtual-card-ship/card/get"
 
 // queryMCYUsableStock returns how many cards of (itemID, skuID) are currently
 // usable (unsold) on the MCY shop — the inventory 补卡 tops up against.
 //
-// The shop's card/get endpoint IGNORES its item_id/sku_id/status filters: every
-// query returns the global card list and the global data.total, so a single
-// filtered query can't yield a per-SKU count. We instead scan the global list
-// once and bucket the unsold cards by item:sku — see mcyUsableStockBySKU.
+// card/get supports a precise filter, but ONLY via `equal-<field>` keys (the
+// same convention as the working equal-card purchase lookup); plain
+// item_id/sku_id/status are silently ignored and return the global total. With
+// equal-item_id/equal-sku_id/equal-status the response's data.total is the exact
+// per-SKU usable count, so one query answers one plan — no full-list scan.
+//
+// Callers must NOT run these concurrently on one session: the shop rejects
+// concurrent requests with a body-level 登录已过期.
 func queryMCYUsableStock(ctx context.Context, itemID, skuID int) (int, error) {
-	counts, err := mcyUsableStockBySKU(ctx)
+	if !mcyConfigured() {
+		return 0, fmt.Errorf("%w: MCY 未配置", ErrShopRequestFailed)
+	}
+	if err := ensureMCYCookie(ctx); err != nil {
+		return 0, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
+	}
+	payload := map[string]any{
+		"equal-item_id": itemID,
+		"equal-sku_id":  skuID,
+		"equal-status":  0, // 0 = unsold
+		"page":          1,
+		"limit":         1,
+	}
+	data, err := mcyCardGet(ctx, payload)
 	if err != nil {
 		return 0, err
 	}
-	return counts[skuStockKey(itemID, skuID)], nil
+	return mcyCardGetTotal(data), nil
 }
 
-// mcyUsableStockBySKU scans the MCY card list (newest first) and counts unsold
-// (status:0) cards per "item:sku", stopping as soon as the running total reaches
-// the shop's global usable count (card_usable_count) — unsold cards cluster at
-// the top, so this terminates long before the full history. Requests are
-// SEQUENTIAL: the shop rejects concurrent calls on one session with 登录已过期.
-func mcyUsableStockBySKU(ctx context.Context) (map[string]int, error) {
-	if !mcyConfigured() {
-		return nil, fmt.Errorf("%w: MCY 未配置", ErrShopRequestFailed)
-	}
-	if err := ensureMCYCookie(ctx); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
-	}
-	counts := map[string]int{}
-	found, target := 0, -1
-	for page := 1; page <= mcyStockScanMaxPages; page++ {
-		data, err := mcyCardGetPage(ctx, page, mcyStockScanPageSize)
-		if err != nil {
-			return nil, err
-		}
-		if target < 0 {
-			target = mcyGlobalUsableCount(data)
-		}
-		list := mcyCardList(data)
-		if len(list) == 0 {
-			break
-		}
-		found += tallyUsableBySKU(list, counts)
-		if target >= 0 && found >= target {
-			break
-		}
-		if len(list) < mcyStockScanPageSize {
-			break
-		}
-	}
-	return counts, nil
-}
-
-// mcyCardGetPage fetches one page of the card list over the encrypted protocol,
-// re-authenticating once on either an HTTP auth error or a body-level 登录已过期
-// (the shop signals an expired session with HTTP 200 + code!=200, not a 401).
-func mcyCardGetPage(ctx context.Context, page, limit int) (map[string]any, error) {
-	payload := map[string]any{"page": page, "limit": limit}
+// mcyCardGet performs an encrypted card/get, re-authenticating once on either an
+// HTTP auth error or a body-level 登录已过期 (the shop signals an expired session
+// with HTTP 200 + code!=200, not a 401).
+func mcyCardGet(ctx context.Context, payload map[string]any) (map[string]any, error) {
 	staleCookie := getMCYCookie()
 	data, err := mcyEncryptedPost(ctx, mcyCardGetEndpoint, payload)
 	if err != nil {
@@ -165,45 +138,15 @@ func mcyRetryCardGetAfterRelogin(ctx context.Context, staleCookie string, payloa
 	return data, nil
 }
 
-func skuStockKey(itemID, skuID int) string {
-	return fmt.Sprintf("%d:%d", itemID, skuID)
-}
-
-// mcyGlobalUsableCount reads the shop-wide unsold count (card_usable_count) every
-// card/get response carries; -1 means the field was absent (unknown).
-func mcyGlobalUsableCount(data map[string]any) int {
-	if v, ok := data["card_usable_count"]; ok {
-		return rawconv.Int(v)
-	}
-	return -1
-}
-
-// mcyCardList returns a card/get page's card records (data.list).
-func mcyCardList(data map[string]any) []any {
+// mcyCardGetTotal reads data.total — with an equal-* filter, the count of cards
+// matching that filter (i.e. the per-SKU usable count).
+func mcyCardGetTotal(data map[string]any) int {
 	if d, ok := data["data"].(map[string]any); ok {
-		if list, ok := d["list"].([]any); ok {
-			return list
+		if total, ok := d["total"]; ok {
+			return rawconv.Int(total)
 		}
 	}
-	return nil
-}
-
-// tallyUsableBySKU adds each unsold (status:0) card on the page into counts keyed
-// by item:sku and returns how many it added.
-func tallyUsableBySKU(list []any, counts map[string]int) int {
-	added := 0
-	for _, item := range list {
-		card, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		if rawconv.Int(card["status"]) != 0 {
-			continue
-		}
-		counts[skuStockKey(rawconv.Int(card["item_id"]), rawconv.Int(card["sku_id"]))]++
-		added++
-	}
-	return added
+	return 0
 }
 
 // mcyIsSessionExpired reports whether a non-OK payload signals an expired login

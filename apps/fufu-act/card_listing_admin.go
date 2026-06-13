@@ -155,10 +155,10 @@ type saleCardStockEntry struct {
 var saleCardStockTimeout = 30 * time.Second
 
 // handleAdminSaleCardsStock reports the current MCY shop stock for every plan so
-// the admin can see live counts before deciding restock targets. The shop
-// ignores per-SKU card/get filters and rejects concurrent session requests, so
-// this is ONE sequential scan of the card list (mcyUsableStockBySKU) that yields
-// every SKU's unsold count at once — not one query per plan.
+// the admin can see live counts before deciding restock targets. Each plan is a
+// precise per-SKU card/get (equal-* filter → data.total). The queries run
+// SEQUENTIALLY — the shop rejects concurrent requests on one session with
+// 登录已过期 — which is fast enough (~one round-trip per plan after login).
 func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")
@@ -166,22 +166,22 @@ func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), saleCardStockTimeout)
 	defer cancel()
-	counts, err := mcyUsableStockBySKU(ctx)
-	if err != nil {
-		// Surface the actual MCY reason (admin-only) instead of a generic message so
-		// the failure is diagnosable.
-		fmt.Printf("[sale-card] stock query failed: %v\n", err)
-		writeJSONError(w, http.StatusBadGateway, "查询库存失败: "+err.Error())
-		return
-	}
 	plans := saleCardPlanList()
 	out := make([]saleCardStockEntry, len(plans))
 	for i, plan := range plans {
+		current, err := queryMCYUsableStock(ctx, plan.ItemID, plan.SKUID)
+		if err != nil {
+			// Surface the actual MCY reason (admin-only) instead of a generic message
+			// so the failure is diagnosable.
+			fmt.Printf("[sale-card] stock query failed: %v\n", err)
+			writeJSONError(w, http.StatusBadGateway, "查询库存失败: "+err.Error())
+			return
+		}
 		out[i] = saleCardStockEntry{
 			PlanID:       plan.ID,
 			PlanName:     plan.Name,
 			Slot:         plan.Slot,
-			CurrentStock: counts[skuStockKey(plan.ItemID, plan.SKUID)],
+			CurrentStock: current,
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"stock": out})
