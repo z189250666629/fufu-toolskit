@@ -44,6 +44,7 @@ export type ActivityConfig = {
   tierPools?: Record<string, PrizeRow[]>;
   postJackpotPrizes?: PrizeRow[];
   scratchRewards?: number[];
+  scratchTiers?: number[];
   [key: string]: unknown;
 };
 

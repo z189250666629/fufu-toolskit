@@ -39,6 +39,9 @@ type Config struct {
 	TierPools           map[int][]Prize `json:"tierPools"`
 	PostJackpotPool     []Prize         `json:"postJackpotPrizes"`
 	ScratchRewards      []int           `json:"scratchRewards"`
+	// ScratchTiers lists the card dollar tiers that play the scratch (刮刮乐) game;
+	// every other participating tier plays the slot machine (老虎机).
+	ScratchTiers []int `json:"scratchTiers"`
 }
 
 type configJSON struct {
@@ -52,6 +55,7 @@ type configJSON struct {
 	TierPools           map[string][]Prize `json:"tierPools"`
 	PostJackpotPool     []Prize            `json:"postJackpotPrizes"`
 	ScratchRewards      []int              `json:"scratchRewards"`
+	ScratchTiers        []int              `json:"scratchTiers"`
 }
 
 var defaultSpinMap = map[float64]int{0.1: 100, 100: 1, 150: 1, 300: 3, 500: 4, 1000: 10}
@@ -68,6 +72,7 @@ var defaultTierPools = map[int][]Prize{
 
 var defaultPostJackpotPool = []Prize{{"miss", 0, 500}, {"retry", 0, 500}, {"win", 1, 3000}, {"win", 5, 3500}, {"win", 10, 1700}, {"win", 20, 800}}
 var defaultScratchRewards = []int{2, 4, 6, 8, 12, 15}
+var defaultScratchTiers = []int{55}
 
 func DefaultSpinMap() map[float64]int {
 	out := make(map[float64]int, len(defaultSpinMap))
@@ -97,6 +102,34 @@ func DefaultScratchRewards() []int {
 	return append([]int(nil), defaultScratchRewards...)
 }
 
+func DefaultScratchTiers() []int {
+	return append([]int(nil), defaultScratchTiers...)
+}
+
+// IsScratchTier reports whether a card of the given dollar tier plays the scratch
+// (刮刮乐) game instead of the slot machine (老虎机).
+func (cfg Config) IsScratchTier(dollars float64) bool {
+	for _, tier := range cfg.ScratchTiers {
+		if float64(tier) == dollars {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeScratchTiers(tiers []int) []int {
+	seen := map[int]bool{}
+	out := []int{}
+	for _, tier := range tiers {
+		if tier <= 0 || seen[tier] {
+			continue
+		}
+		seen[tier] = true
+		out = append(out, tier)
+	}
+	return out
+}
+
 func DefaultConfig() Config {
 	return Config{
 		StartText:           StartText,
@@ -109,6 +142,7 @@ func DefaultConfig() Config {
 		TierPools:           DefaultTierPools(),
 		PostJackpotPool:     DefaultPostJackpotPool(),
 		ScratchRewards:      DefaultScratchRewards(),
+		ScratchTiers:        DefaultScratchTiers(),
 	}
 }
 
@@ -120,6 +154,9 @@ func CloneConfig(cfg Config) Config {
 	out.TierPools = cloneTierPools(cfg.TierPools)
 	out.PostJackpotPool = clonePrizePool(cfg.PostJackpotPool)
 	out.ScratchRewards = append([]int(nil), cfg.ScratchRewards...)
+	// Preserve an explicit empty list (non-nil) so "no scratch tiers" survives the
+	// clone → normalize round-trip instead of being reset to the default {55}.
+	out.ScratchTiers = append(make([]int, 0, len(cfg.ScratchTiers)), cfg.ScratchTiers...)
 	return out
 }
 
@@ -135,6 +172,7 @@ func NormalizeConfig(cfg Config) Config {
 		TierPools:           DefaultTierPools(),
 		PostJackpotPool:     DefaultPostJackpotPool(),
 		ScratchRewards:      DefaultScratchRewards(),
+		ScratchTiers:        DefaultScratchTiers(),
 	}
 	if strings.TrimSpace(cfg.StartText) == "" {
 		cfg.StartText = defaults.StartText
@@ -179,6 +217,13 @@ func NormalizeConfig(cfg Config) Config {
 	} else {
 		cfg.ScratchRewards = normalizeScratchRewards(cfg.ScratchRewards)
 	}
+	// nil → default {55}; an explicit (possibly empty) list is honored so admins
+	// can route every tier to the slot machine.
+	if cfg.ScratchTiers == nil {
+		cfg.ScratchTiers = defaults.ScratchTiers
+	} else {
+		cfg.ScratchTiers = normalizeScratchTiers(cfg.ScratchTiers)
+	}
 	return cfg
 }
 
@@ -195,6 +240,7 @@ func (cfg Config) MarshalJSON() ([]byte, error) {
 		TierPools:           tierPoolsToJSON(cfg.TierPools),
 		PostJackpotPool:     cfg.PostJackpotPool,
 		ScratchRewards:      cfg.ScratchRewards,
+		ScratchTiers:        cfg.ScratchTiers,
 	})
 }
 
@@ -214,6 +260,7 @@ func (cfg *Config) UnmarshalJSON(data []byte) error {
 		TierPools:           tierPoolsFromJSON(raw.TierPools),
 		PostJackpotPool:     raw.PostJackpotPool,
 		ScratchRewards:      raw.ScratchRewards,
+		ScratchTiers:        raw.ScratchTiers,
 	})
 	return nil
 }

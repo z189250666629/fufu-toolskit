@@ -6,6 +6,41 @@ import (
 	"testing"
 )
 
+func TestScratchTiersConfigurableDriveGameRouting(t *testing.T) {
+	def := DefaultConfig()
+	if !def.IsScratchTier(55) || def.IsScratchTier(100) {
+		t.Fatalf("default scratch tier should be {55} (特惠→刮刮乐, 月卡→老虎机), got %#v", def.ScratchTiers)
+	}
+
+	// Configurable: dedup + drop non-positive.
+	cfg := NormalizeConfig(Config{ScratchTiers: []int{100, 100, 0, 300}})
+	if !cfg.IsScratchTier(100) || !cfg.IsScratchTier(300) || cfg.IsScratchTier(55) {
+		t.Fatalf("custom scratch tiers wrong: %#v", cfg.ScratchTiers)
+	}
+	if len(cfg.ScratchTiers) != 2 {
+		t.Fatalf("scratch tiers should dedup + drop ≤0: %#v", cfg.ScratchTiers)
+	}
+
+	// Explicit empty list = no scratch (every card plays the slot machine).
+	empty := NormalizeConfig(Config{ScratchTiers: []int{}})
+	if empty.IsScratchTier(55) || len(empty.ScratchTiers) != 0 {
+		t.Fatalf("explicit empty scratch tiers should disable scratch, got %#v", empty.ScratchTiers)
+	}
+
+	// Survives JSON round-trip (admin saves the whole Config as JSON).
+	raw, err := json.Marshal(NormalizeConfig(Config{ScratchTiers: []int{55, 99}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Config
+	if err := json.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+	if !back.IsScratchTier(55) || !back.IsScratchTier(99) {
+		t.Fatalf("scratch tiers should survive JSON round-trip: %s", raw)
+	}
+}
+
 func TestConfigMarshalsPrizesWithLowercaseJSONKeys(t *testing.T) {
 	// The unified admin config editor renders activity.Config as JSON. Prize must
 	// serialize with lowercase type/dollars/weight so the editor surface matches

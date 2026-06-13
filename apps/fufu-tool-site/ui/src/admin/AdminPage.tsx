@@ -567,6 +567,7 @@ function ActivityConfigEditor({
   const [tierEntries, setTierEntries] = useState<TierEntry[]>(() => tierEntriesFrom(activity.tierPools));
   const [postJackpot, setPostJackpot] = useState<ActivityPrize[]>(() => (activity.postJackpotPrizes ?? []).map(normalizePrize));
   const [scratch, setScratch] = useState<number[]>(() => (activity.scratchRewards ?? []).map(Number));
+  const [scratchTiers, setScratchTiers] = useState<number[]>(() => (activity.scratchTiers ?? []).map(Number));
   const pushedRef = useRef<ActivityConfig | null>(null);
 
   // Re-seed local editor state only on external changes (load/reload), never on
@@ -578,6 +579,7 @@ function ActivityConfigEditor({
     setTierEntries(tierEntriesFrom(activity.tierPools));
     setPostJackpot((activity.postJackpotPrizes ?? []).map(normalizePrize));
     setScratch((activity.scratchRewards ?? []).map(Number));
+    setScratchTiers((activity.scratchTiers ?? []).map(Number));
   }, [activity]);
 
   function emit(next: ActivityConfig) {
@@ -589,6 +591,7 @@ function ActivityConfigEditor({
   const emitTiers = (entries: TierEntry[]) => { setTierEntries(entries); emit({ ...activity, tierPools: buildTierPools(entries) }); };
   const emitPost = (rows: ActivityPrize[]) => { setPostJackpot(rows); emit({ ...activity, postJackpotPrizes: rows }); };
   const emitScratch = (values: number[]) => { setScratch(values); emit({ ...activity, scratchRewards: values }); };
+  const emitScratchTiers = (values: number[]) => { setScratchTiers(values); emit({ ...activity, scratchTiers: values }); };
   const updateWindow = (patch: ActivityConfig) => emit({ ...activity, ...patch });
 
   return (
@@ -604,6 +607,18 @@ function ActivityConfigEditor({
         <label className="field">开始时间戳<Input className="blueprint-input" type="number" min={1} value={String(activity.startTS ?? '')} onChange={(event) => updateWindow({ startTS: Number(event.target.value) })} /></label>
         <label className="field">结束时间戳<Input className="blueprint-input" type="number" min={1} value={String(activity.endTS ?? '')} onChange={(event) => updateWindow({ endTS: Number(event.target.value) })} /></label>
         <label className="field">整体数学期望值<Input className="blueprint-input" type="number" step="0.0001" min={0} value={String(activity.targetExpectedValue ?? '')} onChange={(event) => updateWindow({ targetExpectedValue: Number(event.target.value) })} /></label>
+      </div>
+
+      <div className="config-subhead">卡片 → 活动页（刮刮乐卡档，其余走老虎机）</div>
+      <p className="inline-help">列出走「刮刮乐」的卡片额度档（如 55 = 特惠卡）；不在列表里的额度档走「老虎机」。清空表示全部走老虎机。</p>
+      <div className="scratch-editor">
+        {scratchTiers.map((value, index) => (
+          <div className="scratch-chip" key={index}>
+            <Input className="mini-input blueprint-input" type="number" min={0} value={String(value)} onChange={(event) => emitScratchTiers(scratchTiers.map((v, i) => (i === index ? Number(event.target.value) : v)))} />
+            <Button className="blueprint-danger-button" onPress={() => emitScratchTiers(scratchTiers.filter((_, i) => i !== index))}>×</Button>
+          </div>
+        ))}
+        <Button className="blueprint-button" onPress={() => emitScratchTiers([...scratchTiers, 0])}>新增刮刮乐卡档</Button>
       </div>
 
       <div className="config-subhead">额度 → 抽奖次数</div>

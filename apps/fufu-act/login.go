@@ -176,8 +176,11 @@ func nullString(s string) any {
 	return s
 }
 
+// isScratchDollarTier reports whether a card of the given dollar tier plays the
+// scratch (刮刮乐) game; the scratch tiers are admin-configurable (default {55} —
+// 特惠 → 刮刮乐, 月卡 → 老虎机).
 func isScratchDollarTier(dollars float64) bool {
-	return dollars == 55
+	return SnapshotRuntimeConfig().IsScratchTier(dollars)
 }
 
 func parseActTestTokenName(name string) (float64, bool) {
