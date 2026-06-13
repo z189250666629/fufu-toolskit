@@ -36,7 +36,7 @@ type ShopPurchaseLookup struct {
 
 func findShopPurchase(ctx context.Context, cardKey string) (ShopPurchaseLookup, error) {
 	lookup := ShopPurchaseLookup{}
-	if config.Env("MCY_BASE_URL") == "" && config.Env("SHOP_BASE_URL") == "" {
+	if !mcyConfigured() {
 		return lookup, nil
 	}
 	lookup.Configured = true
@@ -70,7 +70,7 @@ func findShopPurchase(ctx context.Context, cardKey string) (ShopPurchaseLookup, 
 // fufu-shop tool and the card/add upload path); the per-SKU usable count is the
 // data.total of the status:0-filtered query.
 func queryMCYUsableStock(ctx context.Context, itemID, skuID int) (int, error) {
-	if config.Env("MCY_BASE_URL") == "" && config.Env("SHOP_BASE_URL") == "" {
+	if !mcyConfigured() {
 		return 0, fmt.Errorf("%w: MCY 未配置", ErrShopRequestFailed)
 	}
 	if err := ensureMCYCookie(ctx); err != nil {
@@ -132,7 +132,12 @@ func extractPurchaseTime(data map[string]any) string {
 }
 
 func mcyConfig() (string, string, string, string) {
-	return strings.TrimRight(firstNonEmpty(config.Env("MCY_BASE_URL"), config.Env("SHOP_BASE_URL")), "/"), firstNonEmpty(config.Env("MCY_USERNAME"), config.Env("SHOP_USERNAME")), firstNonEmpty(config.Env("MCY_PASSWORD"), config.Env("SHOP_PASSWORD")), firstNonEmpty(config.Env("MCY_LOGIN_ENDPOINT"), "/admin/login")
+	c := getMCYRuntimeConfig()
+	base := strings.TrimRight(firstNonEmpty(c.BaseURL, config.Env("MCY_BASE_URL"), config.Env("SHOP_BASE_URL")), "/")
+	user := firstNonEmpty(c.Username, config.Env("MCY_USERNAME"), config.Env("SHOP_USERNAME"))
+	pass := firstNonEmpty(c.Password, config.Env("MCY_PASSWORD"), config.Env("SHOP_PASSWORD"))
+	login := firstNonEmpty(c.LoginEndpoint, config.Env("MCY_LOGIN_ENDPOINT"), "/admin/login")
+	return base, user, pass, login
 }
 
 func getMCYCookie() string {

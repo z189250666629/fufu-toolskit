@@ -47,11 +47,22 @@ export type ActivityConfig = {
   [key: string]: unknown;
 };
 
+export type MCYConfig = {
+  baseUrl?: string;
+  username?: string;
+  password?: string;
+  passwordSet?: boolean;
+  passwordMasked?: string;
+  loginEndpoint?: string;
+  uploadEndpoint?: string;
+};
+
 export type AdminConfig = {
   newapi: {
     sites: ManagedSite[];
   };
   activity: ActivityConfig;
+  mcy?: MCYConfig;
 };
 
 export type PublicSite = {

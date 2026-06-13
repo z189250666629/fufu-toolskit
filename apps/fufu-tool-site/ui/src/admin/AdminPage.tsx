@@ -16,6 +16,7 @@ import type {
   AdminSession,
   ManagedSite,
   ManagedSiteURL,
+  MCYConfig,
   PrizeConfigResponse,
   RuntimeSitesResponse,
   SaleCardConfig,
@@ -30,7 +31,8 @@ type MessageState = {
 
 const emptyConfig: AdminConfig = {
   newapi: { sites: [] },
-  activity: {}
+  activity: {},
+  mcy: {}
 };
 
 const defaultSite: ManagedSite = {
@@ -272,6 +274,25 @@ function RuntimeSites({ sites }: { sites?: RuntimeSitesResponse }) {
     index === 0 ? '是' : '否'
   ]);
   return <DataTable columns={['站点', '显示地址', 'User ID', '合卡复用']} rows={rows} empty="登录后加载状态页站点。" />;
+}
+
+function MCYConfigEditor({ mcy, onChange }: { mcy: MCYConfig; onChange: (mcy: MCYConfig) => void }) {
+  return (
+    <div className="business-stack">
+      <div className="field-grid">
+        <label className="field">商城地址 (base_url)
+          <Input className="blueprint-input" value={mcy.baseUrl || ''} placeholder="https://shop.example.com" onChange={(event) => onChange({ ...mcy, baseUrl: event.target.value })} />
+        </label>
+        <label className="field">账号 (邮箱 / 用户名)
+          <Input className="blueprint-input" value={mcy.username || ''} placeholder="you@example.com" onChange={(event) => onChange({ ...mcy, username: event.target.value })} />
+        </label>
+        <label className="field">密码
+          <Input className="blueprint-input" type="password" value={mcy.password || ''} placeholder={mcy.passwordSet ? (mcy.passwordMasked || '已设置 · 留空不变') : '输入商城密码'} onChange={(event) => onChange({ ...mcy, password: event.target.value })} />
+        </label>
+      </div>
+      <p className="inline-help">补卡查询库存与上架卡密都用这套 MCY 商城登录。存数据库，密码仅后台可见，留空表示沿用原值。</p>
+    </div>
+  );
 }
 
 const SALE_SLOTS: { group: string; label: string; defaultTime: string }[] = [
@@ -636,7 +657,8 @@ export function AdminPage() {
         .filter((site) => site.urls.length > 0);
       const next = await sendJSON<AdminConfig>('/api/admin/config', 'PUT', {
         newapi: { sites },
-        activity: config.activity
+        activity: config.activity,
+        mcy: config.mcy
       });
       setConfig(next);
       await loadBusinessData();
@@ -734,7 +756,10 @@ export function AdminPage() {
                     onChange={(sites) => setConfig({ ...config, newapi: { sites } })}
                   />
                 </ConfigCard>
-                <ConfigCard title="自动补卡" description="按时段把库存补齐到目标：查询 NewAPI 当前库存，补 目标-当前 张并推送到活动商城。月次卡与 55 次混合特惠卡各一个独立时段。">
+                <ConfigCard title="MCY 商城登录" description="补卡查询库存与上架卡密所用的商城账号；存数据库（env 仅首次种子），密码仅后台可见。">
+                  <MCYConfigEditor mcy={config.mcy ?? {}} onChange={(mcy) => setConfig({ ...config, mcy })} />
+                </ConfigCard>
+                <ConfigCard title="自动补卡" description="按时段把库存补齐到目标：查询 MCY 商城当前可用卡量，补 目标-当前 张并推送到商城。月次卡与 55 次混合特惠卡各一个独立时段。">
                   <SaleCardManager config={saleCards} onSave={saveSaleSchedule} onRun={runSalePlan} />
                 </ConfigCard>
               </Tabs.Panel>

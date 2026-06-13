@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"fufu/config"
 	"fufu/newapi"
 	"fufu/tokens"
 	"net/http"
@@ -274,7 +273,7 @@ func uploadCardsToMCY(ctx context.Context, plan SaleCardPlan, keys []string) err
 		"upload_type": 0,
 		"card":        strings.Join(keys, "\n"),
 	}
-	endpoint := firstNonEmpty(config.Env("MCY_UPLOAD_ENDPOINT"), "/plugin/virtual-card-ship/card/add")
+	endpoint := mcyUploadEndpoint()
 	data, err := mcyEncryptedPost(ctx, endpoint, payload)
 	if err != nil {
 		return classifyShopRequestError(err)

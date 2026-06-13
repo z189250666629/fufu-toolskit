@@ -484,6 +484,49 @@ func TestAdminConfigMergesLegacyPerLineSitesIntoOneSitePerToken(t *testing.T) {
 	}
 }
 
+func TestAdminConfigSavesMCYCredentialsMaskedAndInherited(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	saveAdminConfig(t, map[string]any{
+		"mcy": map[string]any{
+			"baseUrl":  "https://shop.example.test/",
+			"username": "shopuser@example.com",
+			"password": "super-secret-shop-pw",
+		},
+	})
+
+	snap := unifiedConfig.Snapshot()
+	if snap.MCY.BaseURL != "https://shop.example.test" || snap.MCY.Username != "shopuser@example.com" || snap.MCY.Password != "super-secret-shop-pw" {
+		t.Fatalf("MCY config not stored (trailing slash trimmed, password kept): %#v", snap.MCY)
+	}
+
+	// The admin response masks the password and never leaks it raw.
+	raw, err := json.Marshal(adminConfigResponse(snap))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "super-secret-shop-pw") {
+		t.Fatalf("raw MCY password must never be in the response: %s", raw)
+	}
+	if !strings.Contains(string(raw), "shopuser@example.com") || !strings.Contains(string(raw), "passwordSet") {
+		t.Fatalf("MCY response should carry username + passwordSet: %s", raw)
+	}
+
+	// Re-save with a blank password (UI holds only the mask) → keep the stored one.
+	saveAdminConfig(t, map[string]any{
+		"mcy": map[string]any{"baseUrl": "https://shop.example.test", "username": "shopuser@example.com"},
+	})
+	if got := unifiedConfig.Snapshot().MCY.Password; got != "super-secret-shop-pw" {
+		t.Fatalf("blank-password re-save must keep the stored password, got %q", got)
+	}
+}
+
 func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 	root := t.TempDir()
 	writeToolSiteFixture(t, root)

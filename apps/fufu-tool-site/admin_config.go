@@ -33,10 +33,23 @@ var unifiedConfig *toolConfigStore
 type ToolConfig struct {
 	NewAPI   NewAPIAdminConfig `json:"newapi"`
 	Activity activity.Config   `json:"activity"`
+	MCY      MCYAdminConfig    `json:"mcy"`
 }
 
 type NewAPIAdminConfig struct {
 	Sites []ManagedAPISiteConfig `json:"sites"`
+}
+
+// MCYAdminConfig is the MCY shop login + endpoints, configured in the admin panel
+// and stored in tool-config.db. The activity module reads it at runtime to query
+// 补卡 stock and upload cards.
+type MCYAdminConfig struct {
+	BaseURL        string `json:"baseUrl"`
+	Username       string `json:"username"`
+	Password       string `json:"password,omitempty"`
+	Cookie         string `json:"cookie,omitempty"`
+	LoginEndpoint  string `json:"loginEndpoint,omitempty"`
+	UploadEndpoint string `json:"uploadEndpoint,omitempty"`
 }
 
 // ManagedSiteURL is one base_url line of a site, with an optional display name
@@ -70,6 +83,7 @@ type adminConfigPatch struct {
 		Sites []ManagedAPISiteConfig `json:"sites"`
 	} `json:"newapi"`
 	Activity *activity.Config `json:"activity"`
+	MCY      *MCYAdminConfig  `json:"mcy"`
 }
 
 type toolConfigStore struct {
@@ -192,6 +206,9 @@ func (s *toolConfigStore) SavePatch(patch adminConfigPatch) (ToolConfig, bool, e
 	if patch.Activity != nil {
 		next.Activity = activity.CloneConfig(*patch.Activity)
 	}
+	if patch.MCY != nil {
+		next.MCY = *patch.MCY
+	}
 	normalized, err := normalizeToolConfig(next, s.cfg)
 	if err != nil {
 		return ToolConfig{}, false, err
@@ -215,7 +232,30 @@ func defaultToolConfig(root string) ToolConfig {
 	return ToolConfig{
 		NewAPI:   NewAPIAdminConfig{Sites: managedSiteConfigsFromSites(sites)},
 		Activity: activity.DefaultConfig(),
+		MCY:      mcyConfigFromEnv(),
 	}
+}
+
+// mcyConfigFromEnv seeds the MCY admin config from environment variables on the
+// first boot; after that the database is the source of truth.
+func mcyConfigFromEnv() MCYAdminConfig {
+	return MCYAdminConfig{
+		BaseURL:        firstNonEmptyEnv("MCY_BASE_URL", "SHOP_BASE_URL"),
+		Username:       firstNonEmptyEnv("MCY_USERNAME", "SHOP_USERNAME"),
+		Password:       firstNonEmptyEnv("MCY_PASSWORD", "SHOP_PASSWORD"),
+		Cookie:         os.Getenv("MCY_COOKIE"),
+		LoginEndpoint:  os.Getenv("MCY_LOGIN_ENDPOINT"),
+		UploadEndpoint: os.Getenv("MCY_UPLOAD_ENDPOINT"),
+	}
+}
+
+func firstNonEmptyEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func normalizeToolConfig(cfg ToolConfig, previous ToolConfig) (ToolConfig, error) {
@@ -225,11 +265,28 @@ func normalizeToolConfig(cfg ToolConfig, previous ToolConfig) (ToolConfig, error
 	}
 	cfg.NewAPI.Sites = sites
 	cfg.Activity = activity.CloneConfig(cfg.Activity)
+	cfg.MCY = normalizeMCYConfig(cfg.MCY, previous.MCY)
 	return cfg, nil
 }
 
+// normalizeMCYConfig trims the MCY config and, like site tokens, keeps the
+// previous password when the submitted one is blank (the UI never re-sends the
+// masked password).
+func normalizeMCYConfig(c, previous MCYAdminConfig) MCYAdminConfig {
+	c.BaseURL = strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
+	c.Username = strings.TrimSpace(c.Username)
+	c.Password = strings.TrimSpace(c.Password)
+	c.Cookie = strings.TrimSpace(c.Cookie)
+	c.LoginEndpoint = strings.TrimSpace(c.LoginEndpoint)
+	c.UploadEndpoint = strings.TrimSpace(c.UploadEndpoint)
+	if c.Password == "" {
+		c.Password = strings.TrimSpace(previous.Password)
+	}
+	return c
+}
+
 func cloneToolConfig(cfg ToolConfig) ToolConfig {
-	out := ToolConfig{Activity: activity.CloneConfig(cfg.Activity)}
+	out := ToolConfig{Activity: activity.CloneConfig(cfg.Activity), MCY: cfg.MCY}
 	out.NewAPI.Sites = make([]ManagedAPISiteConfig, len(cfg.NewAPI.Sites))
 	for i, site := range cfg.NewAPI.Sites {
 		site.URLs = append([]ManagedSiteURL(nil), site.URLs...)
@@ -475,6 +532,14 @@ func (site ManagedAPISiteConfig) toNewAPISites() []newapi.Site {
 
 func applyToolConfigSnapshot(cfg ToolConfig) {
 	activityapp.SetRuntimeConfig(cfg.Activity)
+	activityapp.SetMCYRuntimeConfig(activityapp.MCYRuntimeConfig{
+		BaseURL:        cfg.MCY.BaseURL,
+		Username:       cfg.MCY.Username,
+		Password:       cfg.MCY.Password,
+		Cookie:         cfg.MCY.Cookie,
+		LoginEndpoint:  cfg.MCY.LoginEndpoint,
+		UploadEndpoint: cfg.MCY.UploadEndpoint,
+	})
 	resetModelStatusCache()
 }
 
@@ -695,6 +760,14 @@ func adminConfigResponse(cfg ToolConfig) map[string]any {
 			"sites": adminSiteResponses(cfg.NewAPI.Sites),
 		},
 		"activity": activityPayload,
+		"mcy": map[string]any{
+			"baseUrl":        cfg.MCY.BaseURL,
+			"username":       cfg.MCY.Username,
+			"loginEndpoint":  cfg.MCY.LoginEndpoint,
+			"uploadEndpoint": cfg.MCY.UploadEndpoint,
+			"passwordSet":    cfg.MCY.Password != "",
+			"passwordMasked": maskSecret(cfg.MCY.Password),
+		},
 	}
 }
 
