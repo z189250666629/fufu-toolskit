@@ -778,6 +778,14 @@ select {
   gap: 10px;
 }
 
+/* "补齐到 [输入] 张" / "启用" 这类标签：文字+控件不换行、间距收紧，
+   不要让“张”被挤到下一行。控件宽度沿用各自的 mini-input 设定（时区不被压窄）。 */
+.field--inline {
+  flex-wrap: nowrap;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .blueprint-input,
 .blueprint-textarea,
 .native-select {
