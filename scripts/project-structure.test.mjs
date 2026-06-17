@@ -387,9 +387,9 @@ test('spin module keeps draw rules in spincore and app handler thin', async () =
   assert.match(spinStore, /func recordSpinRetry/);
   assert.match(spinStore, /func recordSpinResult/);
 
-  assert.match(spinRules, /fufu\/spincore/);
+  assert.match(spinRules, /fufu\/activity/);
   assert.match(spinRules, /func spin\(/);
-  assert.match(spinRules, /func secureRandomInt/);
+  assert.match(spinRules, /secureRandomInt = func/);
   assert.match(spinCore, /package spincore/);
   assert.match(spinCore, /func Spin/);
   assert.match(spinCore, /func Roll/);

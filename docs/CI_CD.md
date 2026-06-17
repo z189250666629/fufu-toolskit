@@ -2,13 +2,13 @@
 
 生产部署沿用 tag-gated 模式：只有 `v*` tag 且 commit message 包含 deploy directive 时才部署。pre-release tag（包含 `-`）会跳过。
 
-GitHub Actions 部署环境固定使用 `toolskit`。不要新增或切换到 `docker` environment，除非是在排查历史遗留状态。
+GitHub Actions 部署环境固定使用 `docker`（持有 n5105 主机的 SSH / registry / ADMIN_TOKEN 等 secret）。旧的 `toolskit` environment 已退休，不要再切回。
 
 ## 部署应用
 
 | Workflow | 目录 | 镜像 | 远端路径 | 对外端口 | Directive |
 | --- | --- | --- | --- | ---: | --- |
-| `deploy-fufu-tool-site` | `apps/fufu-tool-site` | `ghcr.io/<owner>/<repo>-fufu-tool-site` | 优先复用 `NETWORK_DETECT_DEPLOY_PATH` / `DETECT_DEPLOY_PATH`；否则 `DEPLOY_PATH/fufu-tool-site`；默认 `/data/docker/fufu-tool-site` | `38473` | `[deploy fufu-tool-site]` / `[deploy tool-site]` / `[deploy tools]` / `[deploy all]` |
+| `deploy-fufu-tool-site` | `apps/fufu-tool-site` | `ghcr.io/<owner>/<repo>-fufu-tool-site` | `DEPLOY_PATH` 直接作为完整路径（docker env 为 `/data/docker/toolkit`）；默认 `/data/docker/fufu-tool-site` | `38473` | `[deploy fufu-tool-site]` / `[deploy tool-site]` / `[deploy tools]` / `[deploy all]` |
 
 旧 directive 会作为兼容别名触发统一工具站，而不再部署独立服务：`[deploy network]`、`[deploy network-detect]`、`[deploy network_detect]`、`[deploy combine]`、`[deploy act]`、`[deploy activity]`、`[deploy fufu-act]`、`[deploy y2k]`、`[deploy y2k-nav]`、`[deploy nav]`、`[deploy navigation]`。
 

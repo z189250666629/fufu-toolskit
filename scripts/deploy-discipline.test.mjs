@@ -122,11 +122,11 @@ test('legacy deploy directives now target the unified fufu-tool-site workflow an
   }
 });
 
-test('deploy workflows use the canonical toolskit GitHub environment', async () => {
+test('deploy workflows use the canonical docker GitHub environment', async () => {
   for (const path of await deployWorkflowPaths()) {
     const source = await readRepoFile(path);
-    assert.match(source, /^\s*environment:\s*toolskit\s*$/m, `${path} should deploy through the toolskit environment`);
-    assert.doesNotMatch(source, /^\s*environment:\s*docker\s*$/m, `${path} must not deploy through a docker environment`);
+    assert.match(source, /^\s*environment:\s*docker\s*$/m, `${path} should deploy through the docker environment`);
+    assert.doesNotMatch(source, /^\s*environment:\s*toolskit\s*$/m, `${path} must not deploy through the retired toolskit environment`);
   }
 });
 
