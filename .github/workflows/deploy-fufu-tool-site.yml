@@ -67,8 +67,8 @@ jobs:
           file: apps/fufu-tool-site/Dockerfile
           push: true
           build-args: |
-            GO_IMAGE=${{ vars.NETWORK_DETECT_GO_IMAGE || 'golang:1.25-alpine' }}
-            RUNTIME_IMAGE=${{ vars.NETWORK_DETECT_RUNTIME_IMAGE || 'alpine:3.22' }}
+            GO_IMAGE=${{ vars.GO_IMAGE || 'golang:1.25-alpine' }}
+            RUNTIME_IMAGE=${{ vars.RUNTIME_IMAGE || 'alpine:3.22' }}
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
             ${{ env.IMAGE_NAME }}:latest
@@ -91,12 +91,13 @@ jobs:
       SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY || secrets.DEPLOY_SSH_KEY }}
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS || vars.SSH_KNOWN_HOSTS }}
-      DEPLOY_PATH: ${{ vars.NETWORK_DETECT_DEPLOY_PATH || vars.DETECT_DEPLOY_PATH || vars.DEPLOY_PATH && format('{0}/fufu-tool-site', vars.DEPLOY_PATH) || '/data/docker/fufu-tool-site' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH && format('{0}/fufu-tool-site', vars.DEPLOY_PATH) || '/data/docker/fufu-tool-site' }}
       COMPOSE_FILE: infra/deploy/fufu-tool-site/docker-compose.yml
       COMPOSE_SERVICE_NAME: fufu-tool-site
-      CONTAINER_NAME: ${{ vars.NETWORK_DETECT_CONTAINER_NAME || 'fufu-tool-site' }}
-      HOST_BIND: ${{ vars.NETWORK_DETECT_HOST_BIND || vars.HOST_BIND || '0.0.0.0' }}
-      HOST_PORT: ${{ vars.NETWORK_DETECT_HOST_PORT || vars.DETECT_PORT || '38473' }}
+      CONTAINER_NAME: ${{ vars.CONTAINER_NAME || 'fufu-tool-site' }}
+      HOST_BIND: ${{ vars.HOST_BIND || '0.0.0.0' }}
+      # 对外端口：优先 HOST_PORT；兼容旧的 DETECT_PORT；默认 38473。容器内固定 8080。
+      HOST_PORT: ${{ vars.HOST_PORT || vars.DETECT_PORT || '38473' }}
       NEWAPI_MANAGED_API_SITES: ${{ secrets.NEWAPI_MANAGED_API_SITES || vars.NEWAPI_MANAGED_API_SITES }}
       NEWAPI_MANAGED_API_CONFIG: ${{ vars.NEWAPI_MANAGED_API_CONFIG }}
       NEWAPI_API_SITE_URL: ${{ vars.NEWAPI_API_SITE_URL }}
