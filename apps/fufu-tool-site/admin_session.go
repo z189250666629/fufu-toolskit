@@ -15,8 +15,6 @@ import (
 
 const adminSessionCookieName = "fufu_admin_session"
 
-const temporaryAdminLoginPassword = "Cky98"
-
 const adminSessionTTL = 12 * time.Hour
 
 type adminSessionLoginRequest struct {
@@ -25,12 +23,6 @@ type adminSessionLoginRequest struct {
 
 func isUnifiedAdminSessionAPI(path string) bool {
 	return path == "/api/admin/session"
-}
-
-func ensureUnifiedAdminToken() {
-	if strings.TrimSpace(os.Getenv("ADMIN_TOKEN")) == "" {
-		_ = os.Setenv("ADMIN_TOKEN", temporaryAdminLoginPassword)
-	}
 }
 
 func handleUnifiedAdminSessionAPI(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +35,8 @@ func handleUnifiedAdminSessionAPI(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusBadRequest, "登录格式错误")
 			return
 		}
-		if strings.TrimSpace(body.Token) != temporaryAdminLoginPassword {
+		// 管理员口令即 ADMIN_TOKEN（由部署环境/GitHub 配置注入）。未配置时无人能登录。
+		if !auth.CheckAdminToken(body.Token, os.Getenv("ADMIN_TOKEN"), "") {
 			clearUnifiedAdminSession(w)
 			writeJSONError(w, http.StatusUnauthorized, "管理员口令不正确")
 			return
@@ -149,7 +142,7 @@ func verifyUnifiedAdminSession(value string, now time.Time) bool {
 }
 
 func signUnifiedAdminSession(message string) string {
-	secret := auth.FirstNonEmpty(os.Getenv("ADMIN_TOKEN"), temporaryAdminLoginPassword)
+	secret := strings.TrimSpace(os.Getenv("ADMIN_TOKEN"))
 	if secret == "" {
 		return ""
 	}

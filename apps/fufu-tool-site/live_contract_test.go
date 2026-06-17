@@ -220,7 +220,7 @@ func initLiveToolSiteRuntime(t *testing.T) {
 
 func liveAdminCookie(t *testing.T) *http.Cookie {
 	t.Helper()
-	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": temporaryAdminLoginPassword})
+	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": os.Getenv("ADMIN_TOKEN")})
 	loginRec := httptest.NewRecorder()
 	route(loginRec, loginReq)
 	if loginRec.Code != http.StatusOK {

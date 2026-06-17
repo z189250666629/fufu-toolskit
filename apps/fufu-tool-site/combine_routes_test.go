@@ -26,7 +26,7 @@ func (h *fakeCombineHandler) ServeHTTPAsRole(w http.ResponseWriter, r *http.Requ
 }
 
 func TestServeCombineAPIUsesUnifiedAdminSessionAsCombineAdmin(t *testing.T) {
-	t.Setenv("ADMIN_TOKEN", temporaryAdminLoginPassword)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
 	previous := combineApp
 	fake := &fakeCombineHandler{}
 	combineApp = fake

@@ -106,7 +106,6 @@ func run(wd, portValue string) error {
 }
 
 func initRuntime(wd string) error {
-	ensureUnifiedAdminToken()
 	rootDir = wd
 	frontendDir = filepath.Join(rootDir, "frontend")
 	combineDir = filepath.Join(rootDir, "combine")

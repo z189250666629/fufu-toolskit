@@ -43,14 +43,14 @@ func TestAdminSessionLoginSetsCookieAndAuthorizesConfigAPI(t *testing.T) {
 	}
 	t.Cleanup(shutdownRuntime)
 
-	badReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "secret-admin-token"})
+	badReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "wrong-password"})
 	badW := httptest.NewRecorder()
 	route(badW, badReq)
 	if badW.Code != http.StatusUnauthorized {
 		t.Fatalf("bad login code=%d body=%s", badW.Code, badW.Body.String())
 	}
 
-	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": temporaryAdminLoginPassword})
+	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "secret-admin-token"})
 	loginW := httptest.NewRecorder()
 	route(loginW, loginReq)
 	if loginW.Code != http.StatusOK {
@@ -87,7 +87,7 @@ func TestAdminSessionCookieAuthorizesForwardedActivityAdminAPIs(t *testing.T) {
 	}
 	t.Cleanup(shutdownRuntime)
 
-	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": temporaryAdminLoginPassword})
+	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "secret-admin-token"})
 	loginW := httptest.NewRecorder()
 	route(loginW, loginReq)
 	if loginW.Code != http.StatusOK {
@@ -104,7 +104,7 @@ func TestAdminSessionCookieAuthorizesForwardedActivityAdminAPIs(t *testing.T) {
 	}
 }
 
-func TestTemporaryAdminPasswordAuthorizesForwardedActivityAdminAPIsWhenTokenUnset(t *testing.T) {
+func TestAdminLoginRejectedWhenTokenUnset(t *testing.T) {
 	root := t.TempDir()
 	writeToolSiteFixture(t, root)
 	t.Setenv("ADMIN_TOKEN", "")
@@ -113,20 +113,14 @@ func TestTemporaryAdminPasswordAuthorizesForwardedActivityAdminAPIsWhenTokenUnse
 	}
 	t.Cleanup(shutdownRuntime)
 
-	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": temporaryAdminLoginPassword})
-	loginW := httptest.NewRecorder()
-	route(loginW, loginReq)
-	if loginW.Code != http.StatusOK {
-		t.Fatalf("login code=%d body=%s", loginW.Code, loginW.Body.String())
-	}
-	cookie := adminSessionCookieFromRecorder(t, loginW)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/admin/stats", nil)
-	req.AddCookie(cookie)
-	w := httptest.NewRecorder()
-	route(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("forwarded stats with temporary token code=%d body=%s", w.Code, w.Body.String())
+	// 未配置 ADMIN_TOKEN 时，任何口令都不能登录后台（不存在硬编码后门）。
+	for _, token := range []string{"", "Cky98", "anything"} {
+		loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": token})
+		loginW := httptest.NewRecorder()
+		route(loginW, loginReq)
+		if loginW.Code != http.StatusUnauthorized {
+			t.Fatalf("login with %q while ADMIN_TOKEN unset should be 401, got %d body=%s", token, loginW.Code, loginW.Body.String())
+		}
 	}
 }
 
