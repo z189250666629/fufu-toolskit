@@ -121,6 +121,8 @@ test('dragon boat fullscreen uses screen click then switches to peel phase after
   assert.match(source, /body\.dragonboat-fullscreen #dragonboat-panel \{[\s\S]*cursor: pointer;/);
   assert.match(source, /body\.dragonboat-fullscreen \.dragonboat-stage \{[\s\S]*height: 100%;[\s\S]*min-height: 0;/);
   assert.match(source, /body\.dragonboat-fullscreen \.dragonboat-hook \{[\s\S]*height: 86px;[\s\S]*--dragon-hook-idle: 86px;/);
+  // mobile: push the HUD down so the fixed CHANGE KEY button doesn't overlap it
+  assert.match(source, /@media \(max-width: 768px\), \(max-height: 700px\) \{[\s\S]*\.dragonboat-hud \{\s*margin-top: 30px;/);
   assert.doesNotMatch(source, /--dragon-hook-idle: 42%/);
   assert.match(source, /body\.dragonboat-fullscreen \.dragonboat-actions,[\s\S]*display: none;/);
   assert.match(logoutSource, /document\.body\.classList\.remove\('dragonboat-fullscreen'\)/);

@@ -1582,6 +1582,12 @@
         display: none;
       }
     }
+    /* 移动端：右上角 CHANGE KEY 是 fixed 的，会压住 HUD 右侧格；把 HUD 整体下移留出空间 */
+    @media (max-width: 768px), (max-height: 700px) {
+      body.dragonboat-fullscreen .dragonboat-hud {
+        margin-top: 30px;
+      }
+    }
     @media (max-width: 480px) {
       .container { padding: 16px 8px 28px; }
       .page-title { font-size: 18px; letter-spacing: 3px; }
