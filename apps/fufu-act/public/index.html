@@ -1394,6 +1394,63 @@
       transform: rotate(52deg);
       box-shadow: 20px 0 0 #d9aa36;
     }
+    /* 拆粽：抖动蓄力 -> 爆开（金光闪）-> 粽叶上掀、外壳下裂、棕绳解开，露出奖励 */
+    .dragonboat-big-zongzi.opening {
+      animation: zongzi-open 0.72s ease-out 1 both;
+    }
+    .dragonboat-big-zongzi.opening::after {
+      animation: zongzi-leaf-up 0.72s ease-out 1 both;
+    }
+    .dragonboat-big-zongzi.opening::before {
+      animation: zongzi-shell-down 0.72s ease-out 1 both;
+    }
+    .dragonboat-big-zongzi.opening i {
+      animation: zongzi-rope-off 0.5s ease-out 1 both;
+    }
+    @keyframes zongzi-open {
+      0%   { transform: scale(1) rotate(0deg); filter: drop-shadow(8px 8px 0 var(--c-black)); }
+      18%  { transform: scale(1.06) rotate(-7deg); }
+      34%  { transform: scale(1.06) rotate(7deg); }
+      46%  { transform: scale(0.9) rotate(0deg); }
+      60%  { transform: scale(1.4) rotate(0deg); filter: drop-shadow(0 0 32px var(--c-yellow)) brightness(1.7); }
+      100% { transform: scale(1.12) rotate(0deg); filter: drop-shadow(0 0 12px var(--c-yellow)); }
+    }
+    @keyframes zongzi-leaf-up {
+      0%, 46% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+      100%    { transform: translate(-30px, -78px) rotate(-34deg) scale(1.1); opacity: 0; }
+    }
+    @keyframes zongzi-shell-down {
+      0%, 46% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+      100%    { transform: translate(26px, 66px) rotate(30deg) scale(1.1); opacity: 0; }
+    }
+    @keyframes zongzi-rope-off {
+      0%, 40% { transform: rotate(-26deg); opacity: 1; }
+      100%    { transform: translateY(-34px) rotate(-92deg) scale(1.2); opacity: 0; }
+    }
+    /* 拆开后从粽子里升起的奖励数字 */
+    .dragon-prize-pop {
+      position: absolute;
+      left: 50%;
+      top: 42%;
+      z-index: 7;
+      pointer-events: none;
+      white-space: nowrap;
+      font-family: var(--pixel-font);
+      font-size: 22px;
+      color: var(--c-yellow);
+      text-shadow: 3px 3px 0 var(--c-black), 0 0 12px var(--c-yellow);
+      animation: dragon-prize-pop 1.1s ease-out 1 both;
+    }
+    .dragon-prize-pop.miss {
+      color: var(--c-cyan);
+      text-shadow: 3px 3px 0 var(--c-black);
+    }
+    @keyframes dragon-prize-pop {
+      0%   { transform: translate(-50%, -10%) scale(0.4); opacity: 0; }
+      25%  { transform: translate(-50%, -60%) scale(1.2); opacity: 1; }
+      70%  { transform: translate(-50%, -95%) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -150%) scale(1); opacity: 0; }
+    }
     .dragonboat-peel-count {
       font-family: var(--pixel-font);
       font-size: 18px;
@@ -1741,7 +1798,7 @@
         <div class="dragonboat-obstacles" id="dragonboat-obstacles" aria-hidden="true"></div>
         <div class="dragonboat-zongzi-field" id="dragonboat-zongzi-field" aria-hidden="true"></div>
         <div class="dragonboat-peel-screen" id="dragonboat-peel-screen" aria-hidden="true">
-          <div class="dragonboat-big-zongzi"><i></i></div>
+          <div class="dragonboat-big-zongzi" id="dragon-big-zongzi"><i></i></div>
           <div class="dragonboat-peel-count">× <span id="dragon-peel-count">0</span></div>
         </div>
       </div>
@@ -2664,44 +2721,72 @@
       }
     }
 
+    function dragonBigZongziCenter() {
+      const big = $('dragon-big-zongzi');
+      const r = big && big.getBoundingClientRect();
+      if (r && r.width) return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+      const rect = $('dragonboat-stage').getBoundingClientRect();
+      return { cx: rect.left + rect.width * 0.5, cy: rect.top + rect.height * 0.45 };
+    }
+
+    function spawnDragonPrizePop(text, isMiss) {
+      const screen = $('dragonboat-peel-screen');
+      if (!screen) return;
+      const el = document.createElement('div');
+      el.className = 'dragon-prize-pop' + (isMiss ? ' miss' : '');
+      el.textContent = text;
+      screen.appendChild(el);
+      setTimeout(() => el.remove(), 1200);
+    }
+
     async function peelDragonBoat() {
       if (dragonBusy || Number(dragonState?.zongziReady || 0) <= 0) return;
       dragonSetBusy(true);
       $('dragon-result').className = 'dragonboat-result';
       $('dragon-result').textContent = '剥粽子中...';
+      // 触发拆粽开壳动画（重置后重新播放，连续拆多个也每次都演）
+      const big = $('dragon-big-zongzi');
+      if (big) { big.classList.remove('opening'); void big.offsetWidth; big.classList.add('opening'); }
       try {
-        const res = await fetch(API + '/dragonboat/peel', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cardKey: currentCardKey }),
-        });
-        const data = await readDragonBoatApi(res, '剥粽失败，请稍后重试', '剥粽失败');
+        const [data] = await Promise.all([
+          (async () => {
+            const res = await fetch(API + '/dragonboat/peel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ cardKey: currentCardKey }),
+            });
+            return readDragonBoatApi(res, '剥粽失败，请稍后重试', '剥粽失败');
+          })(),
+          new Promise(resolve => setTimeout(resolve, 440)), // 等开壳到「爆开」那一刻再揭晓
+        ]);
         renderDragonBoatState(data, true);
         const prize = data.prizeResult || {};
         const dollars = Number(prize.prize) || 0;
         const rank = String(prize.rank || '').trim();
         const label = String(prize.label || '').trim();
-        const rect = $('dragonboat-stage').getBoundingClientRect();
-        const cx = rect.left + rect.width * 0.62;
-        const cy = rect.top + rect.height * 0.52;
+        const { cx, cy } = dragonBigZongziCenter();
         if (prize.isMiss || dollars <= 0) {
           $('dragon-result').className = 'dragonboat-result';
           $('dragon-result').textContent = '剥开是空粽';
+          spawnDragonPrizePop('空粽', true);
           particles.emit(cx, cy, { count: 24, speedMax: 7, palette: ['#00d4d4', '#2c54d6', '#f0f0f0'] });
         } else {
           $('dragon-result').className = 'dragonboat-result win';
           $('dragon-result').textContent = `${label || '中奖'} +$${dollars}`;
+          spawnDragonPrizePop(`+$${dollars}`, false);
           if (rank === 'jackpot') {
             triggerJackpot(dollars, cx, cy);
           } else {
             particles.emit(cx, cy, { count: dollars >= 100 ? 120 : 70, palette: ['#f4d837', '#fff04d', '#4cc24f', '#ff8cb6'] });
           }
         }
+        await new Promise(resolve => setTimeout(resolve, 360)); // 让开壳动画播完
         await refreshDragonBoatCard();
       } catch (e) {
         $('dragon-result').className = 'dragonboat-result';
         $('dragon-result').textContent = activityApi.safeErrorMessage(e, '剥粽失败，请稍后重试');
       } finally {
+        if (big) big.classList.remove('opening'); // 复位，下一个粽子重新演
         dragonSetBusy(false);
       }
     }

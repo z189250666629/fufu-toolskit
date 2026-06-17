@@ -65,6 +65,19 @@ test('dragon boat stage renders zongzi as page-native art instead of generic emo
   assert.match(stageSource, /id="dragonboat-peel-screen"/);
   assert.match(stageSource, /id="dragon-peel-count"/);
   assert.match(source, /function renderDragonBoatScene\(scene\)/);
+  // peeling plays a crack-open animation on the big zongzi
+  assert.match(source, /<div class="dragonboat-big-zongzi" id="dragon-big-zongzi">/);
+  assert.match(source, /@keyframes zongzi-open/);
+  assert.match(source, /@keyframes zongzi-leaf-up/);
+  assert.match(source, /@keyframes zongzi-shell-down/);
+  assert.match(source, /\.dragonboat-big-zongzi\.opening \{/);
+  assert.match(source, /big\.classList\.add\('opening'\)/);
+  assert.match(source, /if \(big\) big\.classList\.remove\('opening'\)/);
+  // the prize rises out of the opened zongzi
+  assert.match(source, /@keyframes dragon-prize-pop/);
+  assert.match(source, /function spawnDragonPrizePop\(text, isMiss\)/);
+  assert.match(source, /spawnDragonPrizePop\(`\+\$\$\{dollars\}`, false\)/);
+  assert.match(source, /spawnDragonPrizePop\('空粽', true\)/);
   assert.match(source, /function dragonBoatSceneObjectStyle\(item,\s*index\)/);
   assert.match(source, /<span class="zongzi-rice"><\/span><span class="zongzi-rope"><\/span>/);
   assert.match(source, /\.dragonboat-zongzi::before/);
