@@ -52,8 +52,10 @@
     const width = Math.max(1, Number(dims?.width) || 1);
     const height = Math.max(1, Number(dims?.height) || 1);
 
-    // 每像素带来的百分比增量
-    const dxPctPerPx = (Math.sin(theta) / width) * 100;
+    // CSS rotate(θ) 作用在向下的杆上，屏幕 y 轴朝下、正角顺时针，杆尖方向是
+    // (-sinθ, cosθ)（正角把杆尖转向「左」）。target 必须沿同一方向，否则钩子
+    // 视觉指一边、后端射线指另一边（曾导致「钩子往右、勾到左边」）。
+    const dxPctPerPx = ((-Math.sin(theta)) / width) * 100;
     const dyPctPerPx = (Math.cos(theta) / height) * 100;
 
     let dist = Infinity;
@@ -79,7 +81,8 @@
     const height = Math.max(1, Number(dims?.height) || 1);
     const dxPx = ((Number(point?.x) || 0) - ox) / 100 * width;
     const dyPx = ((Number(point?.y) || 0) - oy) / 100 * height;
-    const depth = dxPx * Math.sin(theta) + dyPx * Math.cos(theta);
+    // 同一方向约定 (-sinθ, cosθ)，与 castTarget / CSS rotate 一致。
+    const depth = dxPx * (-Math.sin(theta)) + dyPx * Math.cos(theta);
     return Math.max(0, depth);
   }
 

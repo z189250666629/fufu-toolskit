@@ -30,25 +30,34 @@ test('castTarget straight down hits the bottom edge directly below origin', asyn
   assert.ok(near(t.y, 100, 1e-6));
 });
 
-test('castTarget at +45deg from center reaches the bottom-right corner', async () => {
+// CSS rotate(+θ) turns a downward bar CLOCKWISE → its tip points LEFT (-sinθ).
+// castTarget must follow the same convention so the cast line matches the visible hook.
+test('castTarget at +45deg reaches the bottom-LEFT corner (matches CSS rotate)', async () => {
   const hook = await loadHook();
   const t = hook.castTarget(45, { x: 50, y: 50 }, { width: 1000, height: 1000 });
-  assert.ok(near(t.x, 100, 1e-4));
-  assert.ok(near(t.y, 100, 1e-4));
+  assert.ok(near(t.x, 0, 1e-4), `x=${t.x}`);
+  assert.ok(near(t.y, 100, 1e-4), `y=${t.y}`);
 });
 
-test('castTarget horizontal (90deg) walks to the right wall at origin height', async () => {
+test('castTarget +90deg walks to the LEFT wall at origin height', async () => {
   const hook = await loadHook();
   const t = hook.castTarget(90, { x: 50, y: 18 }, { width: 1000, height: 1000 });
-  assert.ok(near(t.x, 100, 1e-4));
+  assert.ok(near(t.x, 0, 1e-4), `x=${t.x}`);
   assert.ok(near(t.y, 18, 1e-4));
 });
 
-test('castTarget negative angle aims left', async () => {
+test('castTarget -90deg walks to the RIGHT wall at origin height', async () => {
   const hook = await loadHook();
   const t = hook.castTarget(-90, { x: 50, y: 18 }, { width: 1000, height: 1000 });
-  assert.ok(near(t.x, 0, 1e-4));
+  assert.ok(near(t.x, 100, 1e-4), `x=${t.x}`);
   assert.ok(near(t.y, 18, 1e-4));
+});
+
+test('castTarget sign matches CSS rotate: +angle aims left, -angle aims right', async () => {
+  const hook = await loadHook();
+  const dims = { width: 1000, height: 1000 };
+  assert.ok(hook.castTarget(40, { x: 50, y: 18 }, dims).x < 50, '+40 must aim left');
+  assert.ok(hook.castTarget(-40, { x: 50, y: 18 }, dims).x > 50, '-40 must aim right');
 });
 
 test('rayDepthPx projects an on-axis point to its straight-line distance', async () => {
@@ -111,10 +120,10 @@ test('a hit item depth is shorter than the boundary (so the hook stops before th
   const hook = await loadHook();
   const origin = { x: 50, y: 18 };
   const dims = { width: 900, height: 800 };
-  const angle = 20;
+  const angle = 20; // +20 aims down-left, so an on-ray item sits left of center
   const target = hook.castTarget(angle, origin, dims);
   const boundary = hook.rayDepthPx(angle, origin, target, dims);
-  const item = { x: 58, y: 55 };
+  const item = { x: 39, y: 53 };
   const stop = hook.rayDepthPx(angle, origin, item, dims);
   assert.ok(stop > 0);
   assert.ok(stop < boundary, `stop ${stop} should be < boundary ${boundary}`);
