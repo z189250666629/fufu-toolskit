@@ -139,6 +139,7 @@ func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 		"/api/admin/stats",
 		"/api/admin/sale-cards/config",
 		"/api/admin/sale-cards/run",
+		"/api/admin/sale-cards/test-key",
 		"/api/prizes",
 		"/api/newapi/sites",
 		"/api/nav/lines",

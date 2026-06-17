@@ -143,6 +143,7 @@ test('tool-site admin page delegates editors and panels to focused modules', asy
   const adminSource = await readText('ui/src/admin/AdminPage.tsx');
   const shared = await readText('ui/src/admin/adminShared.tsx');
   const siteNavigation = await readText('ui/src/admin/siteNavigationPanels.tsx');
+  const siteNavigationCore = await readText('ui/src/admin/siteNavigationConfigCore.ts');
   const mcy = await readText('ui/src/admin/mcyConfigPanel.tsx');
   const saleCard = await readText('ui/src/admin/saleCardPanel.tsx');
   const activity = await readText('ui/src/admin/activityPanels.tsx');
@@ -164,6 +165,8 @@ test('tool-site admin page delegates editors and panels to focused modules', asy
   assert.match(shared, /function ConfigCard/);
   assert.match(siteNavigation, /function SiteEditor/);
   assert.match(siteNavigation, /function NavigationToolsEditor/);
+  assert.match(siteNavigationCore, /function updateManagedSite/);
+  assert.match(siteNavigationCore, /function buildAdminNavigationSavePayload/);
   assert.match(mcy, /function MCYConfigEditor/);
   assert.match(saleCard, /function SaleCardManager/);
   assert.match(activity, /function ActivityConfigEditor/);
@@ -172,13 +175,40 @@ test('tool-site admin page delegates editors and panels to focused modules', asy
 test('tool-site admin navigation links expose one URL field and do not resave ping URLs', async () => {
   const adminSource = await readText('ui/src/admin/AdminPage.tsx');
   const siteNavigation = await readText('ui/src/admin/siteNavigationPanels.tsx');
+  const siteNavigationCore = await readText('ui/src/admin/siteNavigationConfigCore.ts');
   const homeSource = await readText('ui/src/HomePage.tsx');
 
   assert.doesNotMatch(siteNavigation, /可选 ping URL/);
   assert.doesNotMatch(siteNavigation, /value=\{link\.ping/);
   assert.doesNotMatch(siteNavigation, /ping:\s*''/);
-  assert.match(adminSource, /\.map\(\(link\)\s*=>\s*\(\{\s*label:\s*link\.label,\s*href:\s*link\.href\s*\}\)\)/s);
+  assert.match(adminSource, /buildAdminNavigationSavePayload\(config\)/);
+  assert.match(siteNavigationCore, /\.map\(\(link\)\s*=>\s*\(\{\s*label:\s*link\.label,\s*href:\s*link\.href\s*\}\)\)/s);
   assert.match(homeSource, /useLatency\(link\.ping\s*\|\|\s*link\.href\)/);
+});
+
+test('tool-site admin navigation editor keeps pure object rules in a core module', async () => {
+  const adminSource = await readText('ui/src/admin/AdminPage.tsx');
+  const siteNavigation = await readText('ui/src/admin/siteNavigationPanels.tsx');
+  const siteNavigationCore = await readText('ui/src/admin/siteNavigationConfigCore.ts');
+
+  for (const marker of [
+    'updateManagedSite',
+    'addManagedSiteURL',
+    'removeManagedSiteURL',
+    'patchNavigationCard',
+    'addNavigationLink',
+    'setNavigationCardLineKind',
+    'buildAdminNavigationSavePayload'
+  ]) {
+    assert.match(siteNavigationCore, new RegExp(`function\\s+${marker}\\b|const\\s+${marker}\\b`), `missing core rule ${marker}`);
+  }
+  assert.match(siteNavigation, /from '\.\/siteNavigationConfigCore'/);
+  assert.match(adminSource, /from '\.\/siteNavigationConfigCore'/);
+  assert.doesNotMatch(siteNavigation, /const\s+SITE_GROUPS\b/);
+  assert.doesNotMatch(siteNavigation, /const\s+defaultSite\b/);
+  assert.doesNotMatch(siteNavigation, /function\s+ensureSite\b/);
+  assert.doesNotMatch(siteNavigation, /function\s+patchCard\b/);
+  assert.doesNotMatch(adminSource, /const\s+navigationCards\s*=/);
 });
 
 test('tool-site activity window uses human date-time controls instead of raw timestamps', async () => {
@@ -230,6 +260,7 @@ test('tool-site UI preserves actual business API wiring in React source', async 
     '/api/admin/stats',
     '/api/admin/sale-cards/config',
     '/api/admin/sale-cards/run',
+    '/api/admin/sale-cards/test-key',
     '/api/prizes',
     '/api/newapi/sites'
   ]) {
@@ -259,9 +290,10 @@ test('tool-site activity gameplay routes use MCY sale-card tiers instead of manu
 
   assert.match(types, /export type ActivityGameRoute/);
   assert.match(types, /drawCount\?: number/);
-  assert.match(types, /export type ActivityGameConfig = \{\s+game: 'slot' \| 'scratch' \| string;\s+targetExpectedValue\?: number;\s+\};/);
+  assert.match(types, /export type ActivityGameConfig = \{\s+game: 'slot' \| 'scratch' \| 'dragonboat' \| string;\s+targetExpectedValue\?: number;\s+\};/);
   assert.doesNotMatch(types, /ActivityGameConfig[\s\S]*actualExpectedValue\?: number;/);
   assert.match(activity, /salePlans/);
+  assert.match(activity, /onGenerateTestKey/);
   assert.match(activity, /from '\.\/activityConfigCore'/);
   assert.match(activityCore, /function buildSaleCardTierOptions/);
   assert.match(activityCore, /function materializeActivityGameRoutes/);
@@ -277,7 +309,7 @@ test('tool-site activity gameplay routes use MCY sale-card tiers instead of manu
   assert.doesNotMatch(activity, /<span>玩法<\/span><span>目标期望值<\/span><span>实际期望值<\/span>/);
   assert.doesNotMatch(activity, /aria-label=\{`\$\{gameModeLabel\(game\)\}实际期望值`\}/);
   assert.match(adminSource, /stats=\{activityStats\}/);
-  assert.match(activity, /<span>MCY 卡档<\/span><span>玩法<\/span><span>抽奖次数<\/span><span>售价<\/span><span>成本<\/span><span>净利润<\/span><span>入池<\/span>/);
+  assert.match(activity, /<span>MCY 卡档<\/span><span>玩法<\/span><span>抽奖次数<\/span><span>售价<\/span><span>成本<\/span><span>净利润<\/span><span>入池<\/span><span>测试 key<\/span>/);
   assert.doesNotMatch(activity, /<span>额度<\/span>/);
   assert.doesNotMatch(activity, /<span>MCY SKU<\/span>/);
   assert.doesNotMatch(activity, /<span>分组<\/span>/);
@@ -286,9 +318,18 @@ test('tool-site activity gameplay routes use MCY sale-card tiers instead of manu
   assert.match(activity, /aria-label=\{`\$\{option\.label\}成本`\}/);
   assert.match(activityCore, /刮刮乐/);
   assert.match(activityCore, /老虎机/);
+  assert.match(activityCore, /端午捕粽/);
+  assert.match(activityCore, /'dragonboat'/);
+  assert.match(activityCore, /primaryPlanId/);
   assert.match(adminSource, /salePlans=\{saleCards\?\.plans \?\? \[\]\}/);
+  assert.match(adminSource, /generateSaleCardTestKey/);
+  assert.match(adminSource, /\/api\/admin\/sale-cards\/test-key/);
+  assert.match(adminSource, /onGenerateTestKey=\{generateSaleCardTestKey\}/);
   assert.match(adminSource, /activity: materializeActivityGameRoutes\(config\.activity, saleCards\?\.plans \?\? \[\]\)/);
   assert.match(adminSource, /from '\.\/activityConfigCore'/);
+  assert.match(activity, /一键生成 key/);
+  assert.match(activity, /sale-test-key-result/);
+  assert.match(activity, /测试 key 只创建 NewAPI token，不上传 MCY/);
   assert.doesNotMatch(activity, /aria-label=\{`\$\{gameModeLabel\(game\)\}抽奖次数`\}/);
   assert.doesNotMatch(activity, /spinCountForTier/);
   assert.doesNotMatch(activity, /updateSpinCountForTier/);
@@ -347,6 +388,10 @@ test('tool-site sale card manual run exposes execution state beside the button',
   const saleCardCore = await readText('ui/src/admin/saleCardConfigCore.ts');
   const adminPage = await readText('ui/src/admin/AdminPage.tsx');
 
+  assert.match(saleCard, /const STOCK_REFRESH_INTERVAL_MS = 5 \* 60 \* 1000;/);
+  assert.match(saleCard, /refreshingRef = useRef\(false\)/);
+  assert.match(saleCard, /window\.setInterval\(\(\) => \{\s*void refreshStock\(\);\s*\}, STOCK_REFRESH_INTERVAL_MS\)/s);
+  assert.match(saleCard, /window\.clearInterval\(timer\)/);
   assert.match(saleCard, /from '\.\/saleCardConfigCore'/);
   assert.match(saleCardCore, /function buildSlotState/);
   assert.match(saleCardCore, /function buildSaleCardSchedule/);

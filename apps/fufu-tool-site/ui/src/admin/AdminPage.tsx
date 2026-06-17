@@ -8,6 +8,7 @@ import { ConfigCard, LoginPanel, Metric, type MessageState } from './adminShared
 import { MCYConfigEditor } from './mcyConfigPanel';
 import { SaleCardManager } from './saleCardPanel';
 import { HomeNavLines, NavigationToolsEditor, RuntimeSites, SiteEditor } from './siteNavigationPanels';
+import { buildAdminNavigationSavePayload } from './siteNavigationConfigCore';
 import type {
   ActivityStats,
   AdminConfig,
@@ -17,7 +18,8 @@ import type {
   PrizeConfigResponse,
   RuntimeSitesResponse,
   SaleCardConfig,
-  SaleCardRunResult
+  SaleCardRunResult,
+  SaleCardTestKeyResult
 } from './types';
 
 const emptyConfig: AdminConfig = {
@@ -147,27 +149,9 @@ export function AdminPage() {
     setBusy(true);
     setMessage({ text: '正在保存全部配置…' });
     try {
-      const sites = config.newapi.sites
-        .map((site) => ({ ...site, urls: (site.urls ?? []).filter((u) => (u.url ?? '').trim() !== '') }))
-        .filter((site) => site.urls.length > 0);
-      const navigationCards = (config.navigation?.cards ?? [])
-        .map((card) => {
-          const lineKind = (card.lineKind ?? '').trim();
-          return {
-            ...card,
-            lineKind,
-            href: lineKind ? '' : card.href,
-            links: lineKind
-              ? []
-              : (card.links ?? [])
-                .filter((link) => (link.href ?? '').trim() !== '')
-                .map((link) => ({ label: link.label, href: link.href }))
-          };
-        })
-        .filter((card) => (card.title ?? '').trim() !== '' && ((card.href ?? '').trim() !== '' || (card.links ?? []).length > 0 || (card.lineKind ?? '') !== ''));
+      const navigationPayload = buildAdminNavigationSavePayload(config);
       const next = await sendJSON<AdminConfig>('/api/admin/config', 'PUT', {
-        newapi: { sites },
-        navigation: { cards: navigationCards },
+        ...navigationPayload,
         activity: materializeActivityGameRoutes(config.activity, saleCards?.plans ?? []),
         mcy: config.mcy
       });
@@ -208,6 +192,10 @@ export function AdminPage() {
 
   async function runSalePlan(plan: string, targetStock: number): Promise<SaleCardRunResult> {
     return sendAdminActionJSON<SaleCardRunResult>('/api/admin/sale-cards/run', 'POST', { plan, targetStock });
+  }
+
+  async function generateSaleCardTestKey(plan: string, count: number): Promise<SaleCardTestKeyResult> {
+    return sendAdminActionJSON<SaleCardTestKeyResult>('/api/admin/sale-cards/test-key', 'POST', { plan, count });
   }
 
   const siteCount = config.newapi.sites.length;
@@ -311,6 +299,7 @@ export function AdminPage() {
                   activity={config.activity}
                   stats={activityStats}
                   salePlans={saleCards?.plans ?? []}
+                  onGenerateTestKey={generateSaleCardTestKey}
                   onChange={(activity) => setConfig({ ...config, activity })}
                 />
               </ConfigCard>

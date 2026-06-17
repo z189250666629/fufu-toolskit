@@ -37,12 +37,12 @@ export type PrizeRow = {
 
 export type ActivityGameRoute = {
   dollars: number;
-  game: 'slot' | 'scratch' | string;
+  game: 'slot' | 'scratch' | 'dragonboat' | string;
   drawCount?: number;
 };
 
 export type ActivityGameConfig = {
-  game: 'slot' | 'scratch' | string;
+  game: 'slot' | 'scratch' | 'dragonboat' | string;
   targetExpectedValue?: number;
 };
 
@@ -203,6 +203,16 @@ export type SaleCardRunResult = {
   targetStock?: number;
   toUpload?: number;
   uploaded?: number;
+  generated?: number;
+  keys?: string[];
+};
+
+export type SaleCardTestKeyResult = {
+  planId?: string;
+  planName?: string;
+  quota?: number;
+  game?: 'slot' | 'scratch' | 'dragonboat' | string;
+  drawCount?: number;
   generated?: number;
   keys?: string[];
 };

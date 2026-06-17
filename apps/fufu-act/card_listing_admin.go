@@ -65,6 +65,41 @@ func handleAdminSaleCardsRun(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+func handleAdminSaleCardsTestKey(w http.ResponseWriter, r *http.Request) {
+	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
+		writeJSONError(w, http.StatusUnauthorized, "未授权")
+		return
+	}
+	if tokenConfigErr != nil || tokenSvc == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "次数 fufu 未配置")
+		return
+	}
+	var req saleCardRunRequest
+	if err := readBody(r, &req); err != nil {
+		if errors.Is(err, errRequestBodyTooLarge) {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, "请求体过大")
+			return
+		}
+		writeJSONError(w, http.StatusBadRequest, "请求格式错误")
+		return
+	}
+	if req.Count <= 0 {
+		req.Count = 1
+	}
+	req.TargetStock = 0
+	plan, err := saleCardPlanFromRunRequest(req)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	result, err := generateSaleCardTestKeys(r.Context(), tokenSvc, plan, req.Count, SnapshotRuntimeConfig())
+	if err != nil {
+		writeSaleCardRunError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func handleAdminSaleCardsConfig(w http.ResponseWriter, r *http.Request) {
 	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")

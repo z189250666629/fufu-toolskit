@@ -25,6 +25,7 @@ const (
 const (
 	GameSlot    = "slot"
 	GameScratch = "scratch"
+	GameDragon  = "dragonboat"
 )
 
 type Prize = prizepoolcore.Prize
@@ -162,6 +163,7 @@ var defaultDynamicPrizePool = poolfundcore.Config{
 var defaultGameConfigs = []GameConfig{
 	{Game: GameSlot, TargetExpectedValue: ExpectedValue(defaultPrizePool), ActualExpectedValue: ExpectedValue(defaultPrizePool)},
 	{Game: GameScratch, TargetExpectedValue: ExpectedValue(defaultPrizePool), ActualExpectedValue: ExpectedValue(defaultPrizePool)},
+	{Game: GameDragon, TargetExpectedValue: ExpectedValue(defaultPrizePool), ActualExpectedValue: ExpectedValue(defaultPrizePool)},
 }
 
 func DefaultSpinMap() map[float64]int {
@@ -285,6 +287,8 @@ func normalizeGameMode(game string) string {
 		return GameScratch
 	case GameSlot, "spin", "slot-machine", "slot_machine", "老虎机":
 		return GameSlot
+	case GameDragon, "dragon", "duanwu", "端午", "黄金矿工":
+		return GameDragon
 	default:
 		return ""
 	}

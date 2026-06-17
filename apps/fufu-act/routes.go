@@ -36,6 +36,12 @@ func apiRoute(w http.ResponseWriter, r *http.Request) {
 		post(w, r, handleScratchCashout)
 	case "/api/scratch/reset":
 		post(w, r, handleScratchReset)
+	case "/api/dragonboat/start":
+		post(w, r, handleDragonBoatStart)
+	case "/api/dragonboat/fish":
+		post(w, r, handleDragonBoatFish)
+	case "/api/dragonboat/peel":
+		post(w, r, handleDragonBoatPeel)
 	case "/api/admin/stats":
 		if !webutil.RequireMethod(w, r, http.MethodGet) {
 			return
@@ -43,6 +49,8 @@ func apiRoute(w http.ResponseWriter, r *http.Request) {
 		handleAdminStats(w, r)
 	case "/api/admin/sale-cards/run":
 		post(w, r, handleAdminSaleCardsRun)
+	case "/api/admin/sale-cards/test-key":
+		post(w, r, handleAdminSaleCardsTestKey)
 	case "/api/admin/sale-cards/stock":
 		if !webutil.RequireMethod(w, r, http.MethodGet) {
 			return

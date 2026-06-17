@@ -1,16 +1,19 @@
 import type { ActivityConfig, ActivityGameConfig, ActivityGameRoute, DynamicPrizePoolConfig, DynamicPrizePoolTier, SaleCardPlan } from './types';
 
-export type GameMode = 'slot' | 'scratch';
+export type GameMode = 'slot' | 'scratch' | 'dragonboat';
 
 export type SaleCardTierOption = {
   quota: number;
   label: string;
   planText: string;
+  planIds: string[];
+  primaryPlanId?: string;
 };
 
 export const GAME_MODE_OPTIONS: { value: GameMode; label: string }[] = [
   { value: 'slot', label: '老虎机' },
-  { value: 'scratch', label: '刮刮乐' }
+  { value: 'scratch', label: '刮刮乐' },
+  { value: 'dragonboat', label: '端午捕粽' }
 ];
 
 export function numberValue(value: unknown): number {
@@ -59,14 +62,18 @@ export function buildSaleCardTierOptions(plans: SaleCardPlan[] = []): SaleCardTi
       return {
         quota,
         label: names.join(' / ') || `${formatQuota(quota)} 次卡`,
-        planText: planIds.join(' / ') || '-'
+        planText: planIds.join(' / ') || '-',
+        planIds,
+        primaryPlanId: planIds[0]
       };
     });
 }
 
 export function normalizeGameMode(value: unknown): GameMode {
   const text = String(value ?? '').trim().toLowerCase();
-  return text === 'scratch' || text === '刮刮乐' ? 'scratch' : 'slot';
+  if (text === 'scratch' || text === '刮刮乐') return 'scratch';
+  if (text === 'dragonboat' || text === 'dragon' || text === 'duanwu' || text === '端午' || text === '黄金矿工' || text === '端午捕粽') return 'dragonboat';
+  return 'slot';
 }
 
 export function gameModeLabel(game: string): string {

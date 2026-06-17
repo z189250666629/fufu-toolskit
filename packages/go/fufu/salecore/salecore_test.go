@@ -166,6 +166,51 @@ func TestNormalizeScheduleFillsConfiguredSlotsAndJobs(t *testing.T) {
 	}
 }
 
+func TestDefaultSaleCardPlanTemplatesEncodeBusinessTiers(t *testing.T) {
+	templates := DefaultSaleCardPlanTemplates()
+	special := templates["fufu-mix-special-55"]
+	if special.Quota != 55 || special.IntervalUnit != 3 || special.ItemID != 29 || special.SKUID != 66 || special.Slot != DefaultSaleCardSlotSpecial55 {
+		t.Fatalf("special plan = %#v", special)
+	}
+	if special.TokenNameSlug != "fms55" || !special.Unique {
+		t.Fatalf("special token metadata = %#v", special)
+	}
+	month := templates["fufu-mix-month-100"]
+	if month.Quota != 100 || month.IntervalUnit != 9 || month.ItemID != 28 || month.SKUID != 65 || month.Slot != DefaultSaleCardSlotMonth {
+		t.Fatalf("month plan = %#v", month)
+	}
+	if SaleCardPlanSlot(templates, " fufu-mix-month-1000 ") != DefaultSaleCardSlotMonth {
+		t.Fatalf("month plan slot lookup failed")
+	}
+	if SaleCardPlanSlot(templates, "missing") != "" {
+		t.Fatalf("missing plan should not map to a slot")
+	}
+}
+
+func TestDefaultSaleCardScheduleBuildsJobsFromCatalog(t *testing.T) {
+	templates := DefaultSaleCardPlanTemplates()
+	plans := make([]SchedulePlan, 0, len(templates))
+	for id, plan := range templates {
+		plans = append(plans, SchedulePlan{ID: id, Slot: plan.Slot})
+	}
+	schedule := DefaultSaleCardSchedule(ScheduleCatalog{
+		Slots: DefaultSaleCardSlotDefinitions(),
+		Plans: plans,
+	})
+	if schedule.Enabled || schedule.Timezone != "Asia/Shanghai" || len(schedule.Slots) != 2 {
+		t.Fatalf("default schedule = %#v", schedule)
+	}
+	if schedule.Slots[0].Group != DefaultSaleCardSlotSpecial55 || schedule.Slots[0].Time != "09:00" || len(schedule.Slots[0].Jobs) != 1 {
+		t.Fatalf("special slot = %#v", schedule.Slots[0])
+	}
+	if schedule.Slots[0].Jobs[0].Plan != "fufu-mix-special-55" || schedule.Slots[0].Jobs[0].Enabled {
+		t.Fatalf("special jobs = %#v", schedule.Slots[0].Jobs)
+	}
+	if schedule.Slots[1].Group != DefaultSaleCardSlotMonth || schedule.Slots[1].Time != "09:30" || len(schedule.Slots[1].Jobs) != 5 {
+		t.Fatalf("month slot = %#v", schedule.Slots[1])
+	}
+}
+
 func TestNormalizeScheduleRejectsInvalidJobs(t *testing.T) {
 	catalog := ScheduleCatalog{
 		Slots: []ScheduleSlotDefinition{{Group: "special55", Label: "55", Time: "09:00"}},

@@ -109,6 +109,18 @@ func TestGameRoutesCanOverrideDrawCountByTier(t *testing.T) {
 	}
 }
 
+func TestDragonBoatGameRouteUsesTierDrawCount(t *testing.T) {
+	cfg := NormalizeConfig(Config{
+		GameRoutes: []GameRoute{{Dollars: 55, Game: "端午", DrawCount: 7}},
+	})
+	if cfg.GameForTier(55) != GameDragon || cfg.DrawCountForTier(55) != 7 {
+		t.Fatalf("dragon route not normalized: routes=%#v game=%q draws=%d", cfg.GameRoutes, cfg.GameForTier(55), cfg.DrawCountForTier(55))
+	}
+	if cfg.GameConfigFor(GameDragon).Game != GameDragon {
+		t.Fatalf("dragon game config missing: %#v", cfg.GameConfigs)
+	}
+}
+
 func TestLegacyGameConfigDrawCountMigratesToCardRoutes(t *testing.T) {
 	var cfg Config
 	if err := json.Unmarshal([]byte(`{

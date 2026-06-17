@@ -35,6 +35,111 @@ test('login flow masks server errors instead of rendering raw data.error', async
   assert.doesNotMatch(loginSource, /\$\('login-error'\)\.textContent = 'NETWORK ERROR'/);
 });
 
+test('login flow routes dragon boat cards by backend game mode', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const loginStart = source.indexOf("$('btn-login').onclick = async () =>");
+  const loginEnd = source.indexOf("$('card-input').onkeydown");
+  const loginSource = source.slice(loginStart, loginEnd);
+
+  assert.match(source, /id="dragonboat-panel"/);
+  assert.match(source, /id="btn-dragon-fish"/);
+  assert.match(source, /id="btn-dragon-peel"/);
+  assert.match(loginSource, /data\.game === 'dragonboat'/);
+  assert.match(loginSource, /showDragonBoat\(data\)/);
+  assert.doesNotMatch(loginSource, /data\.dollars\s*={2,3}\s*55/);
+  assert.match(source, /\$\('dragonboat-panel'\)\.style\.display = 'none'/);
+  assert.match(source, /document\.body\.classList\.add\('dragonboat-fullscreen'\)/);
+});
+
+test('dragon boat stage renders zongzi as page-native art instead of generic emoji', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const stageSource = source.slice(
+    source.indexOf('<div class="dragonboat-stage"'),
+    source.indexOf('<div class="dragonboat-result"'),
+  );
+
+  assert.doesNotMatch(stageSource, /\u{1F359}/u);
+  assert.match(stageSource, /id="dragonboat-stage" role="button" tabindex="0"/);
+  assert.match(stageSource, /id="dragonboat-obstacles"/);
+  assert.match(stageSource, /id="dragonboat-zongzi-field"/);
+  assert.match(stageSource, /id="dragonboat-peel-screen"/);
+  assert.match(stageSource, /id="dragon-peel-count"/);
+  assert.match(source, /function renderDragonBoatScene\(scene\)/);
+  assert.match(source, /function dragonBoatSceneObjectStyle\(item,\s*index\)/);
+  assert.match(source, /<span class="zongzi-rice"><\/span><span class="zongzi-rope"><\/span>/);
+  assert.match(source, /\.dragonboat-zongzi::before/);
+  assert.match(source, /\.dragonboat-zongzi::after/);
+  assert.match(source, /\.zongzi-rope::before/);
+  assert.match(source, /\$\('dragon-result'\)\.textContent = '捞到粽子'/);
+  assert.doesNotMatch(source, /夹到粽子/);
+});
+
+test('dragon boat stage keeps boat on top and targets below', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const stageSource = source.slice(
+    source.indexOf('<div class="dragonboat-stage"'),
+    source.indexOf('<div class="dragonboat-result"'),
+  );
+
+  assert.match(source, /\.dragonboat-boat \{\s*position: absolute;\s*left: calc\(50% - 78px\);\s*top: 46px;/);
+  assert.match(source, /\.dragonboat-hook \{\s*position: absolute;\s*top: 94px;\s*left: 50%;/);
+  assert.match(source, /\.dragonboat-mine-zone \{/);
+  assert.match(source, /\.dragonboat-obstacles \{/);
+  assert.match(source, /\.dragonboat-obstacle::before/);
+  assert.match(source, /--dragon-x:\$\{x\}%/);
+  assert.match(source, /--dragon-y:\$\{y\}%/);
+  assert.match(source, /sceneSeed/);
+  assert.doesNotMatch(source, /\.dragonboat-obstacle:nth-child/);
+  assert.doesNotMatch(source, /\.dragonboat-zongzi:nth-child/);
+  assert.ok(stageSource.indexOf('dragonboat-boat') < stageSource.indexOf('dragonboat-hook'));
+  assert.ok(stageSource.indexOf('dragonboat-hook') < stageSource.indexOf('dragonboat-mine-zone'));
+  assert.ok(stageSource.indexOf('dragonboat-mine-zone') < stageSource.indexOf('dragonboat-obstacles'));
+  assert.ok(stageSource.indexOf('dragonboat-obstacles') < stageSource.indexOf('dragonboat-zongzi-field'));
+});
+
+test('dragon boat fullscreen uses screen click then switches to peel phase after fishing', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const logoutStart = source.indexOf("$('btn-logout').onclick = () =>");
+  const logoutEnd = source.indexOf("$('btn-scratch-logout').onclick");
+  const logoutSource = source.slice(logoutStart, logoutEnd);
+
+  assert.match(source, /body\.dragonboat-fullscreen #dragonboat-panel/);
+  assert.match(source, /body\.dragonboat-fullscreen \.dragonboat-stage/);
+  assert.match(source, /body\.dragonboat-fullscreen #dragonboat-panel \{[\s\S]*cursor: pointer;/);
+  assert.match(source, /body\.dragonboat-fullscreen \.dragonboat-stage \{[\s\S]*height: 100%;[\s\S]*min-height: 0;/);
+  assert.match(source, /body\.dragonboat-fullscreen \.dragonboat-hook \{[\s\S]*height: 86px;[\s\S]*--dragon-hook-idle: 86px;/);
+  assert.doesNotMatch(source, /--dragon-hook-idle: 42%/);
+  assert.match(source, /body\.dragonboat-fullscreen \.dragonboat-actions,[\s\S]*display: none;/);
+  assert.match(logoutSource, /document\.body\.classList\.remove\('dragonboat-fullscreen'\)/);
+  assert.match(source, /function updateDragonBoatPhase\(\)/);
+  assert.match(source, /phase = 'fish'/);
+  assert.match(source, /phase = 'peel'/);
+  assert.match(source, /\$\('btn-dragon-peel'\)\.disabled = dragonBusy \|\| remaining > 0 \|\| ready <= 0/);
+  assert.match(source, /function handleDragonBoatScreenAction\(target\)/);
+  assert.match(source, /function dragonBoatCastTargetFromEvent\(e\)/);
+  assert.match(source, /function prepareDragonBoatCast\(target\)/);
+  assert.match(source, /function prepareDragonBoatReelTarget\(el\)/);
+  assert.match(source, /function animateDragonBoatPayload\(el\)/);
+  assert.match(source, /const angle = Math\.max\(-42, Math\.min\(42, -Math\.atan2\(dx, Math\.max\(1, dy\)\) \* 180 \/ Math\.PI\)\)/);
+  assert.match(source, /\.dragonboat-reel-source \{[\s\S]*opacity: 0 !important;[\s\S]*animation: none !important;/);
+  assert.match(source, /\.dragonboat-reel-payload \{[\s\S]*animation: dragon-payload-reel/);
+  assert.match(source, /clone\.classList\.add\('dragonboat-reel-payload'\)/);
+  assert.match(source, /el\.classList\.add\('dragonboat-reel-source'\)/);
+  assert.match(source, /zongzi\?\.classList\.add\('dragonboat-reel-source'\);\s*return;/);
+  assert.match(source, /obstacle\?\.classList\.add\('dragonboat-reel-source'\);/);
+  assert.match(source, /document\.querySelectorAll\('\.dragonboat-reel-payload'\)\.forEach\(el => el\.remove\(\)\)/);
+  assert.match(source, /setTimeout\(resolve,\s*980\)/);
+  assert.match(source, /if \(remaining > 0\) \{\s*fishDragonBoat\(target \|\| defaultDragonBoatTarget\(\)\);/);
+  assert.match(source, /if \(ready > 0\) \{\s*peelDragonBoat\(\);/);
+  assert.match(source, /function isDragonBoatControlClick\(target\)/);
+  assert.match(source, /\$\('dragonboat-panel'\)\.onclick = \(e\) => \{/);
+  assert.match(source, /if \(isDragonBoatControlClick\(e\.target\)\) return;/);
+  assert.match(source, /handleDragonBoatScreenAction\(dragonBoatCastTargetFromEvent\(e\)\)/);
+  assert.match(source, /data\.cast\?\.blockedBy/);
+  assert.match(source, /\$\('dragon-result'\)\.textContent = '勾到障碍物'/);
+  assert.match(source, /\$\('dragonboat-stage'\)\.onkeydown = \(e\) =>/);
+});
+
 test('prize drawer reports load failures instead of silently swallowing them', async () => {
   const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const fetchPrizesStart = source.indexOf('async function fetchPrizes()');
@@ -112,5 +217,33 @@ test('scratch API calls do not expose server 5xx error fields', async () => {
     assert.doesNotMatch(slice, /await res\.json\(\)/);
     assert.doesNotMatch(slice, /\$\('scratch-progress'\)\.textContent = data\.error \|\|/);
     assert.doesNotMatch(slice, /\$\('scratch-progress'\)\.textContent = '网络错误'/);
+  }
+});
+
+test('dragon boat API calls use safe parsing and keep card progress in dragon state', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const dragonStart = source.indexOf('async function startDragonBoatGame()');
+  const dragonSource = source.slice(
+    dragonStart,
+    source.indexOf('/* ============================================================\n       Scratch Card', dragonStart),
+  );
+  const slices = [
+    dragonSource.slice(dragonSource.indexOf('async function startDragonBoatGame()'), dragonSource.indexOf('function readDragonBoatApi')),
+    dragonSource.slice(dragonSource.indexOf('async function fishDragonBoat'), dragonSource.indexOf('async function peelDragonBoat')),
+    dragonSource.slice(dragonSource.indexOf('async function peelDragonBoat'), dragonSource.indexOf('async function refreshDragonBoatCard')),
+    dragonSource.slice(dragonSource.indexOf('async function refreshDragonBoatCard')),
+  ];
+
+  assert.match(source, /function readDragonBoatApi\(res,\s*serverErrorMessage,\s*clientErrorMessage\)/);
+  assert.match(dragonSource, /\/dragonboat\/start/);
+  assert.match(dragonSource, /\/dragonboat\/fish/);
+  assert.match(dragonSource, /\/dragonboat\/peel/);
+  assert.match(dragonSource, /remainingFish/);
+  assert.match(dragonSource, /zongziReady/);
+  assert.match(dragonSource, /renderDragonBoatState\(data,\s*true\)/);
+  for (const slice of slices) {
+    assert.doesNotMatch(slice, /await res\.json\(\)/);
+    assert.doesNotMatch(slice, /data\.error \|\|/);
+    assert.doesNotMatch(slice, /网络错误/);
   }
 });

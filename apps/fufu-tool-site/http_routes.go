@@ -198,6 +198,7 @@ func isActivityAPI(path string) bool {
 		path == "/api/spin",
 		path == "/api/prizes",
 		strings.HasPrefix(path, "/api/scratch/"),
+		strings.HasPrefix(path, "/api/dragonboat/"),
 		strings.HasPrefix(path, "/api/admin/"):
 		return true
 	default:

@@ -14,6 +14,7 @@ func respondCard(w http.ResponseWriter, card Card) {
 	}
 	cfg := SnapshotRuntimeConfig()
 	isScratch := cfg.IsScratchTier(card.Dollars)
+	game := cfg.GameForTier(card.Dollars)
 	var sg any
 	if isScratch {
 		g, ok, err := lookupScratch(card.CardKey)
@@ -29,11 +30,23 @@ func respondCard(w http.ResponseWriter, card Card) {
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, buildLoginCardResponse(card, hist, sg, cfg))
+	var dg any
+	if game == activity.GameDragon {
+		g, ok, err := lookupDragonBoat(card.CardKey)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "服务器错误")
+			return
+		}
+		if ok {
+			dg = dragonBoatAppResponse(g, card)
+		}
+	}
+	writeJSON(w, http.StatusOK, buildLoginCardResponse(card, hist, sg, dg, cfg))
 }
 
-func buildLoginCardResponse(card Card, history []map[string]any, scratchGame any, cfg activity.Config) map[string]any {
+func buildLoginCardResponse(card Card, history []map[string]any, scratchGame any, dragonBoatGame any, cfg activity.Config) map[string]any {
 	cfg = activity.CloneConfig(cfg)
+	game := cfg.GameForTier(card.Dollars)
 	return map[string]any{
 		"cardKey":        card.CardKey,
 		"cardName":       card.CardName,
@@ -45,6 +58,8 @@ func buildLoginCardResponse(card Card, history []map[string]any, scratchGame any
 		"wonJackpot":     card.WonJackpot != 0,
 		"history":        history,
 		"isScratch":      cfg.IsScratchTier(card.Dollars),
+		"game":           game,
 		"scratchGame":    scratchGame,
+		"dragonBoatGame": dragonBoatGame,
 	}
 }

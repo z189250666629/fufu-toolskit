@@ -150,6 +150,45 @@ func TestLiveToolSiteSaleCardRunContract(t *testing.T) {
 	}
 }
 
+func TestLiveToolSiteSaleCardTestKeyContract(t *testing.T) {
+	if os.Getenv("FUFU_LIVE_SALE_CARD_TEST_KEY") != "1" {
+		t.Skip("set FUFU_LIVE_SALE_CARD_TEST_KEY=1 to run the live sale-card test-key contract")
+	}
+	initLiveToolSiteRuntime(t)
+	cookie := liveAdminCookie(t)
+
+	plan := liveStringEnv("FUFU_LIVE_SALE_CARD_TEST_PLAN", "fufu-mix-special-55")
+	count := liveIntEnv("FUFU_LIVE_SALE_CARD_TEST_COUNT", 1)
+	generatedKeys := []string{}
+	defer func() {
+		liveDeleteKeysBySearch(t, cookie, generatedKeys)
+	}()
+
+	req := jsonRequest(t, http.MethodPost, "/api/admin/sale-cards/test-key", map[string]any{
+		"plan":  plan,
+		"count": count,
+	})
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	route(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("live sale-card test-key status=%d error=%q", rec.Code, liveErrorFromRecorder(rec))
+	}
+	var body struct {
+		Generated int      `json:"generated"`
+		Game      string   `json:"game"`
+		DrawCount int      `json:"drawCount"`
+		Keys      []string `json:"keys"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode live sale-card test-key response: %v", err)
+	}
+	generatedKeys = body.Keys
+	if body.Generated != count || len(body.Keys) != count || strings.TrimSpace(body.Game) == "" || body.DrawCount <= 0 {
+		t.Fatalf("live test-key response generated=%d keys=%d game=%q drawCount=%d want count=%d", body.Generated, len(body.Keys), body.Game, body.DrawCount, count)
+	}
+}
+
 type liveMergeStatus struct {
 	Status string `json:"status"`
 	Error  string `json:"error"`

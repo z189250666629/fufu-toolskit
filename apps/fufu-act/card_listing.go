@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"fufu/activity"
 	"fufu/salecore"
 	"fufu/tokens"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,21 +19,7 @@ var (
 
 var saleCardNow = time.Now
 
-type SaleCardPlan struct {
-	ID            string  `json:"id,omitempty"`
-	Name          string  `json:"name,omitempty"`
-	Count         int     `json:"count"`
-	TargetStock   int     `json:"targetStock,omitempty"`
-	Quota         float64 `json:"quota"`
-	Group         string  `json:"group,omitempty"`
-	Slot          string  `json:"slot,omitempty"`
-	IntervalUnit  int     `json:"intervalUnit"`
-	ItemID        int     `json:"itemId"`
-	SKUID         int     `json:"skuId"`
-	Remark        string  `json:"remark,omitempty"`
-	Unique        bool    `json:"unique"`
-	TokenNameSlug string  `json:"tokenNameSlug,omitempty"`
-}
+type SaleCardPlan = salecore.SaleCardPlan
 
 type SaleCardListingResult struct {
 	PlanID       string   `json:"planId,omitempty"`
@@ -44,6 +32,16 @@ type SaleCardListingResult struct {
 	TargetStock  int      `json:"targetStock"`
 	ToUpload     int      `json:"toUpload"`
 	Keys         []string `json:"keys"`
+}
+
+type SaleCardTestKeyResult struct {
+	PlanID    string   `json:"planId,omitempty"`
+	PlanName  string   `json:"planName,omitempty"`
+	Quota     float64  `json:"quota"`
+	Game      string   `json:"game"`
+	DrawCount int      `json:"drawCount"`
+	Generated int      `json:"generated"`
+	Keys      []string `json:"keys"`
 }
 
 func generateAndUploadSaleCards(ctx context.Context, svc *tokens.Service, plan SaleCardPlan) (SaleCardListingResult, error) {
@@ -90,6 +88,36 @@ func generateAndUploadSaleCards(ctx context.Context, svc *tokens.Service, plan S
 		return result, err
 	}
 	result.Uploaded = len(keys)
+	return result, nil
+}
+
+func generateSaleCardTestKeys(ctx context.Context, svc *tokens.Service, plan SaleCardPlan, count int, cfg activity.Config) (SaleCardTestKeyResult, error) {
+	plan = normalizeSaleCardPlan(plan)
+	if count <= 0 {
+		count = 1
+	}
+	plan.Count = count
+	plan.TargetStock = 0
+	result := SaleCardTestKeyResult{
+		PlanID:    plan.ID,
+		PlanName:  plan.Name,
+		Quota:     plan.Quota,
+		Game:      cfg.GameForTier(plan.Quota),
+		DrawCount: cfg.DrawCountForTier(plan.Quota),
+		Keys:      []string{},
+	}
+	if err := salecore.ValidatePlan(saleCardTokenPlan(plan)); err != nil {
+		return result, err
+	}
+	if svc == nil {
+		return result, fmt.Errorf("%w: token service is not configured", ErrSaleCardGenerationFailed)
+	}
+	keys, err := createSaleCardTestTokenKeys(ctx, svc, plan, count)
+	if err != nil {
+		return result, err
+	}
+	result.Keys = keys
+	result.Generated = len(keys)
 	return result, nil
 }
 
@@ -172,6 +200,56 @@ func createSaleCardTokenKeys(ctx context.Context, svc *tokens.Service, plan Sale
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func createSaleCardTestTokenKeys(ctx context.Context, svc *tokens.Service, plan SaleCardPlan, count int) ([]string, error) {
+	stamp := strconv.FormatInt(saleCardNow().UTC().Unix(), 36)
+	keys := make([]string, 0, count)
+	quota := svc.DollarsToQuota(plan.Quota)
+	for i := 0; i < count; i++ {
+		name, err := saleCardTestTokenName(plan.Quota, stamp, i, count)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrSaleCardInvalidPlan, err)
+		}
+		createBody := buildSaleTokenCreateBody(name, quota, plan.Group, plan.IntervalUnit)
+		created, err := svc.CreateTokenAndResolveKey(ctx, createBody, name)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrSaleCardGenerationFailed, err)
+		}
+		key := strings.TrimSpace(created.Key)
+		if key == "" {
+			return nil, fmt.Errorf("%w: NewAPI 返回空卡密", ErrSaleCardGenerationFailed)
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
+}
+
+func saleCardTestTokenName(quota float64, stamp string, index, total int) (string, error) {
+	dollars := strconv.FormatFloat(quota, 'f', -1, 64)
+	base := strings.TrimSpace(dollars) + "-act-test"
+	if base == "-act-test" {
+		return "", errors.New("测试卡额度无效")
+	}
+	suffix := strings.TrimSpace(stamp)
+	if suffix == "" {
+		suffix = strconv.FormatInt(time.Now().UTC().Unix(), 36)
+	}
+	if total > 1 {
+		if index < 0 {
+			index = 0
+		}
+		width := len(strconv.Itoa(total))
+		if width < 2 {
+			width = 2
+		}
+		suffix += "-" + fmt.Sprintf("%0*d", width, index+1)
+	}
+	name := base + "-" + suffix
+	if len([]rune(name)) > salecore.MaxSaleTokenNameRunes {
+		return "", errors.New("测试卡名称过长")
+	}
+	return name, nil
 }
 
 func saleCardTokenPlan(plan SaleCardPlan) salecore.SaleCardPlan {

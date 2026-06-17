@@ -227,4 +227,15 @@ func TestToolSiteMergedAPIRoutes(t *testing.T) {
 	if adminW.Code != http.StatusUnauthorized {
 		t.Fatalf("admin stats without token code=%d body=%s", adminW.Code, adminW.Body.String())
 	}
+
+	dragonReq := httptest.NewRequest(http.MethodPost, "/api/dragonboat/start", strings.NewReader(`{}`))
+	dragonReq.Header.Set("Content-Type", "application/json")
+	dragonW := httptest.NewRecorder()
+	route(dragonW, dragonReq)
+	if dragonW.Code != http.StatusBadRequest || !strings.Contains(dragonW.Body.String(), "请输入卡密") {
+		t.Fatalf("dragonboat API should be forwarded to activity app, code=%d body=%s", dragonW.Code, dragonW.Body.String())
+	}
+	if strings.Contains(dragonW.Body.String(), "API not found") {
+		t.Fatalf("dragonboat API must not be handled by tool-site fallback: %s", dragonW.Body.String())
+	}
 }

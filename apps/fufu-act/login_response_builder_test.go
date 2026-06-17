@@ -23,7 +23,7 @@ func TestBuildLoginCardResponseCalculatesCardPayload(t *testing.T) {
 		WonJackpot:   1,
 		TotalWon:     20,
 		PurchaseTime: sql.NullString{String: "2026-05-02 12:00:00", Valid: true},
-	}, history, scratchGame, cfg)
+	}, history, scratchGame, nil, cfg)
 
 	if payload["cardKey"] != "sk-response-card" || payload["cardName"] != "response-card" {
 		t.Fatalf("identity payload = %#v", payload)

@@ -31,7 +31,7 @@ func isSpinDollarTier(dollars float64) bool {
 	return cfg.GameForTier(dollars) == activity.GameSlot && cfg.DrawCountForTier(dollars) > 0
 }
 
-func secureRandomInt(max int) int {
+var secureRandomInt = func(max int) int {
 	var b [4]byte
 	_, _ = rand.Read(b[:])
 	return int(binary.BigEndian.Uint32(b[:]) % uint32(max))

@@ -38,3 +38,20 @@ func requireScratchEligibleCard(ctx context.Context, key string) (Card, error) {
 	}
 	return card, nil
 }
+
+func requireDragonBoatEligibleCard(ctx context.Context, key string) (Card, error) {
+	card, ok, err := lookupCard(key)
+	if err != nil {
+		return Card{}, err
+	}
+	if !ok {
+		return Card{}, httpErr{http.StatusNotFound, "请先登录"}
+	}
+	if err := requireCurrentTokenActive(ctx, key); err != nil {
+		return Card{}, err
+	}
+	if !isDragonBoatDollarTier(card.Dollars) {
+		return Card{}, httpErr{http.StatusForbidden, "此卡密不参与端午捕粽活动"}
+	}
+	return card, nil
+}

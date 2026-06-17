@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Input } from '@heroui/react';
 import { messageFromError } from '../api';
 import { MessageLine } from '../blueprint';
 import { Metric, type MessageState } from './adminShared';
 import { SALE_SLOTS, buildSaleCardSchedule, buildSlotState, validateTargetStock, type SlotState } from './saleCardConfigCore';
 import type { SaleCardConfig, SaleCardRunResult, SaleCardStockResponse } from './types';
+
+const STOCK_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export function SaleCardManager({
   config,
@@ -28,6 +30,7 @@ export function SaleCardManager({
   const [stock, setStock] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [stockError, setStockError] = useState('');
+  const refreshingRef = useRef(false);
 
   useEffect(() => {
     setEnabled(Boolean(config?.schedule?.enabled));
@@ -36,7 +39,9 @@ export function SaleCardManager({
     setRunPlan((config?.plans ?? [])[0]?.id ?? '');
   }, [config]);
 
-  async function refreshStock() {
+  const refreshStock = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
     setRefreshing(true);
     setStockError('');
     try {
@@ -51,9 +56,22 @@ export function SaleCardManager({
     } catch (error) {
       setStockError(error instanceof Error ? error.message : '查询库存失败');
     } finally {
+      refreshingRef.current = false;
       setRefreshing(false);
     }
-  }
+  }, []);
+
+  const planIds = plans.map((plan) => plan.id).join('|');
+
+  useEffect(() => {
+    if (!planIds) return;
+    void refreshStock();
+    const timer = window.setInterval(() => {
+      void refreshStock();
+    }, STOCK_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [planIds, refreshStock]);
+
   const stockText = (planId: string) => (planId in stock ? String(stock[planId]) : '—');
 
   function patchSlot(group: string, patch: Partial<Omit<SlotState, 'jobs'>>) {
@@ -111,7 +129,7 @@ export function SaleCardManager({
       <div className="action-row">
         <label className="field--inline"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /> 启用自动补卡</label>
         <label className="field--inline field--inline-tz">时区<Input className="mini-input blueprint-input" value={timezone} onChange={(event) => setTimezone(event.target.value)} aria-label="时区" /></label>
-        <Button className="blueprint-button" onPress={refreshStock} isDisabled={refreshing}>{refreshing ? '刷新中…' : '刷新当前库存'}</Button>
+        <Button className="blueprint-button" onPress={() => { void refreshStock(); }} isDisabled={refreshing}>{refreshing ? '刷新中…' : '刷新当前库存'}</Button>
         <Button className="blueprint-primary-button" onPress={saveSchedule}>保存补卡计划</Button>
       </div>
       <p className="inline-help">月次卡与 55 次混合特惠卡各占一个独立时段；到点按目标库存补齐（补 目标-当前）。点“刷新当前库存”查询 MCY 商城实时可用卡量。</p>

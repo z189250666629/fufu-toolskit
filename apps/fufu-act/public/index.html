@@ -1009,8 +1009,535 @@
     body.scratch-shake { animation: pixel-shake 0.5s steps(8) 1; }
 
     /* ============================================================
+       Dragon Boat Zongzi Catch Panel
+       ============================================================ */
+    #dragonboat-panel { display: none; }
+
+    .dragonboat-stage {
+      margin: 16px 4px 20px;
+      padding: 14px;
+      background: #14304a;
+      position: relative;
+      min-height: 340px;
+      overflow: hidden;
+      box-shadow:
+        inset 4px 4px 0 0 #3d7db2,
+        inset -4px -4px 0 0 #071728,
+        0 0 0 4px var(--c-black),
+        0 0 0 8px var(--c-cyan),
+        0 0 0 12px var(--c-black);
+    }
+    .dragonboat-stage::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 74%;
+      background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 4px, transparent 4px 12px),
+        linear-gradient(180deg, #1a6e8e 0%, #0f436d 100%);
+      animation: river-flow 1.4s steps(4) infinite;
+    }
+    .dragonboat-stage::after {
+      content: '';
+      position: absolute;
+      left: -20%; right: -20%; bottom: 28px;
+      height: 20px;
+      background: repeating-linear-gradient(90deg, var(--c-cyan) 0 18px, transparent 18px 34px);
+      opacity: 0.35;
+      animation: river-current 1.2s linear infinite;
+    }
+    @keyframes river-flow {
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 0 12px, 0 0; }
+    }
+    @keyframes river-current {
+      from { transform: translateX(0); }
+      to { transform: translateX(34px); }
+    }
+
+    .dragonboat-skyline {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      font-family: var(--cn-font);
+      color: var(--c-yellow);
+      font-size: 12px;
+      letter-spacing: 2px;
+    }
+    .dragonboat-boat {
+      position: absolute;
+      left: calc(50% - 78px);
+      top: 46px;
+      z-index: 2;
+      width: 156px;
+      height: 48px;
+      background: var(--c-red);
+      box-shadow:
+        inset 4px 4px 0 0 #ff667e,
+        inset -4px -4px 0 0 #8a0020,
+        0 0 0 4px var(--c-black);
+      animation: boat-bob 1.1s steps(4) infinite;
+    }
+    .dragonboat-boat::before {
+      content: '';
+      position: absolute;
+      left: -20px;
+      top: 12px;
+      width: 32px;
+      height: 24px;
+      background: var(--c-yellow);
+      box-shadow:
+        inset 4px 4px 0 0 #fff8c8,
+        inset -4px -4px 0 0 #b89a00,
+        0 0 0 4px var(--c-black);
+    }
+    .dragonboat-boat::after {
+      content: '';
+      position: absolute;
+      right: -18px;
+      top: 18px;
+      border-left: 18px solid var(--c-red);
+      border-top: 12px solid transparent;
+      border-bottom: 12px solid transparent;
+      filter: drop-shadow(4px 0 0 var(--c-black));
+    }
+    @keyframes boat-bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px); }
+    }
+
+    .dragonboat-hook {
+      position: absolute;
+      top: 94px;
+      left: 50%;
+      z-index: 4;
+      width: 8px;
+      height: 72px;
+      background: var(--c-chrome);
+      transform-origin: top center;
+      box-shadow: inset 3px 0 0 var(--c-chrome-hi), 0 0 0 2px var(--c-black);
+      animation: hook-swing 1.5s steps(6) infinite;
+      --dragon-hook-idle: 72px;
+    }
+    .dragonboat-hook::after {
+      content: 'J';
+      position: absolute;
+      bottom: -32px;
+      left: -8px;
+      font-family: var(--pixel-font);
+      font-size: 34px;
+      color: var(--c-chrome-hi);
+      text-shadow: 2px 2px 0 var(--c-black);
+    }
+    .dragonboat-stage.casting .dragonboat-hook {
+      animation: hook-cast 0.96s steps(8) 1;
+    }
+    @keyframes hook-swing {
+      0%, 100% { transform: rotate(-12deg); }
+      50% { transform: rotate(12deg); }
+    }
+    @keyframes hook-cast {
+      0% { height: var(--dragon-hook-idle, 72px); transform: rotate(var(--dragon-hook-angle, -10deg)); }
+      54% { height: var(--dragon-hook-length, 220px); transform: rotate(var(--dragon-hook-angle, 4deg)); }
+      100% { height: var(--dragon-hook-idle, 72px); transform: rotate(var(--dragon-hook-angle, 10deg)); }
+    }
+
+    .dragonboat-mine-zone {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      height: 210px;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.08) 0 2px, transparent 2px 100%),
+        repeating-linear-gradient(90deg, rgba(0,212,212,0.20) 0 18px, transparent 18px 42px);
+      box-shadow:
+        inset 0 4px 0 rgba(0,212,212,0.32),
+        inset 0 -4px 0 rgba(0,0,0,0.22);
+    }
+
+    .dragonboat-obstacles {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+    .dragonboat-obstacle {
+      position: absolute;
+      left: var(--dragon-x, 50%);
+      top: var(--dragon-y, 60%);
+      width: 44px;
+      height: 36px;
+      background:
+        linear-gradient(180deg, #7b6248 0 24%, #4e3b2a 24% 100%);
+      box-shadow:
+        inset 4px 4px 0 0 #b58b59,
+        inset -4px -4px 0 0 #24180f,
+        0 0 0 4px var(--c-black);
+      animation: obstacle-bob 1.6s steps(4) infinite;
+      animation-delay: var(--dragon-delay, 0s);
+    }
+    .dragonboat-obstacle::before {
+      content: '';
+      position: absolute;
+      left: 14px;
+      top: -34px;
+      width: 8px;
+      height: 44px;
+      background: #1d6f35;
+      box-shadow:
+        10px 8px 0 #3fa64a,
+        18px -2px 0 #1d6f35,
+        0 0 0 3px var(--c-black);
+    }
+    .dragonboat-obstacle::after {
+      content: '';
+      position: absolute;
+      right: -18px;
+      bottom: 8px;
+      width: 28px;
+      height: 10px;
+      background: var(--c-cyan);
+      box-shadow: 0 0 0 3px var(--c-black);
+    }
+    .dragonboat-obstacle.blocked {
+      filter: drop-shadow(0 0 10px var(--c-yellow));
+      animation: dragon-object-reel 0.92s steps(7) 1;
+    }
+    .dragonboat-reel-source {
+      opacity: 0 !important;
+      animation: none !important;
+    }
+    .dragonboat-reel-payload {
+      position: absolute !important;
+      left: var(--dragon-payload-x, 50%) !important;
+      top: var(--dragon-payload-y, 50%) !important;
+      z-index: 7 !important;
+      pointer-events: none;
+      animation: dragon-payload-reel 0.96s steps(8) 1 forwards !important;
+      animation-delay: 0s !important;
+      filter: drop-shadow(0 0 12px var(--c-yellow)) drop-shadow(4px 4px 0 var(--c-black));
+    }
+    @keyframes obstacle-bob {
+      0%, 100% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1)); }
+      50% { transform: translate(-50%, calc(-50% + 6px)) scale(var(--dragon-scale, 1)); }
+    }
+
+    .dragonboat-zongzi {
+      position: absolute;
+      z-index: 2;
+      left: var(--dragon-x, 50%);
+      top: var(--dragon-y, 70%);
+      width: 64px;
+      height: 58px;
+      filter: drop-shadow(3px 3px 0 var(--c-black));
+      animation: dragon-zongzi-float 1.3s steps(4) infinite;
+      animation-delay: var(--dragon-delay, 0s);
+    }
+    .dragonboat-zongzi::before,
+    .dragonboat-zongzi::after {
+      content: '';
+      position: absolute;
+      clip-path: polygon(50% 0, 100% 54%, 52% 100%, 0 54%);
+    }
+    .dragonboat-zongzi::before {
+      inset: 4px 8px 4px 8px;
+      background: var(--c-black);
+    }
+    .dragonboat-zongzi::after {
+      inset: 8px 12px 8px 12px;
+      background:
+        linear-gradient(135deg, #8fe36c 0 32%, #3fa64a 32% 50%, #1d6f35 50% 100%);
+      box-shadow:
+        inset 5px 4px 0 0 rgba(255,255,255,0.22),
+        inset -5px -5px 0 0 rgba(0,0,0,0.28);
+    }
+    .zongzi-rice {
+      position: absolute;
+      z-index: 1;
+      left: 24px;
+      top: 20px;
+      width: 18px;
+      height: 18px;
+      background: #f7df86;
+      clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+      box-shadow: 0 0 0 3px #5b3818;
+    }
+    .zongzi-rope {
+      position: absolute;
+      z-index: 2;
+      left: 8px;
+      top: 29px;
+      width: 48px;
+      height: 4px;
+      background: #fff2b8;
+      transform: rotate(-28deg);
+      box-shadow: 0 8px 0 #d9aa36;
+    }
+    .zongzi-rope::before {
+      content: '';
+      position: absolute;
+      left: 22px;
+      top: -22px;
+      width: 4px;
+      height: 48px;
+      background: #fff2b8;
+      box-shadow: 8px 0 0 #d9aa36;
+      transform: rotate(54deg);
+    }
+    .dragonboat-zongzi.caught {
+      filter: drop-shadow(0 0 12px var(--c-yellow)) drop-shadow(3px 3px 0 var(--c-black));
+      animation: dragon-object-reel 0.92s steps(7) 1;
+    }
+    @keyframes dragon-zongzi-float {
+      0%, 100% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1)); }
+      50% { transform: translate(-50%, calc(-50% - 8px)) scale(var(--dragon-scale, 1)); }
+    }
+    @keyframes dragon-object-reel {
+      0% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1)); opacity: 1; }
+      54% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1.08)); opacity: 1; }
+      100% { transform: translate(calc(-50% + var(--dragon-reel-x, 0px)), calc(-50% + var(--dragon-reel-y, -260px))) scale(0.72); opacity: 0; }
+    }
+    @keyframes dragon-payload-reel {
+      0% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1)); opacity: 1; }
+      58% { transform: translate(calc(-50% + var(--dragon-reel-x, 0px)), calc(-50% + var(--dragon-reel-y, -220px))) scale(0.84); opacity: 1; }
+      100% { transform: translate(calc(-50% + var(--dragon-reel-x, 0px)), calc(-50% + var(--dragon-reel-y, -220px))) scale(0.58); opacity: 0; }
+    }
+    @keyframes zongzi-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .dragonboat-result {
+      margin: 12px 4px 0;
+      padding: 12px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-family: var(--cn-font);
+      font-size: 13px;
+      letter-spacing: 2px;
+      color: var(--c-cyan);
+      background: var(--c-bg-2);
+      box-shadow:
+        inset 4px 4px 0 0 var(--c-purple),
+        inset -4px -4px 0 0 var(--c-frame-lo),
+        0 0 0 4px var(--c-black);
+    }
+    .dragonboat-result.win {
+      font-family: var(--pixel-font);
+      color: var(--c-ink);
+      background: var(--c-yellow);
+      animation: jackpot-flash 0.3s steps(2) infinite;
+    }
+    .dragonboat-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 4px;
+    }
+    .dragonboat-actions .px-btn {
+      margin: 0;
+      letter-spacing: 2px;
+    }
+
+    .dragonboat-peel-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 18px;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(244,216,55,0.16), transparent 36%),
+        linear-gradient(180deg, rgba(20,48,74,0.66), rgba(15,67,109,0.86));
+    }
+    .dragonboat-big-zongzi {
+      position: relative;
+      width: 176px;
+      height: 152px;
+      filter: drop-shadow(8px 8px 0 var(--c-black));
+      animation: zongzi-float 1.1s steps(4) infinite;
+    }
+    .dragonboat-big-zongzi::before,
+    .dragonboat-big-zongzi::after {
+      content: '';
+      position: absolute;
+      clip-path: polygon(50% 0, 100% 54%, 52% 100%, 0 54%);
+    }
+    .dragonboat-big-zongzi::before {
+      inset: 0 16px;
+      background: var(--c-black);
+    }
+    .dragonboat-big-zongzi::after {
+      inset: 12px 28px;
+      background:
+        linear-gradient(135deg, #9cf071 0 32%, #3fa64a 32% 50%, #165c2d 50% 100%);
+      box-shadow:
+        inset 12px 10px 0 0 rgba(255,255,255,0.24),
+        inset -12px -12px 0 0 rgba(0,0,0,0.30);
+    }
+    .dragonboat-big-zongzi i {
+      position: absolute;
+      z-index: 2;
+      left: 26px;
+      top: 72px;
+      width: 126px;
+      height: 8px;
+      background: #fff2b8;
+      transform: rotate(-26deg);
+      box-shadow: 0 20px 0 #d9aa36;
+    }
+    .dragonboat-big-zongzi i::before {
+      content: '';
+      position: absolute;
+      left: 58px;
+      top: -62px;
+      width: 8px;
+      height: 132px;
+      background: #fff2b8;
+      transform: rotate(52deg);
+      box-shadow: 20px 0 0 #d9aa36;
+    }
+    .dragonboat-peel-count {
+      font-family: var(--pixel-font);
+      font-size: 18px;
+      color: var(--c-yellow);
+      text-shadow: 3px 3px 0 var(--c-black);
+    }
+    #dragonboat-panel.dragonboat-phase-peel .dragonboat-peel-screen,
+    #dragonboat-panel.dragonboat-phase-done .dragonboat-peel-screen {
+      display: flex;
+    }
+    #dragonboat-panel.dragonboat-phase-peel .dragonboat-boat,
+    #dragonboat-panel.dragonboat-phase-peel .dragonboat-hook,
+    #dragonboat-panel.dragonboat-phase-peel .dragonboat-mine-zone,
+    #dragonboat-panel.dragonboat-phase-peel .dragonboat-obstacles,
+    #dragonboat-panel.dragonboat-phase-peel .dragonboat-zongzi-field,
+    #dragonboat-panel.dragonboat-phase-done .dragonboat-boat,
+    #dragonboat-panel.dragonboat-phase-done .dragonboat-hook,
+    #dragonboat-panel.dragonboat-phase-done .dragonboat-mine-zone,
+    #dragonboat-panel.dragonboat-phase-done .dragonboat-obstacles,
+    #dragonboat-panel.dragonboat-phase-done .dragonboat-zongzi-field {
+      display: none;
+    }
+
+    body.dragonboat-fullscreen {
+      overflow: hidden;
+    }
+    body.dragonboat-fullscreen .container {
+      max-width: none;
+      width: 100vw;
+      height: 100svh;
+      min-height: 100svh;
+      padding: 0;
+      margin: 0;
+    }
+    body.dragonboat-fullscreen .page-title,
+    body.dragonboat-fullscreen .page-sub {
+      display: none;
+    }
+    body.dragonboat-fullscreen #dragonboat-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: grid !important;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 12px;
+      padding: calc(env(safe-area-inset-top) + 14px) 14px calc(env(safe-area-inset-bottom) + 14px);
+      cursor: pointer;
+      touch-action: manipulation;
+      background:
+        radial-gradient(circle at 50% 12%, rgba(0,212,212,0.20), transparent 34%),
+        linear-gradient(180deg, #0f1c3d 0%, #112a4f 44%, #0a1d34 100%);
+    }
+    body.dragonboat-fullscreen .dragonboat-hud {
+      width: min(760px, 100%);
+      margin: 0 auto;
+      z-index: 8;
+    }
+    body.dragonboat-fullscreen .dragonboat-stage {
+      width: min(960px, 100%);
+      height: 100%;
+      min-height: 0;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    body.dragonboat-fullscreen .dragonboat-stage::before {
+      height: 78%;
+    }
+    body.dragonboat-fullscreen .dragonboat-stage::after {
+      bottom: 46px;
+    }
+    body.dragonboat-fullscreen .dragonboat-boat {
+      left: calc(50% - 78px);
+      top: 54px;
+    }
+    body.dragonboat-fullscreen .dragonboat-hook {
+      top: 102px;
+      left: 50%;
+      height: 86px;
+      --dragon-hook-idle: 86px;
+    }
+    body.dragonboat-fullscreen .dragonboat-stage.casting .dragonboat-hook {
+      animation: hook-cast-full 0.96s steps(8) 1;
+    }
+    @keyframes hook-cast-full {
+      0% { height: var(--dragon-hook-idle, 86px); transform: rotate(var(--dragon-hook-angle, -12deg)); }
+      54% { height: var(--dragon-hook-length, 76%); transform: rotate(var(--dragon-hook-angle, 4deg)); }
+      100% { height: var(--dragon-hook-idle, 86px); transform: rotate(var(--dragon-hook-angle, 10deg)); }
+    }
+    body.dragonboat-fullscreen .dragonboat-mine-zone {
+      left: 24px;
+      right: 24px;
+      bottom: 24px;
+      height: calc(100% - 162px);
+    }
+    body.dragonboat-fullscreen .dragonboat-result {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom) + 18px);
+      z-index: 90;
+      width: min(560px, calc(100vw - 32px));
+      margin: 0;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    body.dragonboat-fullscreen .dragonboat-progress,
+    body.dragonboat-fullscreen .dragonboat-actions,
+    body.dragonboat-fullscreen #dragonboat-panel .history {
+      display: none;
+    }
+    body.dragonboat-fullscreen #dragonboat-panel > .logout {
+      position: fixed;
+      top: calc(env(safe-area-inset-top) + 18px);
+      right: 18px;
+      z-index: 92;
+      margin: 0;
+      font-size: 9px;
+      opacity: 0.72;
+    }
+
+    /* ============================================================
        Responsive
        ============================================================ */
+    @media (max-height: 700px) {
+      body.dragonboat-fullscreen .dragonboat-stage {
+        min-height: 0;
+      }
+      body.dragonboat-fullscreen .dragonboat-hud .label {
+        display: none;
+      }
+    }
     @media (max-width: 480px) {
       .container { padding: 16px 8px 28px; }
       .page-title { font-size: 18px; letter-spacing: 3px; }
@@ -1196,6 +1723,72 @@
 
       <div class="logout">
         <a id="btn-scratch-logout">CHANGE KEY</a>
+      </div>
+    </div>
+
+    <!-- ===== Dragon Boat Panel ===== -->
+    <div id="dragonboat-panel">
+      <div class="info-bar dragonboat-hud">
+        <div class="info-cell">
+          <div class="label">额度</div>
+          <span class="value" id="dragon-dollars">-</span>
+        </div>
+        <div class="info-cell">
+          <div class="label">捕捞</div>
+          <span class="value" id="dragon-fishing">0/0</span>
+        </div>
+        <div class="info-cell">
+          <div class="label">累计中奖</div>
+          <span class="value" id="dragon-total-won">$0</span>
+        </div>
+      </div>
+
+      <div class="dragonboat-stage" id="dragonboat-stage" role="button" tabindex="0">
+        <div class="dragonboat-skyline">
+          <span>端午捕粽</span>
+          <span id="dragon-ready">粽子 0</span>
+        </div>
+        <div class="dragonboat-boat" aria-hidden="true"></div>
+        <div class="dragonboat-hook" aria-hidden="true"></div>
+        <div class="dragonboat-mine-zone" aria-hidden="true"></div>
+        <div class="dragonboat-obstacles" id="dragonboat-obstacles" aria-hidden="true"></div>
+        <div class="dragonboat-zongzi-field" id="dragonboat-zongzi-field" aria-hidden="true"></div>
+        <div class="dragonboat-peel-screen" id="dragonboat-peel-screen" aria-hidden="true">
+          <div class="dragonboat-big-zongzi"><i></i></div>
+          <div class="dragonboat-peel-count">× <span id="dragon-peel-count">0</span></div>
+        </div>
+      </div>
+
+      <div class="dragonboat-result" id="dragon-result">准备捕捞</div>
+
+      <div class="info-bar dragonboat-progress">
+        <div class="info-cell">
+          <div class="label">剩余捕捞</div>
+          <span class="value" id="dragon-remaining">0</span>
+        </div>
+        <div class="info-cell">
+          <div class="label">已捞到</div>
+          <span class="value" id="dragon-caught">0</span>
+        </div>
+        <div class="info-cell">
+          <div class="label">已剥开</div>
+          <span class="value" id="dragon-peeled">0</span>
+        </div>
+      </div>
+
+      <div class="dragonboat-actions">
+        <button class="px-btn btn-cyan" id="btn-dragon-fish">捕捞</button>
+        <button class="px-btn btn-pink" id="btn-dragon-peel">剥粽子</button>
+      </div>
+
+      <div class="history">
+        <h3>WIN LOG</h3>
+        <div class="history-status" id="dragon-history-status"></div>
+        <div class="history-list" id="dragon-history-list"></div>
+      </div>
+
+      <div class="logout">
+        <a id="btn-dragon-logout">CHANGE KEY</a>
       </div>
     </div>
   </div>
@@ -1441,7 +2034,9 @@
           clientErrorMessage: 'INVALID KEY',
         });
         currentCardKey = key;
-        if (data.isScratch) {
+        if (data.game === 'dragonboat') {
+          showDragonBoat(data);
+        } else if (data.isScratch) {
           showScratch(data);
         } else {
           await fetchPrizes();
@@ -1700,6 +2295,8 @@
       $('login-panel').style.display = 'block';
       $('game-panel').style.display = 'none';
       $('scratch-panel').style.display = 'none';
+      $('dragonboat-panel').style.display = 'none';
+      document.body.classList.remove('dragonboat-fullscreen');
       $('card-input').value = '';
       $('result').className = 'result muted';
       $('result').textContent = 'PRESS LEVER TO START';
@@ -1707,6 +2304,377 @@
     };
 
     $('btn-scratch-logout').onclick = () => $('btn-logout').click();
+    $('btn-dragon-logout').onclick = () => $('btn-logout').click();
+
+    /* ============================================================
+       Dragon Boat Zongzi Catch
+       ============================================================ */
+    let dragonBusy = false;
+    let dragonState = null;
+    let dragonScene = null;
+
+    function showDragonBoat(data) {
+      $('login-panel').style.display = 'none';
+      $('game-panel').style.display = 'none';
+      $('scratch-panel').style.display = 'none';
+      $('dragonboat-panel').style.display = 'block';
+      document.body.classList.add('dragonboat-fullscreen');
+      $('dragon-dollars').textContent = '$' + data.dollars;
+      renderDragonHistory(data.history);
+      if (data.dragonBoatGame) {
+        renderDragonBoatState(data.dragonBoatGame);
+      } else {
+        startDragonBoatGame();
+      }
+    }
+
+    async function startDragonBoatGame() {
+      try {
+        const res = await fetch(API + '/dragonboat/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey }),
+        });
+        const data = await readDragonBoatApi(res, '端午捕粽启动失败，请稍后重试', '启动失败');
+        renderDragonBoatState(data);
+      } catch (e) {
+        $('dragon-result').className = 'dragonboat-result';
+        $('dragon-result').textContent = activityApi.safeErrorMessage(e, '端午捕粽启动失败，请稍后重试');
+      }
+    }
+
+    function readDragonBoatApi(res, serverErrorMessage, clientErrorMessage) {
+      return activityApi.readApiJson(res, { serverErrorMessage, clientErrorMessage });
+    }
+
+    function renderDragonBoatState(state, preserveResult) {
+      dragonState = state || {};
+      dragonScene = dragonState.sceneSeed || null;
+      const total = Number(dragonState.fishingTotal) || 0;
+      const used = Number(dragonState.fishingUsed) || 0;
+      const remaining = Number(dragonState.remainingFish) || 0;
+      const caught = Number(dragonState.zongziCaught) || 0;
+      const peeled = Number(dragonState.zongziPeeled) || 0;
+      const ready = Number(dragonState.zongziReady) || 0;
+      const totalWon = Number(dragonState.totalWon) || 0;
+
+      $('dragon-fishing').textContent = used + '/' + total;
+      $('dragon-remaining').textContent = remaining;
+      $('dragon-caught').textContent = caught;
+      $('dragon-peeled').textContent = peeled;
+      $('dragon-ready').textContent = '粽子 ' + ready;
+      $('dragon-peel-count').textContent = ready;
+      $('dragon-total-won').textContent = '$' + totalWon;
+
+      renderDragonBoatScene(dragonScene);
+      updateDragonBoatButtons();
+      updateDragonBoatPhase();
+
+      if (preserveResult) return;
+      if (remaining > 0) {
+        $('dragon-result').className = 'dragonboat-result';
+        $('dragon-result').textContent = '继续捕捞';
+      } else if (ready > 0) {
+        $('dragon-result').className = 'dragonboat-result';
+        $('dragon-result').textContent = '有粽子可以剥开';
+      } else {
+        $('dragon-result').className = 'dragonboat-result';
+        $('dragon-result').textContent = '捕捞结束';
+      }
+    }
+
+    function renderDragonBoatScene(scene) {
+      const obstacles = Array.isArray(scene?.obstacles) ? scene.obstacles : [];
+      const zongzi = Array.isArray(scene?.zongzi) ? scene.zongzi : [];
+      $('dragonboat-obstacles').innerHTML = obstacles.map((item, index) => {
+        return `<div class="dragonboat-obstacle" data-dragon-id="${activityRender.escapeHtml(item.id)}" ${dragonBoatSceneObjectStyle(item, index)}></div>`;
+      }).join('');
+      $('dragonboat-zongzi-field').innerHTML = zongzi.map((item, index) => {
+        return `<div class="dragonboat-zongzi" data-dragon-id="${activityRender.escapeHtml(item.id)}" ${dragonBoatSceneObjectStyle(item, index)}><span class="zongzi-rice"></span><span class="zongzi-rope"></span></div>`;
+      }).join('');
+    }
+
+    function dragonBoatSceneObjectStyle(item, index) {
+      const x = clampDragonPercent(item?.x, 50);
+      const y = clampDragonPercent(item?.y, 70);
+      const scale = Math.max(0.68, Math.min(1.36, Number(item?.scale) || 1));
+      const delay = ((index % 6) * 0.13).toFixed(2);
+      return `style="--dragon-x:${x}%; --dragon-y:${y}%; --dragon-scale:${scale}; --dragon-delay:${delay}s"`;
+    }
+
+    function clampDragonPercent(value, fallback) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return fallback;
+      return Math.max(0, Math.min(100, number)).toFixed(2);
+    }
+
+    function updateDragonBoatPhase() {
+      const remaining = Number(dragonState?.remainingFish) || 0;
+      const ready = Number(dragonState?.zongziReady) || 0;
+      let phase = 'done';
+      if (remaining > 0) {
+        phase = 'fish';
+      } else if (ready > 0) {
+        phase = 'peel';
+      }
+      $('dragonboat-panel').classList.remove('dragonboat-phase-fish', 'dragonboat-phase-peel', 'dragonboat-phase-done');
+      $('dragonboat-panel').classList.add('dragonboat-phase-' + phase);
+      $('dragonboat-stage').setAttribute('data-phase', phase);
+    }
+
+    function renderDragonHistory(history) {
+      $('dragon-history-status').textContent = '';
+      $('dragon-history-list').innerHTML = activityRender.buildHistoryHtml(history, PRIZE_SYMBOLS);
+    }
+
+    function updateDragonBoatButtons() {
+      const remaining = Number(dragonState?.remainingFish) || 0;
+      const ready = Number(dragonState?.zongziReady) || 0;
+      $('btn-dragon-fish').disabled = dragonBusy || remaining <= 0;
+      $('btn-dragon-peel').disabled = dragonBusy || remaining > 0 || ready <= 0;
+    }
+
+    function handleDragonBoatScreenAction(target) {
+      if (dragonBusy) return;
+      const remaining = Number(dragonState?.remainingFish) || 0;
+      const ready = Number(dragonState?.zongziReady) || 0;
+      if (remaining > 0) {
+        fishDragonBoat(target || defaultDragonBoatTarget());
+        return;
+      }
+      if (ready > 0) {
+        peelDragonBoat();
+      }
+    }
+
+    function isDragonBoatControlClick(target) {
+      return Boolean(target?.closest?.('.logout, button, a, input, textarea, select'));
+    }
+
+    function dragonBoatCastTargetFromEvent(e) {
+      const rect = $('dragonboat-stage').getBoundingClientRect();
+      if (!rect.width || !rect.height) return defaultDragonBoatTarget();
+      return {
+        x: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)),
+        y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
+      };
+    }
+
+    function defaultDragonBoatTarget() {
+      const first = Array.isArray(dragonScene?.zongzi) ? dragonScene.zongzi[0] : null;
+      return first ? { x: Number(first.x) || 50, y: Number(first.y) || 82 } : { x: 50, y: 82 };
+    }
+
+    function prepareDragonBoatCast(target) {
+      const stage = $('dragonboat-stage');
+      const rect = stage.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const origin = dragonScene?.hookOrigin || { x: 50, y: 18 };
+      const dx = ((Number(target.x) || 50) - (Number(origin.x) || 50)) * rect.width / 100;
+      const dy = ((Number(target.y) || 82) - (Number(origin.y) || 18)) * rect.height / 100;
+      const length = Math.max(120, Math.min(rect.height * 0.9, Math.hypot(dx, dy)));
+      const angle = Math.max(-42, Math.min(42, -Math.atan2(dx, Math.max(1, dy)) * 180 / Math.PI));
+      stage.style.setProperty('--dragon-hook-angle', `${angle.toFixed(2)}deg`);
+      stage.style.setProperty('--dragon-hook-length', `${length.toFixed(0)}px`);
+    }
+
+    function markDragonBoatCast(cast) {
+      clearDragonBoatCastMarks();
+      const zongziID = String(cast?.zongziId || '');
+      const blockedBy = String(cast?.blockedBy || '');
+      if (zongziID && cast?.hit) {
+        const zongzi = findDragonBoatSceneElement('dragonboat-zongzi-field', zongziID);
+        prepareDragonBoatReelTarget(zongzi);
+        animateDragonBoatPayload(zongzi);
+        zongzi?.classList.add('dragonboat-reel-source');
+        return;
+      }
+      if (blockedBy) {
+        const obstacle = findDragonBoatSceneElement('dragonboat-obstacles', blockedBy);
+        prepareDragonBoatReelTarget(obstacle);
+        animateDragonBoatPayload(obstacle);
+        obstacle?.classList.add('dragonboat-reel-source');
+      }
+    }
+
+    function clearDragonBoatCastMarks() {
+      document.querySelectorAll('.dragonboat-reel-payload').forEach(el => el.remove());
+      document.querySelectorAll('.dragonboat-zongzi.caught, .dragonboat-obstacle.blocked, .dragonboat-reel-source').forEach(el => {
+        el.classList.remove('caught', 'blocked', 'dragonboat-reel-source');
+      });
+    }
+
+    function findDragonBoatSceneElement(containerID, itemID) {
+      return [...$(containerID).querySelectorAll('[data-dragon-id]')].find(el => el.dataset.dragonId === itemID) || null;
+    }
+
+    function prepareDragonBoatReelTarget(el) {
+      if (!el) return;
+      const stageRect = $('dragonboat-stage').getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const origin = dragonScene?.hookOrigin || { x: 50, y: 18 };
+      const originX = stageRect.left + stageRect.width * (Number(origin.x) || 50) / 100;
+      const originY = stageRect.top + stageRect.height * (Number(origin.y) || 18) / 100;
+      const centerX = elRect.left + elRect.width / 2;
+      const centerY = elRect.top + elRect.height / 2;
+      el.style.setProperty('--dragon-reel-x', `${(originX - centerX).toFixed(0)}px`);
+      el.style.setProperty('--dragon-reel-y', `${(originY - centerY).toFixed(0)}px`);
+    }
+
+    function animateDragonBoatPayload(el) {
+      if (!el) return;
+      const stage = $('dragonboat-stage');
+      const stageRect = stage.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const origin = dragonScene?.hookOrigin || { x: 50, y: 18 };
+      const originX = stageRect.width * (Number(origin.x) || 50) / 100;
+      const originY = stageRect.height * (Number(origin.y) || 18) / 100;
+      const centerX = elRect.left - stageRect.left + elRect.width / 2;
+      const centerY = elRect.top - stageRect.top + elRect.height / 2;
+      const clone = el.cloneNode(true);
+      clone.removeAttribute('id');
+      clone.classList.remove('caught', 'blocked', 'dragonboat-reel-source');
+      clone.classList.add('dragonboat-reel-payload');
+      clone.style.setProperty('--dragon-payload-x', `${centerX.toFixed(0)}px`);
+      clone.style.setProperty('--dragon-payload-y', `${centerY.toFixed(0)}px`);
+      clone.style.setProperty('--dragon-reel-x', `${(originX - centerX).toFixed(0)}px`);
+      clone.style.setProperty('--dragon-reel-y', `${(originY - centerY).toFixed(0)}px`);
+      stage.appendChild(clone);
+      el.classList.add('dragonboat-reel-source');
+    }
+
+    function dragonSetBusy(value) {
+      dragonBusy = value;
+      updateDragonBoatButtons();
+    }
+
+    function dragonStageBurst(hit) {
+      const rect = $('dragonboat-stage').getBoundingClientRect();
+      const x = rect.left + rect.width * 0.62;
+      const y = rect.top + rect.height * 0.62;
+      particles.emit(x, y, hit ? {
+        count: 80,
+        palette: ['#4cc24f', '#f4d837', '#fff04d', '#00d4d4'],
+      } : {
+        count: 24,
+        speedMax: 7,
+        palette: ['#00d4d4', '#2c54d6', '#f0f0f0'],
+      });
+    }
+
+    async function fishDragonBoat(target) {
+      if (dragonBusy || Number(dragonState?.remainingFish || 0) <= 0) return;
+      target = target || defaultDragonBoatTarget();
+      prepareDragonBoatCast(target);
+      dragonSetBusy(true);
+      $('dragonboat-stage').classList.add('casting');
+      $('dragon-result').className = 'dragonboat-result';
+      $('dragon-result').textContent = '捕捞中...';
+      try {
+        const res = await fetch(API + '/dragonboat/fish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey, target }),
+        });
+        const data = await readDragonBoatApi(res, '捕捞失败，请稍后重试', '捕捞失败');
+        markDragonBoatCast(data.cast || {});
+        await new Promise(resolve => setTimeout(resolve, 980));
+        renderDragonBoatState(data, true);
+        dragonStageBurst(Boolean(data.hit));
+        if (data.hit) {
+          $('dragon-result').className = 'dragonboat-result win';
+          $('dragon-result').textContent = '捞到粽子';
+        } else if (data.cast?.blockedBy) {
+          $('dragon-result').className = 'dragonboat-result';
+          $('dragon-result').textContent = '勾到障碍物';
+        } else {
+          $('dragon-result').className = 'dragonboat-result';
+          $('dragon-result').textContent = '空钩';
+        }
+      } catch (e) {
+        $('dragon-result').className = 'dragonboat-result';
+        $('dragon-result').textContent = activityApi.safeErrorMessage(e, '捕捞失败，请稍后重试');
+      } finally {
+        $('dragonboat-stage').classList.remove('casting');
+        clearDragonBoatCastMarks();
+        dragonSetBusy(false);
+      }
+    }
+
+    async function peelDragonBoat() {
+      if (dragonBusy || Number(dragonState?.zongziReady || 0) <= 0) return;
+      dragonSetBusy(true);
+      $('dragon-result').className = 'dragonboat-result';
+      $('dragon-result').textContent = '剥粽子中...';
+      try {
+        const res = await fetch(API + '/dragonboat/peel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey }),
+        });
+        const data = await readDragonBoatApi(res, '剥粽失败，请稍后重试', '剥粽失败');
+        renderDragonBoatState(data, true);
+        const prize = data.prizeResult || {};
+        const dollars = Number(prize.prize) || 0;
+        const rank = String(prize.rank || '').trim();
+        const label = String(prize.label || '').trim();
+        const rect = $('dragonboat-stage').getBoundingClientRect();
+        const cx = rect.left + rect.width * 0.62;
+        const cy = rect.top + rect.height * 0.52;
+        if (prize.isMiss || dollars <= 0) {
+          $('dragon-result').className = 'dragonboat-result';
+          $('dragon-result').textContent = '剥开是空粽';
+          particles.emit(cx, cy, { count: 24, speedMax: 7, palette: ['#00d4d4', '#2c54d6', '#f0f0f0'] });
+        } else {
+          $('dragon-result').className = 'dragonboat-result win';
+          $('dragon-result').textContent = `${label || '中奖'} +$${dollars}`;
+          if (rank === 'jackpot') {
+            triggerJackpot(dollars, cx, cy);
+          } else {
+            particles.emit(cx, cy, { count: dollars >= 100 ? 120 : 70, palette: ['#f4d837', '#fff04d', '#4cc24f', '#ff8cb6'] });
+          }
+        }
+        await refreshDragonBoatCard();
+      } catch (e) {
+        $('dragon-result').className = 'dragonboat-result';
+        $('dragon-result').textContent = activityApi.safeErrorMessage(e, '剥粽失败，请稍后重试');
+      } finally {
+        dragonSetBusy(false);
+      }
+    }
+
+    async function refreshDragonBoatCard() {
+      try {
+        const res = await fetch(API + '/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cardKey: currentCardKey }),
+        });
+        const data = await activityApi.readApiJson(res, {
+          serverErrorMessage: '历史暂未刷新',
+          clientErrorMessage: '历史暂未刷新',
+        });
+        renderDragonHistory(data.history);
+        if (data.dragonBoatGame) {
+          renderDragonBoatState(data.dragonBoatGame, true);
+        }
+      } catch (e) {
+        $('dragon-history-status').textContent = '历史暂未刷新';
+      }
+    }
+
+    $('btn-dragon-fish').onclick = () => fishDragonBoat(defaultDragonBoatTarget());
+    $('btn-dragon-peel').onclick = () => peelDragonBoat();
+    $('dragonboat-panel').onclick = (e) => {
+      if (isDragonBoatControlClick(e.target)) return;
+      handleDragonBoatScreenAction(dragonBoatCastTargetFromEvent(e));
+    };
+    $('dragonboat-stage').onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleDragonBoatScreenAction(defaultDragonBoatTarget());
+      }
+    };
 
     /* ============================================================
        Scratch Card

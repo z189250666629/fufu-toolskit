@@ -1129,7 +1129,7 @@ tr:last-child td {
 
 .game-route-row {
   display: grid;
-  grid-template-columns: minmax(210px, 1.4fr) 100px 106px 86px 86px 76px 76px;
+  grid-template-columns: minmax(210px, 1.4fr) 100px 106px 86px 86px 76px 76px 116px;
   gap: 8px;
   align-items: center;
 }
@@ -1189,6 +1189,68 @@ tr:last-child td {
 
 .game-route-money {
   width: 86px;
+}
+
+.game-route-test-button {
+  width: 116px;
+  min-height: var(--blueprint-control-height) !important;
+  padding-inline: 8px !important;
+  font-size: var(--blueprint-control-font-size) !important;
+}
+
+.sale-test-key-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.sale-test-key-count {
+  width: 84px;
+}
+
+.sale-test-key-result {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 2px;
+}
+
+.sale-test-key-result-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.sale-test-key-result-head strong {
+  color: var(--blueprint-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.sale-test-key-result-head span {
+  color: var(--blueprint-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.sale-test-key-list {
+  display: grid;
+  gap: 6px;
+}
+
+.sale-test-key-list code {
+  display: block;
+  padding: 6px 8px;
+  border-left: 2px solid var(--blueprint-line);
+  background: var(--blueprint-canvas-raised);
+  color: var(--blueprint-text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .dynamic-pool-panel {

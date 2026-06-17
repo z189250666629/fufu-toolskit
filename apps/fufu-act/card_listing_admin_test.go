@@ -2,6 +2,10 @@ package activityapp
 
 import (
 	"encoding/json"
+	"fmt"
+	"fufu/activity"
+	"fufu/newapi"
+	"fufu/tokens"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -172,6 +176,91 @@ func TestHandleAdminSaleCardsConfigRejectsUnknownSchedulePlan(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "未知上架计划") {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleAdminSaleCardsTestKeyGeneratesNewAPIOnlyAndReportsGameplay(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+	setSaleCardNowForTest(t, time.Date(2026, 6, 16, 12, 34, 56, 0, time.UTC))
+	originalConfig := SnapshotRuntimeConfig()
+	t.Cleanup(func() { SetRuntimeConfig(originalConfig) })
+	cfg := activity.DefaultConfig()
+	cfg.GameRoutes = []activity.GameRoute{{Dollars: 55, Game: activity.GameDragon, DrawCount: 6}}
+	SetRuntimeConfig(cfg)
+
+	var createHits atomic.Int32
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
+			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode NewAPI body: %v", err)
+		}
+		idx := createHits.Add(1)
+		name := strings.TrimSpace(fmt.Sprint(body["name"]))
+		if !strings.Contains(name, "55-act-test") {
+			t.Fatalf("test key token name=%q, want activity-test marker", name)
+		}
+		if got, want := int64(body["remain_quota"].(float64)), int64(55_000); got != want {
+			t.Fatalf("remain_quota=%d, want %d; body=%#v", got, want, body)
+		}
+		if body["group"] != "mix" || int(body["interval_unit"].(float64)) != 3 {
+			t.Fatalf("unexpected token create body: %#v", body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data":    map[string]any{"id": idx, "key": fmt.Sprintf("test-key-%d", idx), "name": name},
+		})
+	}))
+	t.Cleanup(tokenSrv.Close)
+	oldTokenSvc := tokenSvc
+	oldTokenConfigErr := tokenConfigErr
+	t.Cleanup(func() {
+		tokenSvc = oldTokenSvc
+		tokenConfigErr = oldTokenConfigErr
+	})
+	tokenConfigErr = nil
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+
+	var mcyHits atomic.Int32
+	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mcyHits.Add(1)
+		t.Fatalf("test-key generation must not call MCY, got %s", r.URL.Path)
+	}))
+	t.Cleanup(mcySrv.Close)
+	t.Setenv("MCY_BASE_URL", mcySrv.URL)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/sale-cards/test-key", strings.NewReader(`{"plan":"fufu-mix-special-55","count":2}`))
+	req.Header.Set("Authorization", "Bearer test-admin-token")
+	w := httptest.NewRecorder()
+	apiRoute(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var body SaleCardTestKeyResult
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v; body=%s", err, w.Body.String())
+	}
+	if body.PlanID != "fufu-mix-special-55" || body.Generated != 2 || strings.Join(body.Keys, ",") != "sk-test-key-1,sk-test-key-2" {
+		t.Fatalf("response keys/plan wrong: %#v", body)
+	}
+	if body.Game != activity.GameDragon || body.DrawCount != 6 {
+		t.Fatalf("gameplay should come from activity config, got game=%q drawCount=%d", body.Game, body.DrawCount)
+	}
+	if createHits.Load() != 2 || mcyHits.Load() != 0 {
+		t.Fatalf("createHits=%d mcyHits=%d, want 2/0", createHits.Load(), mcyHits.Load())
+	}
+}
+
+func TestHandleAdminSaleCardsTestKeyRequiresAdminToken(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/sale-cards/test-key", strings.NewReader(`{"plan":"fufu-mix-special-55"}`))
+	w := httptest.NewRecorder()
+	apiRoute(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized test-key query should be 401, got %d body=%s", w.Code, w.Body.String())
 	}
 }
 

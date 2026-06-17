@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Input } from '@heroui/react';
+import { messageFromError } from '../api';
+import { MessageLine } from '../blueprint';
 import { DataTable, Metric } from './adminShared';
 import {
   GAME_MODE_OPTIONS,
@@ -24,7 +26,12 @@ import {
   upsertGameRoute,
   type GameMode
 } from './activityConfigCore';
-import type { ActivityConfig, ActivityGameConfig, ActivityGameRoute, ActivityStats, DynamicPrizePoolConfig, DynamicPrizePoolTier, PrizeConfigResponse, SaleCardPlan } from './types';
+import type { ActivityConfig, ActivityGameConfig, ActivityGameRoute, ActivityStats, DynamicPrizePoolConfig, DynamicPrizePoolTier, PrizeConfigResponse, SaleCardPlan, SaleCardTestKeyResult } from './types';
+
+type LocalMessage = {
+  text: string;
+  tone?: 'ok' | 'error';
+};
 
 export function ActivityStatsPanel({ stats }: { stats?: ActivityStats }) {
   const prizeSummary = Array.isArray(stats?.prizeRows) ? stats.prizeRows as Array<Record<string, unknown>> : [];
@@ -74,17 +81,23 @@ export function ActivityConfigEditor({
   activity,
   stats,
   salePlans = [],
+  onGenerateTestKey,
   onChange
 }: {
   activity: ActivityConfig;
   stats?: ActivityStats;
   salePlans?: SaleCardPlan[];
+  onGenerateTestKey?: (plan: string, count: number) => Promise<SaleCardTestKeyResult>;
   onChange: (activity: ActivityConfig) => void;
 }) {
   const [gameConfigs, setGameConfigs] = useState<ActivityGameConfig[]>(() => normalizeGameConfigs(activity.gameConfigs, activity));
   const [scratch, setScratch] = useState<number[]>(() => (activity.scratchRewards ?? []).map(Number));
   const [gameRoutes, setGameRoutes] = useState<ActivityGameRoute[]>(() => gameRoutesFromActivity(activity));
   const [dynamicPool, setDynamicPool] = useState<DynamicPrizePoolConfig>(() => normalizeDynamicPrizePool(activity.dynamicPrizePool));
+  const [testKeyCount, setTestKeyCount] = useState(1);
+  const [generatingTestPlan, setGeneratingTestPlan] = useState('');
+  const [testKeyResult, setTestKeyResult] = useState<SaleCardTestKeyResult>();
+  const [testKeyMessage, setTestKeyMessage] = useState<LocalMessage>({ text: '' });
   const pushedRef = useRef<ActivityConfig | null>(null);
   const saleTierOptions = buildSaleCardTierOptions(salePlans);
 
@@ -124,6 +137,25 @@ export function ActivityConfigEditor({
   const patchDynamicPool = (patch: Partial<DynamicPrizePoolConfig>) => emitDynamicPool({ ...dynamicPool, ...patch });
   const updateGameForTier = (quota: number, game: GameMode) => emitGameRoutes(upsertGameRoute(gameRoutes, quota, { game }));
   const updateDrawCountForTier = (quota: number, drawCount: number) => emitGameRoutes(upsertGameRoute(gameRoutes, quota, { drawCount }));
+  const updateTestKeyCount = (value: string) => {
+    const next = Math.max(1, Math.min(20, Math.floor(Number(value) || 1)));
+    setTestKeyCount(next);
+  };
+  const generateTestKeyForTier = async (planID?: string) => {
+    const plan = String(planID ?? '').trim();
+    if (!plan || !onGenerateTestKey) return;
+    setGeneratingTestPlan(plan);
+    setTestKeyMessage({ text: '正在生成测试 key…' });
+    try {
+      const result = await onGenerateTestKey(plan, testKeyCount);
+      setTestKeyResult(result);
+      setTestKeyMessage({ text: `已生成 ${result.generated ?? result.keys?.length ?? 0} 个测试 key`, tone: 'ok' });
+    } catch (error) {
+      setTestKeyMessage({ text: messageFromError(error, '测试 key 生成失败'), tone: 'error' });
+    } finally {
+      setGeneratingTestPlan('');
+    }
+  };
   const routeForTier = (quota: number): ActivityGameRoute | undefined => gameRoutes.find((route) => numberValue(route.dollars) === quota);
   const gameForTier = (quota: number): GameMode => normalizeGameMode(routeForTier(quota)?.game);
   const drawCountForTier = (quota: number): number => {
@@ -171,8 +203,12 @@ export function ActivityConfigEditor({
 
       <div className="config-subhead">卡档配置（来自 MCY 上架配置）</div>
       <p className="inline-help">卡档读取自动补卡里的 MCY 套餐配置；这里维护每个卡档的玩法、抽奖次数、售价和成本。</p>
+      <div className="sale-test-key-toolbar">
+        <label className="field field--inline">测试数量<Input className="mini-input blueprint-input sale-test-key-count" type="number" min={1} max={20} value={String(testKeyCount)} onChange={(event) => updateTestKeyCount(event.target.value)} /></label>
+        <span className="inline-help">测试 key 只创建 NewAPI token，不上传 MCY；token 名会带活动测试标记。</span>
+      </div>
       <div className="game-route-editor">
-        <div className="game-route-row game-route-row--head"><span>MCY 卡档</span><span>玩法</span><span>抽奖次数</span><span>售价</span><span>成本</span><span>净利润</span><span>入池</span></div>
+        <div className="game-route-row game-route-row--head"><span>MCY 卡档</span><span>玩法</span><span>抽奖次数</span><span>售价</span><span>成本</span><span>净利润</span><span>入池</span><span>测试 key</span></div>
         {saleTierOptions.length === 0 ? <p className="inline-help">未加载到 MCY 卡档配置，先检查自动补卡配置。</p> : null}
         {saleTierOptions.map((option) => {
           const tier = dynamicTierForQuota(dynamicPool, option.quota);
@@ -195,10 +231,25 @@ export function ActivityConfigEditor({
               <Input className="mini-input blueprint-input game-route-money" type="number" step="0.01" min={0} value={String(cost || '')} aria-label={`${option.label}成本`} onChange={(event) => updatePoolTier({ cost: Number(event.target.value) })} />
               <span className="game-route-meta">{profit.toFixed(2)}</span>
               <span className="game-route-meta">{contribution.toFixed(2)}</span>
+              <Button className="blueprint-button game-route-test-button" isDisabled={!option.primaryPlanId || !onGenerateTestKey || generatingTestPlan === option.primaryPlanId} onPress={() => { void generateTestKeyForTier(option.primaryPlanId); }}>
+                {generatingTestPlan === option.primaryPlanId ? '生成中…' : '一键生成 key'}
+              </Button>
             </div>
           );
         })}
       </div>
+      {testKeyMessage.text ? <MessageLine tone={testKeyMessage.tone}>{testKeyMessage.text}</MessageLine> : null}
+      {testKeyResult ? (
+        <div className="sale-test-key-result">
+          <div className="sale-test-key-result-head">
+            <strong>{testKeyResult.planName || testKeyResult.planId || '测试 key'}</strong>
+            <span>{gameModeLabel(testKeyResult.game || 'slot')} · {testKeyResult.drawCount ?? '-'} 次</span>
+          </div>
+          <div className="sale-test-key-list">
+            {(testKeyResult.keys ?? []).map((key, index) => <code key={`${key}-${index}`}>{key}</code>)}
+          </div>
+        </div>
+      ) : null}
 
       <div className="config-subhead">动态奖池</div>
       <div className="dynamic-pool-panel">

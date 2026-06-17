@@ -64,6 +64,16 @@ type ScratchGame struct {
 	Status       string
 }
 
+type DragonBoatGame struct {
+	ID             int
+	CardKey        string
+	FishingUsed    int
+	ZongziCaught   int
+	ZongziPeeled   int
+	Status         string
+	RemovedObjects string
+}
+
 func main() {
 	wd, _ := os.Getwd()
 	if err := Run(wd, os.Getenv("SLOT_PORT")); err != nil {
