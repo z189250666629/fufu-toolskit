@@ -87,9 +87,10 @@ test('dragon boat peel results are a navigable carousel over persisted peels', a
   assert.match(source, /<button class="dragon-peel-nav prev" id="dragon-peel-prev"/);
   assert.match(source, /<button class="dragon-peel-nav next" id="dragon-peel-next"/);
   assert.match(source, /<div class="dragonboat-peel-label" id="dragon-peel-label">/);
-  // carousel reads the persisted per-key peel list
+  // carousel reads the persisted per-key peel list, falling back to win history
   assert.match(source, /function renderDragonPeelCarousel\(\)/);
-  assert.match(source, /Array\.isArray\(dragonState\?\.peels\) \? dragonState\.peels : \[\]/);
+  assert.match(source, /if \(Array\.isArray\(peels\) && peels\.length\) return peels;/);
+  assert.match(source, /\[\.\.\.dragonHistory\]\.reverse\(\)/);
   // < shows only when there is an earlier result; > only when there is a later one
   assert.match(source, /prev\.style\.display = dragonPeelView > 0 \? '' : 'none'/);
   assert.match(source, /next\.style\.display = dragonPeelView < n - 1 \? '' : 'none'/);

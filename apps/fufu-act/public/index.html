@@ -1055,6 +1055,38 @@
       to { transform: translateX(34px); }
     }
 
+    /* 水面波浪：两排错位的像素扇形浪头，反向横向流动，叠出起伏的水面 */
+    .dragonboat-wave {
+      position: absolute;
+      left: -16px;
+      right: -16px;
+      top: 26%;
+      height: 16px;
+      z-index: 1;
+      pointer-events: none;
+      transform: translateY(-58%);
+      background: radial-gradient(circle at 9px 12px, #9fe8f5 7px, transparent 8px) 0 0 / 18px 16px repeat-x;
+      filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.25));
+      animation: dragon-wave-a 1.8s steps(6) infinite;
+    }
+    .dragonboat-wave::before {
+      content: '';
+      position: absolute;
+      left: -9px;
+      right: -9px;
+      top: 5px;
+      bottom: -4px;
+      background: radial-gradient(circle at 9px 12px, #3f9cbd 7px, transparent 8px) 0 0 / 18px 16px repeat-x;
+      opacity: 0.72;
+      animation: dragon-wave-b 2.5s steps(6) infinite;
+    }
+    @keyframes dragon-wave-a {
+      to { background-position-x: 18px; }
+    }
+    @keyframes dragon-wave-b {
+      to { background-position-x: -18px; }
+    }
+
     .dragonboat-skyline {
       position: relative;
       z-index: 1;
@@ -1521,11 +1553,13 @@
     }
     #dragonboat-panel.dragonboat-phase-peel .dragonboat-boat,
     #dragonboat-panel.dragonboat-phase-peel .dragonboat-hook,
+    #dragonboat-panel.dragonboat-phase-peel .dragonboat-wave,
     #dragonboat-panel.dragonboat-phase-peel .dragonboat-mine-zone,
     #dragonboat-panel.dragonboat-phase-peel .dragonboat-obstacles,
     #dragonboat-panel.dragonboat-phase-peel .dragonboat-zongzi-field,
     #dragonboat-panel.dragonboat-phase-done .dragonboat-boat,
     #dragonboat-panel.dragonboat-phase-done .dragonboat-hook,
+    #dragonboat-panel.dragonboat-phase-done .dragonboat-wave,
     #dragonboat-panel.dragonboat-phase-done .dragonboat-mine-zone,
     #dragonboat-panel.dragonboat-phase-done .dragonboat-obstacles,
     #dragonboat-panel.dragonboat-phase-done .dragonboat-zongzi-field {
@@ -1563,7 +1597,8 @@
     }
     body.dragonboat-fullscreen .dragonboat-hud {
       width: min(760px, 100%);
-      margin: 0 auto;
+      /* 顶部留出一行给固定的 CHANGE KEY 按钮（各屏宽都生效，避免压住「累计中奖」格） */
+      margin: 30px auto 0;
       z-index: 8;
     }
     body.dragonboat-fullscreen .dragonboat-stage {
@@ -1575,6 +1610,9 @@
     }
     body.dragonboat-fullscreen .dragonboat-stage::before {
       height: 78%;
+    }
+    body.dragonboat-fullscreen .dragonboat-wave {
+      top: 22%;
     }
     body.dragonboat-fullscreen .dragonboat-stage::after {
       bottom: 46px;
@@ -1857,6 +1895,7 @@
           <span id="dragon-ready">粽子 0</span>
         </div>
         <div class="dragonboat-boat" aria-hidden="true"></div>
+        <div class="dragonboat-wave" aria-hidden="true"></div>
         <div class="dragonboat-hook" id="dragonboat-hook" aria-hidden="true"></div>
         <div class="dragonboat-mine-zone" aria-hidden="true"></div>
         <div class="dragonboat-obstacles" id="dragonboat-obstacles" aria-hidden="true"></div>
@@ -2426,6 +2465,7 @@
     let dragonState = null;
     let dragonScene = null;
     let dragonPeelView = 0; // 开奖结果轮播当前下标（指向 dragonState.peels）
+    let dragonHistory = []; // 最近一次 /login 返回的中奖历史（peels 缺失时作轮播兜底）
 
     function showDragonBoat(data) {
       $('login-panel').style.display = 'none';
@@ -2502,7 +2542,12 @@
     }
 
     function dragonPeelList() {
-      return Array.isArray(dragonState?.peels) ? dragonState.peels : [];
+      // 优先用后端的逐颗开奖列表（含空粽）；旧服务端未返回 peels 时，退回到中奖
+      // 历史（仅中奖记录，按时间正序）以便仍能用 </> 翻看。
+      const peels = dragonState?.peels;
+      if (Array.isArray(peels) && peels.length) return peels;
+      if (Array.isArray(dragonHistory) && dragonHistory.length) return [...dragonHistory].reverse();
+      return [];
     }
 
     function dragonPeelLatest() {
@@ -2584,8 +2629,10 @@
     }
 
     function renderDragonHistory(history) {
+      dragonHistory = Array.isArray(history) ? history : [];
       $('dragon-history-status').textContent = '';
       $('dragon-history-list').innerHTML = activityRender.buildHistoryHtml(history, PRIZE_SYMBOLS);
+      renderDragonPeelCarousel();
     }
 
     function updateDragonBoatButtons() {
