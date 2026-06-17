@@ -62,6 +62,23 @@ export function renderTokenGroupSelect(groups, selectedGroup, stateLike = {}) {
   `;
 }
 
+export function renderLockedTokenGroupValue(group) {
+  return `
+    <div class="field group-select heroui-select is-readonly" data-slot="select" data-token-group-static>
+      <span id="tokenGroupSelectLabel" data-slot="select-label">分组</span>
+      <div
+        class="heroui-select-trigger"
+        id="tokenGroupSelect"
+        data-slot="select-trigger"
+        aria-labelledby="tokenGroupSelectLabel tokenGroupSelectValue"
+        aria-readonly="true"
+      >
+        <span class="heroui-select-value" id="tokenGroupSelectValue" data-slot="select-value">${escapeHtml(group || 'mix')}</span>
+      </div>
+    </div>
+  `;
+}
+
 export function renderModelScopeControls(modelStatus, scope, stateLike) {
   const sites = modelStatus.sites || [];
   const siteOptions = sites.map((item) => ({
@@ -83,7 +100,7 @@ export function renderModelScopeControls(modelStatus, scope, stateLike) {
         dataAttribute: 'model-site'
       })}
       <div class="model-scope-group-slot${hasTokenGroups ? '' : ' is-placeholder'}" ${hasTokenGroups ? '' : 'aria-hidden="true"'}>
-        ${hasTokenGroups ? renderTokenGroupSelect(scope.groups || [], scope.group, stateLike) : ''}
+        ${hasTokenGroups ? ((scope.groups || []).length === 1 ? renderLockedTokenGroupValue(scope.group || scope.groups[0]) : renderTokenGroupSelect(scope.groups || [], scope.group, stateLike)) : ''}
       </div>
     </div>
   `;

@@ -36,6 +36,10 @@
   --blueprint-radius-stamp: 1px;
   --blueprint-radius-nav: 2px;
   --blueprint-radius-flat: 0;
+  --blueprint-control-height: 38px;
+  --blueprint-control-font-size: 0.7rem;
+  --blueprint-control-line-height: 1.65;
+  --blueprint-control-letter-spacing: 0.06em;
 
   /* HeroUI bridge tokens mapped to the project blueprint layer */
   --background: var(--blueprint-canvas);
@@ -755,10 +759,26 @@ select {
   gap: 12px;
 }
 
+.activity-window-grid {
+  grid-template-columns: repeat(2, minmax(270px, 280px));
+  column-gap: 28px;
+  row-gap: 12px;
+  align-items: start;
+}
+
+.activity-window-grid .blueprint-date-input {
+  width: 100%;
+  min-width: 0;
+}
+
 .field,
 .business-stack {
   display: grid;
   gap: 8px;
+}
+
+.business-stack--compact {
+  gap: 6px;
 }
 
 .field {
@@ -795,6 +815,11 @@ select {
   background: var(--blueprint-panel) !important;
   color: var(--blueprint-text-primary) !important;
   box-shadow: none !important;
+  font-family: var(--font-mono) !important;
+  font-size: var(--blueprint-control-font-size) !important;
+  font-weight: 500 !important;
+  letter-spacing: var(--blueprint-control-letter-spacing);
+  line-height: var(--blueprint-control-line-height) !important;
 }
 
 .blueprint-input :where([data-slot="input-wrapper"], input),
@@ -811,9 +836,8 @@ select {
 
 .native-select {
   width: auto;
-  min-height: 36px;
+  min-height: var(--blueprint-control-height);
   padding: 0 12px;
-  font-family: var(--font-mono);
 }
 
 .site-list {
@@ -837,10 +861,28 @@ select {
   margin-top: 6px;
 }
 
+.site-url-list + .action-row {
+  margin-top: 12px;
+}
+
 .site-url-row {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.site-url-row .site-url-tag,
+.site-url-row .blueprint-input,
+.site-url-row .blueprint-danger-button {
+  height: var(--blueprint-control-height) !important;
+  min-height: var(--blueprint-control-height) !important;
+  box-sizing: border-box;
+}
+
+.site-url-row .blueprint-danger-button {
+  font-size: var(--blueprint-control-font-size) !important;
+  letter-spacing: var(--blueprint-control-letter-spacing);
+  line-height: var(--blueprint-control-line-height) !important;
 }
 
 .site-url-row .blueprint-input {
@@ -848,21 +890,34 @@ select {
 }
 
 .site-url-row .site-url-name {
-  flex: 0 1 120px;
-  min-width: 80px;
+  flex: 0 0 120px;
+  min-width: 120px;
 }
 
 .site-url-tag {
   flex: 0 0 auto;
   min-width: 44px;
-  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
+  font-size: var(--blueprint-control-font-size);
+  font-weight: 500;
+  letter-spacing: var(--blueprint-control-letter-spacing);
+  line-height: var(--blueprint-control-line-height);
   text-align: center;
   color: var(--blueprint-text-secondary);
-  background: var(--blueprint-fill-block);
-  border: 1px solid var(--blueprint-line-soft);
+  background: var(--blueprint-panel);
+  border: 1.5px solid var(--blueprint-line);
+}
+
+.site-url-list + .action-row .blueprint-button,
+.site-url-list ~ .action-row .blueprint-button {
+  min-height: var(--blueprint-control-height);
+  font-size: var(--blueprint-control-font-size) !important;
+  letter-spacing: var(--blueprint-control-letter-spacing);
+  line-height: var(--blueprint-control-line-height) !important;
 }
 
 .site-card {
@@ -975,7 +1030,7 @@ tr:last-child td {
    height (explicit height + border-box, else padding pushes time/number taller). */
 .blueprint-input,
 .native-select {
-  height: 38px !important;
+  height: var(--blueprint-control-height) !important;
   box-sizing: border-box;
 }
 
@@ -1067,6 +1122,126 @@ tr:last-child td {
   width: 80px;
 }
 
+.game-route-editor {
+  display: grid;
+  gap: 6px;
+}
+
+.game-route-row {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.4fr) 100px 106px 86px 86px 76px 76px;
+  gap: 8px;
+  align-items: center;
+}
+
+.game-config-row {
+  grid-template-columns: minmax(140px, 0.75fr) 170px;
+  max-width: 390px;
+}
+
+.game-route-row--head {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blueprint-text-secondary);
+}
+
+.game-route-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.game-route-main strong,
+.game-route-main span,
+.game-route-meta,
+.game-route-quota {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-route-main strong {
+  color: var(--blueprint-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.game-route-main span,
+.game-route-meta,
+.game-route-quota {
+  color: var(--blueprint-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.game-mode-select {
+  width: 100%;
+}
+
+.game-route-spin {
+  width: 104px;
+}
+
+.game-route-money {
+  width: 86px;
+}
+
+.dynamic-pool-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.dynamic-pool-help {
+  margin: 0;
+  max-width: 920px;
+}
+
+.dynamic-pool-note {
+  color: var(--blueprint-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.dynamic-pool-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) repeat(4, minmax(116px, 140px));
+  gap: 10px;
+  align-items: start;
+}
+
+.dynamic-pool-toggle {
+  min-height: 64px;
+}
+
+.dynamic-toggle-control {
+  min-height: var(--blueprint-control-height);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  color: var(--blueprint-text-primary);
+  font-size: var(--blueprint-control-font-size);
+  font-weight: 500;
+  letter-spacing: var(--blueprint-control-letter-spacing);
+  line-height: var(--blueprint-control-line-height);
+  text-transform: none;
+}
+
+.dynamic-toggle-control input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.dynamic-rate-field .mini-input {
+  width: 100%;
+}
+
 .sale-job-list {
   display: grid;
   gap: 8px;
@@ -1148,6 +1323,15 @@ tr:last-child td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .activity-window-grid {
+    grid-template-columns: repeat(2, minmax(270px, 280px));
+    column-gap: 28px;
+  }
+
+  .dynamic-pool-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .json-grid {
     grid-template-columns: 1fr;
   }
@@ -1173,8 +1357,30 @@ tr:last-child td {
   .field-grid,
   .metrics,
   .business-grid,
+  .dynamic-pool-controls,
   .sale-job-row {
     grid-template-columns: 1fr;
+  }
+
+  .site-url-row {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .site-url-row .site-url-tag {
+    width: 44px;
+  }
+
+  .site-url-row .site-url-name {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .site-url-row .blueprint-input:not(.site-url-name),
+  .site-url-row .blueprint-danger-button {
+    grid-column: 2;
+    width: 100%;
   }
 }
 

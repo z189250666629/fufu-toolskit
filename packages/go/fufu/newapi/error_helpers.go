@@ -22,6 +22,13 @@ func messageFromPayload(data map[string]any) (string, bool) {
 }
 
 func cleanPayloadMessage(value any) string {
+	if obj, ok := value.(map[string]any); ok {
+		for _, key := range []string{"message", "error"} {
+			if text := cleanPayloadMessage(obj[key]); text != "" {
+				return text
+			}
+		}
+	}
 	text := strings.TrimSpace(fmt.Sprint(value))
 	if text == "<nil>" {
 		return ""

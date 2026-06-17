@@ -42,7 +42,7 @@ func TestProcessCreditsReturnsOnQueueQueryError(t *testing.T) {
 }
 
 func TestCreditQueueRejectsDuplicateActiveCardKeys(t *testing.T) {
-	setupScratchLockTestDB(t)
+	setupCreditTestDB(t)
 
 	if _, err := db.Exec(`INSERT INTO credit_queue (card_key, prize_dollars, status) VALUES (?,?,?)`, "credit-card", 10, "pending"); err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestCreditQueueRejectsDuplicateActiveCardKeys(t *testing.T) {
 }
 
 func TestProcessCreditsMarksMalformedQueueRowFailedOnScanError(t *testing.T) {
-	setupScratchLockTestDB(t)
+	setupCreditTestDB(t)
 	oldTokenSvc := tokenSvc
 	tokenSvc = &tokens.Service{}
 	t.Cleanup(func() { tokenSvc = oldTokenSvc })
@@ -94,7 +94,7 @@ func TestProcessCreditsMarksMalformedQueueRowFailedOnScanError(t *testing.T) {
 }
 
 func TestProcessCreditsStoresSanitizedFailureMessage(t *testing.T) {
-	setupScratchLockTestDB(t)
+	setupCreditTestDB(t)
 
 	key := "sk-credit-fail-123456"
 	rawDetail := "internal https://newapi.example.local/api/token/7 secret=abc"
@@ -150,7 +150,7 @@ func TestProcessCreditsStoresSanitizedFailureMessage(t *testing.T) {
 }
 
 func TestProcessCreditsTimesOutStalledQuotaUpdate(t *testing.T) {
-	setupScratchLockTestDB(t)
+	setupCreditTestDB(t)
 
 	key := "sk-credit-timeout-123456"
 	putStarted := make(chan struct{})
@@ -236,7 +236,7 @@ func TestProcessCreditsTimesOutStalledQuotaUpdate(t *testing.T) {
 }
 
 func TestProcessCreditsClearsErrorAfterSuccessfulRetry(t *testing.T) {
-	setupScratchLockTestDB(t)
+	setupCreditTestDB(t)
 
 	key := "sk-credit-card-123456"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

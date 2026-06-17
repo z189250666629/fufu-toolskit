@@ -56,8 +56,25 @@ test('prize drawer uses backend weight metadata instead of hardcoded weights', a
 
   assert.match(fetchPrizesSource, /p\.weight/);
   assert.match(fetchPrizesSource, /p\.totalWeight/);
+  assert.match(fetchPrizesSource, /rank: p\.rank/);
+  assert.match(fetchPrizesSource, /label: p\.label/);
   assert.doesNotMatch(fetchPrizesSource, /const weights = \{/);
   assert.doesNotMatch(fetchPrizesSource, /1:\s*1100/);
+});
+
+test('slot jackpot display follows backend rank instead of fixed prize amount', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const spinStart = source.indexOf('async function doSpin()');
+  const spinEnd = source.indexOf('function triggerJackpot');
+  const spinSource = source.slice(spinStart, spinEnd);
+
+  assert.match(source, /const RANK_SYMBOLS = \{ jackpot: '🏆', second: '👑', third: '⭐' \}/);
+  assert.match(source, /id="jackpot-sub"/);
+  assert.match(spinSource, /RANK_SYMBOLS\[data\.rank\]/);
+  assert.match(spinSource, /rank === 'jackpot'/);
+  assert.match(spinSource, /rank === 'second' \|\| rank === 'third'/);
+  assert.doesNotMatch(spinSource, /prize >= 1000/);
+  assert.match(source, /\$\('jackpot-sub'\)\.textContent = `\$\$\{prize\} GET`/);
 });
 
 test('history refresh marks stale state without clearing previous rows', async () => {

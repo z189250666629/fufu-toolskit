@@ -16,12 +16,28 @@ func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.static.ServeHTTP(w, r)
 }
 
+func (a *App) ServeHTTPAsRole(w http.ResponseWriter, r *http.Request, role Role) {
+	if role == "" {
+		a.ServeHTTP(w, r)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		a.handleAPIAsRole(w, r, role)
+		return
+	}
+	a.static.ServeHTTP(w, r)
+}
+
 func isPublicAPI(path string) bool {
 	route, ok := findAPIPath(path)
 	return ok && route.Public
 }
 
 func (a *App) handleAPI(w http.ResponseWriter, r *http.Request) {
+	a.handleAPIAsRole(w, r, "")
+}
+
+func (a *App) handleAPIAsRole(w http.ResponseWriter, r *http.Request, trustedRole Role) {
 	route, ok := findAPIPath(r.URL.Path)
 	if !ok {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Not found"})
@@ -31,7 +47,9 @@ func (a *App) handleAPI(w http.ResponseWriter, r *http.Request) {
 		webutil.RequireMethodMessage(w, r, route.Method, "Only "+route.Method)
 		return
 	}
-	if !isPublicAPI(r.URL.Path) {
+	if trustedRole != "" {
+		r = r.WithContext(context.WithValue(r.Context(), roleContextKey, trustedRole))
+	} else if !isPublicAPI(r.URL.Path) {
 		role, ok := a.authenticate(r)
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "未授权"})

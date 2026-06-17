@@ -60,6 +60,12 @@ apps/**/backups/
 
 
 # Go app artifacts
+/network-detect
+/network-detect.exe
+/fufu-act
+/fufu-act.exe
+/fufu-tool-site
+/fufu-tool-site.exe
 apps/network-detect/network-detect
 apps/network-detect/network-detect.exe
 apps/fufu-act/fufu-act

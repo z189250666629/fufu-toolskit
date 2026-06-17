@@ -177,8 +177,8 @@ tr:last-child td { border-bottom: 0; }
         </button>
         <button class="nav-card admin-tab card" data-slot="tab" type="button" role="tab" aria-selected="false" data-tab-target="activity" style="--accent: var(--clay);">
           <span class="card-stamp">活动</span>
-          <span class="card-title">活动统计 / 奖池 / 期望值</span>
-          <span class="card-desc">活动日期、抽奖次数、中奖率权重与运行统计统一管理。</span>
+          <span class="card-title">活动统计 / 统一奖池 / 玩法参数</span>
+          <span class="card-desc">活动日期、各玩法期望值、卡档抽奖次数、卡档玩法与运行统计统一管理。</span>
         </button>
       </nav>
 
@@ -239,7 +239,7 @@ tr:last-child td { border-bottom: 0; }
             <div class="panel-head">
               <div class="panel-title">
                 <b>当前奖池中奖率</b>
-                <small>读取 /api/prizes 展示当前运行时奖池权重，保存活动配置后这里同步变化。</small>
+                <small>读取 /api/prizes 展示目标期望值平衡后的运行时概率。</small>
               </div>
             </div>
             <div id="current-prizes" class="business-stack muted-box">等待加载当前奖池。</div>
@@ -249,7 +249,7 @@ tr:last-child td { border-bottom: 0; }
             <div class="panel-head">
               <div class="panel-title">
                 <b>活动配置</b>
-                <small>集中调控活动日期、抽奖次数、奖池权重、整体数学期望值和中奖率。</small>
+                <small>集中调控活动日期、各玩法期望值、卡档抽奖次数和卡档玩法。</small>
               </div>
               <div class="metrics">
                 <div class="metric"><span>目标期望值</span><b id="target-ev">-</b></div>
@@ -261,13 +261,10 @@ tr:last-child td { border-bottom: 0; }
               <div class="field"><label for="activity-end-text">结束时间文本</label><input id="activity-end-text" data-slot="input" placeholder="2026-06-30 23:59:59"></div>
               <div class="field"><label for="activity-start-ts">开始时间戳</label><input id="activity-start-ts" data-slot="input" type="number" min="1"></div>
               <div class="field"><label for="activity-end-ts">结束时间戳</label><input id="activity-end-ts" data-slot="input" type="number" min="1"></div>
-              <div class="field"><label for="activity-target-ev">整体数学期望值</label><input id="activity-target-ev" data-slot="input" type="number" step="0.0001" min="0"></div>
+              <div class="field"><label for="activity-target-ev">老虎机目标期望值</label><input id="activity-target-ev" data-slot="input" type="number" step="0.0001" min="0"></div>
             </div>
             <div class="json-grid">
-              <div class="field"><label for="spin-map-json">额度 → 抽奖次数</label><textarea id="spin-map-json" data-slot="input" spellcheck="false"></textarea></div>
-              <div class="field"><label for="prize-pool-json">普通奖池权重（调整中奖率）</label><textarea id="prize-pool-json" data-slot="input" spellcheck="false"></textarea></div>
-              <div class="field"><label for="tier-pools-json">分额度奖池权重</label><textarea id="tier-pools-json" data-slot="input" spellcheck="false"></textarea></div>
-              <div class="field"><label for="post-jackpot-json">中大奖后奖池权重</label><textarea id="post-jackpot-json" data-slot="input" spellcheck="false"></textarea></div>
+              <div class="field"><label for="game-config-json">玩法参数</label><textarea id="game-config-json" data-slot="input" spellcheck="false"></textarea></div>
               <div class="field"><label for="scratch-rewards-json">刮刮卡奖励</label><textarea id="scratch-rewards-json" data-slot="input" spellcheck="false"></textarea></div>
             </div>
           </section>
@@ -437,10 +434,7 @@ function renderConfig(data) {
   $('activity-target-ev').value = act.targetExpectedValue ?? '';
   $('target-ev').textContent = formatNumber(act.targetExpectedValue);
   $('actual-ev').textContent = formatNumber(act.actualExpectedValue);
-  $('spin-map-json').value = pretty(act.spinMap || {});
-  $('prize-pool-json').value = pretty(act.prizePool || []);
-  $('tier-pools-json').value = pretty(act.tierPools || {});
-  $('post-jackpot-json').value = pretty(act.postJackpotPrizes || []);
+  $('game-config-json').value = pretty(act.gameConfigs || []);
   $('scratch-rewards-json').value = pretty(act.scratchRewards || []);
 }
 function formatNumber(value) {
@@ -523,10 +517,8 @@ function collectConfig() {
       startTS: numberValue('activity-start-ts'),
       endTS: numberValue('activity-end-ts'),
       targetExpectedValue: Number($('activity-target-ev').value || 0),
-      spinMap: parseJSONField('spin-map-json', {}),
-      prizePool: parseJSONField('prize-pool-json', []),
-      tierPools: parseJSONField('tier-pools-json', {}),
-      postJackpotPrizes: parseJSONField('post-jackpot-json', []),
+      prizePool: state.config?.activity?.prizePool || [],
+      gameConfigs: parseJSONField('game-config-json', []),
       scratchRewards: parseJSONField('scratch-rewards-json', [])
     }
   };
@@ -670,16 +662,11 @@ async function runSaleCardPlan() {
   } catch (error) { setMessage(error.message, 'error'); }
 }
 function renderPrizeRuntime(data = {}) {
-  const pools = data.tierPools || {};
   $('current-prizes').className = 'business-stack';
   $('current-prizes').innerHTML = `
     <div class="table-wrap"><table>
-      <tr><th>普通奖项</th><th>权重</th><th>总权重</th><th>理论概率</th></tr>
+      <tr><th>统一奖项</th><th>权重</th><th>总权重</th><th>理论概率</th></tr>
       ${rowOrEmpty(data.prizes, 4, row => `<tr><td>$${esc(row.dollars)}</td><td>${num(row.weight)}</td><td>${num(row.totalWeight)}</td><td>${row.totalWeight ? ((Number(row.weight) / Number(row.totalWeight)) * 100).toFixed(2) + '%' : '-'}</td></tr>`)}
-    </table></div>
-    <div class="table-wrap"><table>
-      <tr><th>额度</th><th>中奖项数量</th><th>详情</th></tr>
-      ${Object.keys(pools).length ? Object.entries(pools).map(([tier, rows]) => `<tr><td>$${esc(tier)}</td><td>${Array.isArray(rows) ? rows.length : 0}</td><td>${esc((Array.isArray(rows) ? rows : []).map(row => '$' + row.dollars + ':' + row.weight).join(' / '))}</td></tr>`).join('') : '<tr><td colspan="3"><span class="inline-help">暂无分额度奖池</span></td></tr>'}
     </table></div>`;
 }
 function renderRuntimeSites(data = {}) {

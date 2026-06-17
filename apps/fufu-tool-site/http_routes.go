@@ -44,7 +44,7 @@ func route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if isActivityAdminPagePath(path) {
-		serveActivityPageAs(w, r, "/admin.html")
+		http.Redirect(w, r, "/admin", http.StatusFound)
 		return
 	}
 	if isAdminPagePath(path) {
@@ -133,7 +133,7 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, 503, "combine is not configured")
 			return
 		}
-		combineApp.ServeHTTP(w, r)
+		serveCombineAPI(w, r)
 		return
 	}
 	path := r.URL.Path
@@ -171,25 +171,9 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, status, map[string]any{"configured": len(sites) > 0, "error": publicMsg, "sites": publics})
 	case "/api/nav/lines":
-		sites, _ := managedSitesForRuntime()
-		apiLines := []map[string]any{}
-		tokenLines := []map[string]any{}
-		for _, s := range sites {
-			lineName := s.LineName
-			if strings.TrimSpace(lineName) == "" {
-				lineName = s.Name
-			}
-			line := map[string]any{"name": lineName, "url": s.URL}
-			if strings.EqualFold(s.Category, "token") {
-				tokenLines = append(tokenLines, line)
-			} else {
-				apiLines = append(apiLines, line)
-			}
-		}
-		writeJSON(w, 200, map[string]any{"categories": []map[string]any{
-			{"kind": "api", "name": "API 次数站", "lines": apiLines},
-			{"kind": "token", "name": "Token 站", "lines": tokenLines},
-		}})
+		writeJSON(w, 200, navLineResponse{Categories: navLineCategories()})
+	case "/api/nav/tools":
+		writeJSON(w, 200, navToolsResponse{Cards: navigationToolsForRuntime()})
 	case "/api/newapi/model-status":
 		force := r.URL.Query().Get("refresh") == "1"
 		status := getModelStatus(r.Context(), force)

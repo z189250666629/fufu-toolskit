@@ -101,11 +101,11 @@ func (a *App) deleteToken(ctx context.Context, id int) (bool, APIResponse, error
 	return a.tokenSvc.DeleteToken(ctx, id)
 }
 
-func (a *App) createToken(ctx context.Context, body map[string]any) (APIResponse, map[string]any, error) {
+func (a *App) createTokenAndResolveKey(ctx context.Context, body map[string]any, name string) (tokens.CreatedTokenResult, error) {
 	if a.tokenSvc == nil {
 		a.tokenSvc = tokens.NewService(a.apiClient)
 	}
-	return a.tokenSvc.CreateToken(ctx, body)
+	return a.tokenSvc.CreateTokenAndResolveKey(ctx, body, name)
 }
 
 func (a *App) updateTokenRaw(ctx context.Context, raw map[string]any) (APIResponse, map[string]any, error) {

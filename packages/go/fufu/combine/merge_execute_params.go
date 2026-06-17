@@ -1,26 +1,19 @@
 package combine
 
-import "strings"
+import "fufu/combinecore"
 
 func buildExecuteMergeCardParams(p ExecuteMergeParams, onProgress func(MergeJobPatch)) MergeCardParams {
 	validate := func(tokens []ResolvedToken) error {
 		return validateExecuteMergeRequest(p, tokens)
 	}
-	var quota *int64
-	if p.Role == RoleAdmin && p.CustomQuota {
-		quota = p.TotalQuota
-	}
-	name := ""
-	if p.Role != RoleGuest {
-		name = strings.TrimSpace(p.Name)
-	}
+	plan := combinecore.BuildExecuteMergeCardPlan(coreExecuteMergeParams(p))
 	return MergeCardParams{
-		Keys:         p.Keys,
-		IntervalUnit: p.IntervalUnit,
-		Quota:        quota,
-		Name:         name,
+		Keys:         plan.Keys,
+		IntervalUnit: plan.IntervalUnit,
+		Quota:        plan.Quota,
+		Name:         plan.Name,
 		Role:         p.Role,
-		JobID:        p.JobID,
+		JobID:        plan.JobID,
 		Validate:     validate,
 		OnProgress:   onProgress,
 	}

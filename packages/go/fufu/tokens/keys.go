@@ -18,6 +18,14 @@ func EnsureFullKey(key string) string {
 
 func BareKey(key string) string { return strings.TrimPrefix(EnsureFullKey(key), "sk-") }
 
+func IsMaskedKey(key string) bool {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return false
+	}
+	return strings.Contains(key, "*") || strings.Contains(key, "…") || strings.Contains(key, "...") || strings.Contains(key, "•")
+}
+
 func DisplayKey(key string) string {
 	value := EnsureFullKey(key)
 	if value == "" {

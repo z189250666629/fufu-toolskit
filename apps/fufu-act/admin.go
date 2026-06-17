@@ -37,26 +37,38 @@ func adminBearerToken(r *http.Request) string {
 
 func handlePrizes(w http.ResponseWriter, r *http.Request) {
 	cfg := SnapshotRuntimeConfig()
-	tierPoolsOut := map[string][]prizeWeightResponse{}
-	for dollars, pool := range cfg.TierPools {
-		tierPoolsOut[strconv.Itoa(dollars)] = buildPrizeWeightRows(pool)
-	}
 	spinMapOut := map[string]int{}
 	for dollars, spins := range cfg.SpinMap {
 		spinMapOut[strconv.FormatFloat(dollars, 'f', -1, 64)] = spins
 	}
+	poolBalance, err := currentPrizePoolBalance()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "服务器错误")
+		return
+	}
+	pool := cfg.PrizePool
+	if cfg.DynamicPrizePool.Enabled {
+		pool = activity.PrizePoolWithDynamicAwards(cfg, poolBalance)
+	}
+	poolCfg := cfg
+	poolCfg.PrizePool = pool
+	balanced := activity.BalancedPrizePoolForGame(poolCfg, activity.GameSlot)
 	writeJSON(w, 200, map[string]any{
-		"prizes":            buildPrizeWeightRows(cfg.PrizePool),
-		"tierPools":         tierPoolsOut,
-		"postJackpotPrizes": buildPrizeWeightRows(cfg.PostJackpotPool),
-		"spinMap":           spinMapOut,
+		"prizes":      buildPrizeWeightRows(balanced.Pool),
+		"gameConfigs": cfg.GameConfigs,
+		"spinMap":     spinMapOut,
+		"poolBalance": poolBalance,
 	})
 }
 
 type prizeWeightResponse struct {
-	Dollars     int `json:"dollars"`
-	Weight      int `json:"weight"`
-	TotalWeight int `json:"totalWeight"`
+	Type        string `json:"type"`
+	Dollars     int    `json:"dollars"`
+	Weight      int    `json:"weight"`
+	TotalWeight int    `json:"totalWeight"`
+	Rank        string `json:"rank,omitempty"`
+	Label       string `json:"label,omitempty"`
+	Advertised  bool   `json:"advertised,omitempty"`
 }
 
 func buildPrizeWeightRows(pool []activity.Prize) []prizeWeightResponse {
@@ -64,7 +76,15 @@ func buildPrizeWeightRows(pool []activity.Prize) []prizeWeightResponse {
 	prizes := []prizeWeightResponse{}
 	for _, p := range pool {
 		if p.Type == "win" {
-			prizes = append(prizes, prizeWeightResponse{Dollars: p.Dollars, Weight: p.Weight, TotalWeight: total})
+			prizes = append(prizes, prizeWeightResponse{
+				Type:        p.Type,
+				Dollars:     p.Dollars,
+				Weight:      p.Weight,
+				TotalWeight: total,
+				Rank:        p.Rank,
+				Label:       p.Label,
+				Advertised:  p.Advertised,
+			})
 		}
 	}
 	return prizes
@@ -107,7 +127,11 @@ func buildAdminStats() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"prizeRows": prizeRows, "totalSpins": totalSpins, "totalWon": totalWon, "ev": ev, "tierRows": tierRows, "queueRows": queueRows, "scratchRows": scratchRows}, nil
+	poolBalance, err := currentPrizePoolBalance()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"prizeRows": prizeRows, "totalSpins": totalSpins, "totalWon": totalWon, "ev": ev, "tierRows": tierRows, "queueRows": queueRows, "scratchRows": scratchRows, "poolBalance": poolBalance}, nil
 }
 
 func queryRows(q string) ([]map[string]any, error) {

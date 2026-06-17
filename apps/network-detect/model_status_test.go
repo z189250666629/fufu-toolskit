@@ -101,6 +101,21 @@ func TestBuildCellSummarizesChannelsLogsAndPricing(t *testing.T) {
 	}
 }
 
+func TestBuildCellKeepsRequestPricing(t *testing.T) {
+	cell := buildCell(
+		"site-a",
+		"model-a",
+		[]Channel{{Status: channelStatusEnabled, Groups: []string{"mix"}}},
+		nil,
+		nil,
+		Pricing{Type: "request", Request: 0.975, Currency: "$"},
+	)
+
+	if cell.Pricing == nil || cell.Pricing.Type != "request" || cell.Pricing.Request != 0.975 {
+		t.Fatalf("request pricing = %#v", cell.Pricing)
+	}
+}
+
 func TestPricingFromRawAppliesRechargeRatioAndFallbacks(t *testing.T) {
 	price := pricingFromRaw(newapi.Site{RechargeRatio: 2.5, Currency: "CNY"}, map[string]any{
 		"model_ratio":     float64(0.1),

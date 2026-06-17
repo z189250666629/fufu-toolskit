@@ -11,6 +11,6 @@ Go backend serving the existing static activity frontend from `public/`.
 
 - `main.go` — HTTP entry point, SQLite schema/migrations, activity routes, scratch routes, admin stats, credit queue worker.
 - Shared business logic comes from `packages/go/fufu` (`config`, `newapi`, `tokens`, `activity`, `auth`).
-- Static frontend files remain `public/index.html` and `public/admin.html`.
+- Static frontend files remain `public/index.html`; activity administration is handled by the unified `apps/fufu-tool-site` `/admin` page through `/api/admin/*`.
 
 Runtime SQLite files live in `data/` and must not be committed.

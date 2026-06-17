@@ -333,7 +333,7 @@ func TestStaticRouteOnlyServesReferencedBrowserAssets(t *testing.T) {
 		}
 	}
 
-	for _, path := range []string{"/activity-api.js", "/activity-render.js", "/scratch-card.js", "/admin-render.js", "/admin.html"} {
+	for _, path := range []string{"/activity-api.js", "/activity-render.js", "/scratch-card.js"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		w := httptest.NewRecorder()
 		staticRoute(w, req)
@@ -342,17 +342,19 @@ func TestStaticRouteOnlyServesReferencedBrowserAssets(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/debug.js", nil)
-	w := httptest.NewRecorder()
-	staticRoute(w, req)
-	if w.Code == http.StatusOK {
-		t.Fatalf("unreferenced static asset should not be served: body=%s", w.Body.String())
-	}
-	if strings.Contains(w.Body.String(), "debugSecret") {
-		t.Fatalf("unreferenced static asset leaked body: %s", w.Body.String())
-	}
-	if got := w.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("unreferenced static asset Cache-Control = %q", got)
+	for _, path := range []string{"/admin-render.js", "/admin.html", "/debug.js"} {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		w := httptest.NewRecorder()
+		staticRoute(w, req)
+		if w.Code == http.StatusOK {
+			t.Fatalf("%s should not be served: body=%s", path, w.Body.String())
+		}
+		if strings.Contains(w.Body.String(), "adminRender") || strings.Contains(w.Body.String(), "debugSecret") {
+			t.Fatalf("%s leaked hidden static body: %s", path, w.Body.String())
+		}
+		if got := w.Header().Get("Cache-Control"); got != "no-store" {
+			t.Fatalf("%s Cache-Control = %q", path, got)
+		}
 	}
 }
 

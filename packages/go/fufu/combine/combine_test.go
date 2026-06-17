@@ -162,6 +162,50 @@ func TestMergeStatusRequiresSessionForNonGuestJobs(t *testing.T) {
 	}
 }
 
+func TestServeHTTPAsRoleAuthorizesWithoutCombineSession(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	userRole := RoleUser
+	app.setMergeJob("job-user", MergeJobPatch{Status: strp("done"), Role: &userRole, Result: map[string]any{"newCard": map[string]string{"key": "sk-secret"}}, HasResult: true})
+
+	statusReq := httptest.NewRequest(http.MethodGet, "/api/merge-status/job-user", nil)
+	statusRec := httptest.NewRecorder()
+	app.ServeHTTPAsRole(statusRec, statusReq, RoleAdmin)
+	if statusRec.Code != http.StatusOK || !strings.Contains(statusRec.Body.String(), "sk-secret") {
+		t.Fatalf("trusted role status code=%d body=%s", statusRec.Code, statusRec.Body.String())
+	}
+
+	sessionReq := httptest.NewRequest(http.MethodGet, "/api/session", nil)
+	sessionRec := httptest.NewRecorder()
+	app.ServeHTTPAsRole(sessionRec, sessionReq, RoleAdmin)
+	if sessionRec.Code != http.StatusOK || !strings.Contains(sessionRec.Body.String(), `"role":"admin"`) {
+		t.Fatalf("trusted role session code=%d body=%s", sessionRec.Code, sessionRec.Body.String())
+	}
+	if len(app.sessions) != 0 {
+		t.Fatalf("trusted role should not create combine sessions: %#v", app.sessions)
+	}
+}
+
+func TestServeHTTPAsRoleKeepsPasswordAuthEndpoint(t *testing.T) {
+	app := NewApp(Config{}, nil)
+	app.passwords = map[string]struct {
+		Hash string
+		Role Role
+	}{
+		"user": {Hash: sha256Hex("test-user"), Role: RoleUser},
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/auth", strings.NewReader(`{"password":"bad"}`))
+	rec := httptest.NewRecorder()
+
+	app.ServeHTTPAsRole(rec, req, RoleAdmin)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("trusted role should not bypass /api/auth password check: code=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(app.sessions) != 0 {
+		t.Fatalf("failed auth should not create sessions: %#v", app.sessions)
+	}
+}
+
 func TestGuestMergeStatusRedactsSourceKeysAndRawErrors(t *testing.T) {
 	app := NewApp(Config{}, nil)
 	guestRole := RoleGuest

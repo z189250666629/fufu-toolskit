@@ -2,6 +2,7 @@ package main
 
 import (
 	"fufu/combine"
+	"net/http"
 	"path/filepath"
 )
 
@@ -35,4 +36,18 @@ func isCombineAPI(path string) bool {
 
 func combineAPIMethod(path string) (string, bool) {
 	return combine.APIMethod(path)
+}
+
+type trustedCombineHandler interface {
+	ServeHTTPAsRole(http.ResponseWriter, *http.Request, combine.Role)
+}
+
+func serveCombineAPI(w http.ResponseWriter, r *http.Request) {
+	if validUnifiedAdminSession(r) {
+		if handler, ok := combineApp.(trustedCombineHandler); ok {
+			handler.ServeHTTPAsRole(w, r, combine.RoleAdmin)
+			return
+		}
+	}
+	combineApp.ServeHTTP(w, r)
 }

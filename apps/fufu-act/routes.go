@@ -17,7 +17,7 @@ const (
 	maxJSONBodyBytes int64 = 1 << 20
 )
 
-var publicStaticEntryPoints = []string{"/index.html", "/admin.html"}
+var publicStaticEntryPoints = []string{"/index.html"}
 
 var errInvalidCardKey = errors.New("invalid card key")
 var errRequestBodyTooLarge = errors.New("request body too large")

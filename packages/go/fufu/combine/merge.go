@@ -119,29 +119,25 @@ func (a *App) mergeCards(ctx context.Context, p MergeCardParams) (result MergeRe
 
 	update(buildMergePhasePatch("creating", "创建新卡中...", 1))
 	a.setTraceStatus(ctx, mergeID, "creating")
-	res, _, e := a.createToken(ctx, buildNewMergeTokenBody(uniqueName, target, p.IntervalUnit))
+	created, e := a.createTokenAndResolveKey(ctx, buildNewMergeTokenBody(uniqueName, target, p.IntervalUnit), uniqueName)
 	if e != nil {
-		return MergeResult{}, e
-	}
-	if !res.OK() {
-		return MergeResult{}, errors.New(upstreamStatusMessage(res, "新卡创建失败"))
+		return MergeResult{}, fmt.Errorf("新卡创建失败：%v", e)
 	}
 	update(MergeJobPatch{Current: intp(1)})
 
 	update(buildMergePhasePatch("renaming", "整理新卡信息中...", 1))
 	a.setTraceStatus(ctx, mergeID, "renaming")
-	token, e := a.searchTokenByName(ctx, uniqueName)
-	if e != nil {
-		return MergeResult{}, e
-	}
-	if token == nil || token.ID == 0 {
+	token := created.Token
+	if token.ID == 0 {
 		return MergeResult{}, errors.New("新卡创建成功但未找到，请稍后人工检查")
 	}
 	newCard := cloneMap(token.Raw)
-	createdID = toInt(newCard["id"])
+	createdID = token.ID
+	newCard["id"] = token.ID
+	newCard["key"] = created.Key
 	a.setTraceCreatedCard(ctx, mergeID, createdID)
 	newCard["name"] = target.Name
-	res, _, e = a.updateTokenRaw(ctx, newCard)
+	res, _, e := a.updateTokenRaw(ctx, newCard)
 	if e != nil || !res.OK() {
 		rb := attemptRollback("重命名失败")
 		if rb.succeeded {

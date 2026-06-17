@@ -43,14 +43,14 @@ func TestAdminSessionLoginSetsCookieAndAuthorizesConfigAPI(t *testing.T) {
 	}
 	t.Cleanup(shutdownRuntime)
 
-	badReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "wrong-token"})
+	badReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "secret-admin-token"})
 	badW := httptest.NewRecorder()
 	route(badW, badReq)
 	if badW.Code != http.StatusUnauthorized {
 		t.Fatalf("bad login code=%d body=%s", badW.Code, badW.Body.String())
 	}
 
-	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "secret-admin-token"})
+	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": temporaryAdminLoginPassword})
 	loginW := httptest.NewRecorder()
 	route(loginW, loginReq)
 	if loginW.Code != http.StatusOK {
@@ -87,7 +87,7 @@ func TestAdminSessionCookieAuthorizesForwardedActivityAdminAPIs(t *testing.T) {
 	}
 	t.Cleanup(shutdownRuntime)
 
-	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "secret-admin-token"})
+	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": temporaryAdminLoginPassword})
 	loginW := httptest.NewRecorder()
 	route(loginW, loginReq)
 	if loginW.Code != http.StatusOK {
@@ -104,6 +104,32 @@ func TestAdminSessionCookieAuthorizesForwardedActivityAdminAPIs(t *testing.T) {
 	}
 }
 
+func TestTemporaryAdminPasswordAuthorizesForwardedActivityAdminAPIsWhenTokenUnset(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	loginReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": temporaryAdminLoginPassword})
+	loginW := httptest.NewRecorder()
+	route(loginW, loginReq)
+	if loginW.Code != http.StatusOK {
+		t.Fatalf("login code=%d body=%s", loginW.Code, loginW.Body.String())
+	}
+	cookie := adminSessionCookieFromRecorder(t, loginW)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/stats", nil)
+	req.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("forwarded stats with temporary token code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 	html := readToolSiteUISource(t)
 	for _, want := range []string{
@@ -115,6 +141,10 @@ func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 		"/api/admin/sale-cards/run",
 		"/api/prizes",
 		"/api/newapi/sites",
+		"/api/nav/lines",
+		"/api/nav/tools",
+		"首页导航线路",
+		"首页卡片",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("production admin shell should reference %q", want)
@@ -139,6 +169,26 @@ func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 	} {
 		if strings.Contains(html, notWant) {
 			t.Fatalf("production admin shell should not expose inline token auth marker %q", notWant)
+		}
+	}
+}
+
+func TestProductionAdminShellDoesNotSwallowBusinessDataLoadFailures(t *testing.T) {
+	html := readToolSiteUISource(t)
+	for _, notWant := range []string{
+		"catch(() => undefined)",
+		"配置已加载', tone: 'ok' });",
+	} {
+		if strings.Contains(html, notWant) {
+			t.Fatalf("production admin shell should not silently swallow business-data load failures with marker %q", notWant)
+		}
+	}
+	for _, want := range []string{
+		"部分业务数据加载失败",
+		"loadBusinessData",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("production admin shell should expose partial-load failure handling marker %q", want)
 		}
 	}
 }
@@ -336,6 +386,332 @@ func TestAdminConfigSavesNewAPISitesForStatusAndCombine(t *testing.T) {
 	}
 	if body := connectivityW.Body.String(); !strings.Contains(body, "https://api-primary.example.test") || !strings.Contains(body, "https://api-backup.example.test") {
 		t.Fatalf("connectivity targets should reuse status-page base URLs, got %s", body)
+	}
+
+	navReq := httptest.NewRequest(http.MethodGet, "/api/nav/lines", nil)
+	navW := httptest.NewRecorder()
+	route(navW, navReq)
+	if navW.Code != http.StatusOK {
+		t.Fatalf("nav lines code=%d body=%s", navW.Code, navW.Body.String())
+	}
+	if body := navW.Body.String(); !strings.Contains(body, "https://api-primary.example.test") || !strings.Contains(body, "https://api-backup.example.test") {
+		t.Fatalf("homepage nav lines should reuse configured base URLs, got %s", body)
+	}
+
+	runReq := authorizedJSONRequest(t, http.MethodPost, "/api/admin/sale-cards/run", map[string]any{
+		"plan":        "__unknown_plan__",
+		"targetStock": 1,
+	})
+	runW := httptest.NewRecorder()
+	route(runW, runReq)
+	if runW.Code != http.StatusBadRequest || !strings.Contains(runW.Body.String(), "未知上架计划") {
+		t.Fatalf("sale-card run should reuse admin NewAPI config and reach plan validation, code=%d body=%s", runW.Code, runW.Body.String())
+	}
+}
+
+func TestNavLinesExposeHomepageDefaultsWithoutManagedSites(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(root, "missing-managed-sites.json"))
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	sitesReq := httptest.NewRequest(http.MethodGet, "/api/newapi/sites", nil)
+	sitesW := httptest.NewRecorder()
+	route(sitesW, sitesReq)
+	if sitesW.Code != http.StatusOK {
+		t.Fatalf("newapi sites code=%d body=%s", sitesW.Code, sitesW.Body.String())
+	}
+	if body := sitesW.Body.String(); !strings.Contains(body, `"configured":false`) || strings.Contains(body, `api.fufuapi.top`) {
+		t.Fatalf("runtime NewAPI sites must stay empty without token config, got %s", body)
+	}
+
+	navReq := httptest.NewRequest(http.MethodGet, "/api/nav/lines", nil)
+	navW := httptest.NewRecorder()
+	route(navW, navReq)
+	if navW.Code != http.StatusOK {
+		t.Fatalf("nav lines code=%d body=%s", navW.Code, navW.Body.String())
+	}
+	body := navW.Body.String()
+	for _, want := range []string{
+		"https://api.fufuapi.top",
+		"https://api.fufuapi.online",
+		"https://api.fufuflower.top",
+		"https://token.fufuapi.top",
+		"https://token.fufuapi.online",
+		"https://token.fufuflower.top",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("nav fallback should include %q, got %s", want, body)
+		}
+	}
+}
+
+func TestConnectivityTargetsSplitManagedSitesByAPIAndTokenCategory(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	saveAdminConfig(t, map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{"name": "次数站", "category": "api", "token": "api-token", "urls": []map[string]any{
+					{"name": "国内加速", "url": "https://api-a.example.test"},
+					{"name": "海外线路", "url": "https://api-b.example.test"},
+				}},
+				{"name": "Token 站", "category": "token", "token": "token-site-token", "urls": []map[string]any{
+					{"name": "主线路", "url": "https://token-a.example.test"},
+					{"name": "备用线路", "url": "https://token-b.example.test"},
+				}},
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/connectivity/targets", nil)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("connectivity targets code=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var payload struct {
+		Groups []struct {
+			ID   string   `json:"id"`
+			Name string   `json:"name"`
+			URLs []string `json:"urls"`
+		} `json:"groups"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode connectivity targets: %v body=%s", err, w.Body.String())
+	}
+	if len(payload.Groups) != 2 {
+		t.Fatalf("expected api/token groups, got %#v body=%s", payload.Groups, w.Body.String())
+	}
+	if payload.Groups[0].ID != "api" || payload.Groups[0].Name != "API 次数站" || len(payload.Groups[0].URLs) != 2 {
+		t.Fatalf("api group = %#v", payload.Groups[0])
+	}
+	if payload.Groups[1].ID != "token" || payload.Groups[1].Name != "Token 站" || len(payload.Groups[1].URLs) != 2 {
+		t.Fatalf("token group = %#v", payload.Groups[1])
+	}
+	for _, notWant := range []string{"NewAPI 站点", `"id":"newapi"`} {
+		if strings.Contains(w.Body.String(), notWant) {
+			t.Fatalf("connectivity targets should not merge categories into %q: %s", notWant, w.Body.String())
+		}
+	}
+}
+
+func TestAdminConfigSavesNavigationToolsForHomepage(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	saveAdminConfig(t, map[string]any{
+		"navigation": map[string]any{
+			"cards": []map[string]any{
+				{
+					"id":          "terminal",
+					"stamp":       "终端",
+					"title":       "Web Terminal",
+					"description": "服务器网页管理终端",
+					"accent":      "moss",
+					"links": []map[string]any{
+						{"label": "主线路", "href": "https://terminal.example.test", "ping": "https://terminal.example.test/health"},
+					},
+				},
+				{
+					"id":          "build",
+					"stamp":       "造物",
+					"title":       "Build",
+					"description": "AI 画图生成",
+					"accent":      "stone",
+					"href":        "https://build.example.test",
+				},
+			},
+		},
+	})
+
+	toolsReq := httptest.NewRequest(http.MethodGet, "/api/nav/tools", nil)
+	toolsW := httptest.NewRecorder()
+	route(toolsW, toolsReq)
+	if toolsW.Code != http.StatusOK {
+		t.Fatalf("nav tools code=%d body=%s", toolsW.Code, toolsW.Body.String())
+	}
+	body := toolsW.Body.String()
+	for _, want := range []string{"terminal", "https://terminal.example.test", "https://build.example.test"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("nav tools should include configured %q, got %s", want, body)
+		}
+	}
+	if strings.Contains(body, "https://terminal.fufuapi.top") || strings.Contains(body, "https://build.fufuapi.online") {
+		t.Fatalf("nav tools should use saved config instead of hardcoded defaults, got %s", body)
+	}
+
+	configReq := authorizedJSONRequest(t, http.MethodGet, "/api/admin/config", nil)
+	configW := httptest.NewRecorder()
+	route(configW, configReq)
+	if configW.Code != http.StatusOK {
+		t.Fatalf("admin config code=%d body=%s", configW.Code, configW.Body.String())
+	}
+	if body := configW.Body.String(); !strings.Contains(body, `"navigation"`) || !strings.Contains(body, "https://terminal.example.test") {
+		t.Fatalf("admin config should expose navigation config for editing, got %s", body)
+	}
+}
+
+func TestNavToolsResolveConfiguredLineCardsFromManagedSites(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	saveAdminConfig(t, map[string]any{
+		"newapi": map[string]any{
+			"sites": []map[string]any{
+				{
+					"name":      "主次数站",
+					"category":  "api",
+					"url":       "https://api-primary.example.test/",
+					"token":     "primary-token",
+					"userId":    "1",
+					"quotaUnit": 500000,
+				},
+				{
+					"name":      "主 Token 站",
+					"category":  "token",
+					"url":       "https://token-primary.example.test/",
+					"token":     "token-site-token",
+					"userId":    "1",
+					"quotaUnit": 500000,
+				},
+			},
+		},
+		"navigation": map[string]any{
+			"cards": []map[string]any{
+				{"id": "api", "stamp": "次数", "title": "API 次数站", "accent": "clay", "lineKind": "api"},
+				{"id": "token", "stamp": "额度", "title": "Token 站", "accent": "moss", "lineKind": "token"},
+				{"id": "status", "stamp": "状态", "title": "状态页", "accent": "moss", "href": "/status"},
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/nav/tools", nil)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("nav tools code=%d body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	for _, want := range []string{
+		`"id":"api"`,
+		`"lineKind":"api"`,
+		"https://api-primary.example.test",
+		`"id":"token"`,
+		`"lineKind":"token"`,
+		"https://token-primary.example.test",
+		"/status",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("nav tools should include configured line card %q, got %s", want, body)
+		}
+	}
+	for _, notWant := range []string{"https://api.fufuapi.top", "https://token.fufuapi.top"} {
+		if strings.Contains(body, notWant) {
+			t.Fatalf("nav tools should resolve from managed sites instead of fallback %q, got %s", notWant, body)
+		}
+	}
+}
+
+func TestNavToolsSortsRuntimeMultiLineCardsBeforeSingleLinkCards(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	saveAdminConfig(t, map[string]any{
+		"navigation": map[string]any{
+			"cards": []map[string]any{
+				{"id": "status", "stamp": "状态", "title": "状态页", "accent": "moss", "href": "/status"},
+				{"id": "api", "stamp": "次数", "title": "API 次数站", "accent": "clay", "lineKind": "api"},
+				{"id": "build", "stamp": "造物", "title": "Build", "accent": "stone", "href": "https://build.example.test"},
+				{"id": "token", "stamp": "额度", "title": "Token 站", "accent": "moss", "lineKind": "token"},
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/nav/tools", nil)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("nav tools code=%d body=%s", w.Code, w.Body.String())
+	}
+
+	var payload navToolsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode nav tools: %v body=%s", err, w.Body.String())
+	}
+	gotIDs := []string{}
+	for _, card := range payload.Cards {
+		gotIDs = append(gotIDs, card.ID)
+	}
+	wantIDs := []string{"api", "token", "status", "build"}
+	for i, want := range wantIDs {
+		if i >= len(gotIDs) || gotIDs[i] != want {
+			t.Fatalf("nav tools order = %#v, want prefix %#v", gotIDs, wantIDs)
+		}
+	}
+}
+
+func TestNavToolsExposeHomepageDefaults(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(root, "missing-managed-sites.json"))
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/nav/tools", nil)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("nav tools code=%d body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	for _, want := range []string{
+		"API 次数站",
+		`"lineKind":"api"`,
+		"https://api.fufuapi.top",
+		"Token 站",
+		`"lineKind":"token"`,
+		"https://token.fufuapi.top",
+		"Web Terminal",
+		"https://terminal.fufuapi.top",
+		"Build",
+		"https://build.fufuapi.online",
+		"/status",
+		"/combine",
+		"/activity",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("nav tools default should include %q, got %s", want, body)
+		}
 	}
 }
 
@@ -570,11 +946,15 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 			"startTS":             1780243200,
 			"endTS":               1782835199,
 			"targetExpectedValue": 4.5,
+			"gameConfigs": []map[string]any{
+				{"game": "slot", "targetExpectedValue": 4.5, "actualExpectedValue": 4.5},
+				{"game": "scratch", "targetExpectedValue": 2.5, "actualExpectedValue": 2.5},
+			},
 			"spinMap": map[string]int{
 				"42": 3,
 			},
 			"prizePool": []map[string]any{
-				{"type": "miss", "weight": 1},
+				{"type": "miss", "weight": 100},
 				{"type": "win", "dollars": 9, "weight": 1},
 			},
 			"tierPools": map[string][]map[string]any{
@@ -582,9 +962,6 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 					{"type": "miss", "weight": 1},
 					{"type": "win", "dollars": 7, "weight": 3},
 				},
-			},
-			"postJackpotPrizes": []map[string]any{
-				{"type": "win", "dollars": 1, "weight": 1},
 			},
 			"scratchRewards": []int{2, 4, 6, 8, 10, 12},
 		},
@@ -594,7 +971,7 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 	if cfg.StartText != "2026-06-01 00:00:00" || cfg.EndText != "2026-06-30 23:59:59" || cfg.StartTS != 1780243200 || cfg.EndTS != 1782835199 {
 		t.Fatalf("activity dates not applied: %#v", cfg)
 	}
-	if cfg.SpinMap[42] != 3 || len(cfg.TierPools[42]) != 2 || cfg.TierPools[42][1].Dollars != 7 || cfg.TierPools[42][1].Weight != 3 {
+	if cfg.DrawCountForTier(42) != 3 || len(cfg.PrizePool) != 2 || cfg.PrizePool[0].Weight != 100 || cfg.PrizePool[1].Dollars != 9 || cfg.PrizePool[1].Weight != 1 {
 		t.Fatalf("activity odds not applied: %#v", cfg)
 	}
 
@@ -612,6 +989,10 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 	if activity["targetExpectedValue"] != float64(4.5) || activity["actualExpectedValue"] != float64(4.5) {
 		t.Fatalf("activity expected values = %#v", activity)
 	}
+	gameConfigs, _ := activity["gameConfigs"].([]any)
+	if len(gameConfigs) < 2 {
+		t.Fatalf("activity should expose per-game configs, got %#v", activity)
+	}
 
 	prizesReq := httptest.NewRequest(http.MethodGet, "/api/prizes", nil)
 	prizesW := httptest.NewRecorder()
@@ -619,7 +1000,7 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 	if prizesW.Code != http.StatusOK {
 		t.Fatalf("prizes code=%d body=%s", prizesW.Code, prizesW.Body.String())
 	}
-	if body := prizesW.Body.String(); !strings.Contains(body, `"42"`) || !strings.Contains(body, `"dollars":7`) || !strings.Contains(body, `"weight":3`) {
+	if body := prizesW.Body.String(); !strings.Contains(body, `"gameConfigs"`) || !strings.Contains(body, `"dollars":9`) || !strings.Contains(body, `"weight":1`) || !strings.Contains(body, `"totalWeight":2`) || strings.Contains(body, `"tierPools"`) || strings.Contains(body, `"postJackpotPrizes"`) || strings.Contains(body, `"dollars":7`) {
 		t.Fatalf("activity prizes should reflect unified admin config, got %s", body)
 	}
 }

@@ -29,19 +29,11 @@ func restockBackend(t *testing.T, stockTotal int) (*atomic.Int32, *atomic.Int32,
 	setMCYCookieForTest(t, "manage_token=test")
 	var stockQ, create, upload atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/token/tokens" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
 			t.Fatalf("unexpected NewAPI request %s", r.URL.Path)
 		}
-		create.Add(1)
-		n := 1
-		if c := r.URL.Query().Get("tokenCount"); c != "" {
-			fmt.Sscanf(c, "%d", &n)
-		}
-		items := make([]any, 0, n)
-		for i := range n {
-			items = append(items, map[string]any{"id": i + 1, "key": fmt.Sprintf("key-%d", i)})
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
+		idx := create.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"id": idx, "key": fmt.Sprintf("key-%d", idx)}})
 	}))
 	t.Cleanup(tokenSrv.Close)
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +133,65 @@ func TestRunDueSaleCardSlotsFiresSlotsIndependently(t *testing.T) {
 	}
 }
 
+func TestRunDueSaleCardSlotsCatchesUpEarlierEnabledSpecial55Slot(t *testing.T) {
+	setupSaleCardConfigTestRoot(t)
+	resetSaleCardFiredGuard(t)
+	stockQ, create, upload := restockBackend(t, 1)
+
+	schedule := SaleCardScheduleConfig{
+		Enabled:  true,
+		Timezone: "Asia/Shanghai",
+		Slots: []SaleCardScheduleSlot{
+			{Group: "special55", Time: "19:54", Enabled: true, Jobs: []SaleCardScheduleJob{{Plan: "fufu-mix-special-55", TargetStock: 2, Enabled: true}}},
+			{Group: "month", Time: "23:30", Enabled: true, Jobs: []SaleCardScheduleJob{{Plan: "fufu-mix-month-100", TargetStock: 10, Enabled: true}}},
+		},
+	}
+	if err := saveSaleCardSchedule(schedule); err != nil {
+		t.Fatalf("saveSaleCardSchedule: %v", err)
+	}
+
+	runDueSaleCardSlots(time.Date(2026, 6, 16, 19, 58, 0, 0, time.FixedZone("CST", 8*60*60)))
+
+	if stockQ.Load() != 1 || create.Load() != 1 || upload.Load() != 1 {
+		t.Fatalf("special55 should catch up after its configured minute: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
+	}
+	runDueSaleCardSlots(time.Date(2026, 6, 16, 20, 1, 0, 0, time.FixedZone("CST", 8*60*60)))
+	if stockQ.Load() != 1 {
+		t.Fatalf("same-day catch-up should still be deduped, stock=%d", stockQ.Load())
+	}
+}
+
+func TestRunDueSaleCardSlotsRefiresWhenSpecial55TimeChangesSameDay(t *testing.T) {
+	setupSaleCardConfigTestRoot(t)
+	resetSaleCardFiredGuard(t)
+	stockQ, create, upload := restockBackend(t, 1)
+
+	schedule := SaleCardScheduleConfig{
+		Enabled:  true,
+		Timezone: "Asia/Shanghai",
+		Slots: []SaleCardScheduleSlot{
+			{Group: "special55", Time: "19:54", Enabled: true, Jobs: []SaleCardScheduleJob{{Plan: "fufu-mix-special-55", TargetStock: 2, Enabled: true}}},
+		},
+	}
+	if err := saveSaleCardSchedule(schedule); err != nil {
+		t.Fatalf("saveSaleCardSchedule: %v", err)
+	}
+
+	runDueSaleCardSlots(time.Date(2026, 6, 16, 20, 0, 0, 0, time.FixedZone("CST", 8*60*60)))
+	if stockQ.Load() != 1 || create.Load() != 1 || upload.Load() != 1 {
+		t.Fatalf("initial special55 fire failed: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
+	}
+
+	schedule.Slots[0].Time = "20:04"
+	if err := saveSaleCardSchedule(schedule); err != nil {
+		t.Fatalf("saveSaleCardSchedule updated time: %v", err)
+	}
+	runDueSaleCardSlots(time.Date(2026, 6, 16, 20, 4, 0, 0, time.FixedZone("CST", 8*60*60)))
+	if stockQ.Load() != 2 || create.Load() != 2 || upload.Load() != 2 {
+		t.Fatalf("special55 should re-evaluate after same-day time change: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
+	}
+}
+
 // TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime exercises the full scheduler
 // path: the 55卡 slot fires only at its configured minute, restocks to target
 // (MCY reports 8 in stock, target 20 → create 12), and refuses to re-run the
@@ -152,18 +203,11 @@ func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 
 	var stockHits, createHits, uploadHits atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/token/tokens" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
 			t.Fatalf("unexpected NewAPI request %s", r.URL.Path)
 		}
-		createHits.Add(1)
-		if got := r.URL.Query().Get("tokenCount"); got != "12" {
-			t.Fatalf("tokenCount=%q, want 12 (target 20 - current 8)", got)
-		}
-		items := make([]any, 0, 12)
-		for i := range 12 {
-			items = append(items, map[string]any{"id": i + 1, "key": "scheduled-key"})
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
+		idx := createHits.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"id": idx, "key": "scheduled-key"}})
 	}))
 	t.Cleanup(tokenSrv.Close)
 
@@ -211,7 +255,7 @@ func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 
 	// Matching minute → the 55卡 slot fires once and restocks 20-8=12.
 	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 30, 30, 0, time.UTC))
-	if stockHits.Load() != 1 || createHits.Load() != 1 || uploadHits.Load() != 1 {
+	if stockHits.Load() != 1 || createHits.Load() != 12 || uploadHits.Load() != 1 {
 		t.Fatalf("expected one restock: search=%d create=%d upload=%d", stockHits.Load(), createHits.Load(), uploadHits.Load())
 	}
 

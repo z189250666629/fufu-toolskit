@@ -17,19 +17,36 @@
     return Number.isFinite(number) ? number : 0;
   }
 
-  function prizeSymbol(symbols, dollars) {
-    return escapeHtml(symbols?.[dollars] || '🎁');
+  function prizeSymbol(symbols, dollars, rank) {
+    const rankSymbols = {
+      jackpot: '🏆',
+      second: '👑',
+      third: '⭐',
+    };
+    return escapeHtml(symbols?.[dollars] || rankSymbols[rank] || '🎁');
+  }
+
+  function prizeRankClass(rank) {
+    return ['jackpot', 'second', 'third'].includes(rank) ? rank : '';
+  }
+
+  function prizeLabel(row, jackpot) {
+    const label = String(row?.label || '').trim();
+    const dollars = normalizeDollars(row?.dollars);
+    return `${label ? `${escapeHtml(label)} ` : ''}$${escapeHtml(dollars)}${jackpot ? ' JP' : ''}`;
   }
 
   function buildPrizeTableHtml(rows, symbols) {
     return safeRows(rows).map((row) => {
       const dollars = normalizeDollars(row?.dollars);
-      const jackpot = dollars === 1000;
+      const rank = String(row?.rank || '').trim();
+      const jackpot = rank === 'jackpot';
+      const rankClass = prizeRankClass(rank);
       return `
-        <div class="prize-row ${jackpot ? 'jackpot' : ''}">
-          <div class="symbol">${prizeSymbol(symbols, dollars)}</div>
+        <div class="prize-row ${rankClass}">
+          <div class="symbol">${prizeSymbol(symbols, dollars, rank)}</div>
           <div class="prize-main">
-            <div class="amount">$${escapeHtml(dollars)}${jackpot ? ' JP' : ''}</div>
+            <div class="amount">${prizeLabel(row, jackpot)}</div>
             <div class="odds">${escapeHtml(row?.pct)}%</div>
           </div>
         </div>

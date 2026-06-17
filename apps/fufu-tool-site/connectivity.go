@@ -57,25 +57,71 @@ func connectivityGroupsWithError() ([]map[string]any, string) {
 
 func connectivityGroupsFromManagedSites() []map[string]any {
 	sites, _ := managedSitesForRuntime()
-	urls := []string{}
-	seen := map[string]bool{}
-	for _, site := range sites {
-		if u, ok := publicBrowserTargetOrigin(site.URL); ok && !seen[u] {
-			urls = append(urls, u)
-			seen[u] = true
+	type groupAccumulator struct {
+		id   string
+		name string
+		urls []string
+		seen map[string]bool
+	}
+	groupsByKind := map[string]*groupAccumulator{}
+	for _, category := range defaultNavigationLineCategories() {
+		groupsByKind[category.Kind] = &groupAccumulator{
+			id:   category.Kind,
+			name: category.Name,
+			seen: map[string]bool{},
 		}
 	}
-	if len(urls) == 0 {
-		return nil
+	for _, site := range sites {
+		u, ok := publicBrowserTargetOrigin(site.URL)
+		if !ok {
+			continue
+		}
+		kind := normalizedConnectivitySiteKind(site.Category, site.Name)
+		group, ok := groupsByKind[kind]
+		if !ok {
+			continue
+		}
+		if !group.seen[u] {
+			group.urls = append(group.urls, u)
+			group.seen[u] = true
+		}
 	}
-	return []map[string]any{{"id": "newapi", "name": "NewAPI 站点", "urls": urls}}
+	out := []map[string]any{}
+	for _, kind := range []string{"api", "token"} {
+		group := groupsByKind[kind]
+		if group != nil && len(group.urls) > 0 {
+			out = append(out, map[string]any{"id": group.id, "name": group.name, "urls": group.urls})
+		}
+	}
+	return out
+}
+
+func normalizedConnectivitySiteKind(category, name string) string {
+	kind := strings.ToLower(strings.TrimSpace(category))
+	if kind == "" {
+		if strings.Contains(strings.ToLower(strings.TrimSpace(name)), "token") {
+			return "token"
+		}
+		return "api"
+	}
+	switch kind {
+	case "api", "token":
+		return kind
+	default:
+		return ""
+	}
 }
 
 func defaultConnectivityGroups() []map[string]any {
-	return []map[string]any{
-		{"id": "api", "name": "API 次数站", "urls": []string{"https://api.fufuapi.top", "https://api.fufuapi.online", "https://api.fufuflower.top"}},
-		{"id": "token", "name": "Token 站", "urls": []string{"https://token.fufuapi.top", "https://token.fufuapi.online", "https://token.fufuflower.top"}},
+	groups := []map[string]any{}
+	for _, category := range defaultNavigationLineCategories() {
+		urls := make([]string, 0, len(category.Lines))
+		for _, line := range category.Lines {
+			urls = append(urls, line.URL)
+		}
+		groups = append(groups, map[string]any{"id": category.Kind, "name": category.Name, "urls": urls})
 	}
+	return groups
 }
 
 func connectivityTargetURLs(explicitName, legacyName, fallbackName string) []string {

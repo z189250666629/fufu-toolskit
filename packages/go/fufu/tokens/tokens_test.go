@@ -31,6 +31,19 @@ func TestNormalizeKeysAcceptsFullWidthPunctuationAndQuotedJSONPaste(t *testing.T
 	}
 }
 
+func TestIsMaskedKey(t *testing.T) {
+	for _, key := range []string{"sk-********masked", "sk-abcd…wxyz"} {
+		if !IsMaskedKey(key) {
+			t.Fatalf("IsMaskedKey(%q) = false, want true", key)
+		}
+	}
+	for _, key := range []string{"sk-full-key-value", "full-key-value", ""} {
+		if IsMaskedKey(key) {
+			t.Fatalf("IsMaskedKey(%q) = true, want false", key)
+		}
+	}
+}
+
 func TestBatchSearchFoundAndMissing(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := r.URL.Query().Get("token")
@@ -211,6 +224,15 @@ func TestSearchCreateUpdateDelete(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
 		case r.Method == http.MethodDelete && r.URL.Path == "/api/token/2":
 			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/batch/keys":
+			var raw map[string][]int
+			_ = json.NewDecoder(r.Body).Decode(&raw)
+			if len(raw["ids"]) != 1 || raw["ids"][0] != 2 {
+				t.Fatalf("bad batch key body: %#v", raw)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"keys": map[string]any{"2": "createdkeyxx"}}})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/2/key":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"key": "createdkeyxx"}})
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -228,8 +250,150 @@ func TestSearchCreateUpdateDelete(t *testing.T) {
 	if res, _, err := svc.UpdateTokenRaw(context.Background(), found.Raw); err != nil || !res.OK() {
 		t.Fatalf("UpdateTokenRaw res=%+v err=%v", res, err)
 	}
+	key, err := svc.GetTokenKey(context.Background(), found.ID)
+	if err != nil || key != "sk-createdkeyxx" {
+		t.Fatalf("GetTokenKey key=%q err=%v", key, err)
+	}
+	keys, err := svc.GetTokenKeysBatch(context.Background(), []int{found.ID})
+	if err != nil || keys[found.ID] != "sk-createdkeyxx" {
+		t.Fatalf("GetTokenKeysBatch keys=%#v err=%v", keys, err)
+	}
 	if ok, res, err := svc.DeleteToken(context.Background(), 2); err != nil || !ok || !res.OK() {
 		t.Fatalf("DeleteToken ok=%v res=%+v err=%v", ok, res, err)
+	}
+}
+
+func TestCreateTokenAndResolveKeyUsesCreateResponseKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data": map[string]any{
+				"id":           9,
+				"name":         "created-direct",
+				"key":          "direct-key",
+				"remain_quota": 100,
+				"group":        "mix",
+			},
+		})
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	created, err := svc.CreateTokenAndResolveKey(context.Background(), map[string]any{"name": "created-direct"}, "created-direct")
+
+	if err != nil {
+		t.Fatalf("CreateTokenAndResolveKey err=%v", err)
+	}
+	if created.Key != "sk-direct-key" || created.Token.ID != 9 || created.Token.Key != "sk-direct-key" || created.Token.Raw["key"] != "sk-direct-key" {
+		t.Fatalf("created=%#v", created)
+	}
+}
+
+func TestCreateTokenAndResolveKeyUsesUnmaskedSearchKey(t *testing.T) {
+	var createdName string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/":
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			createdName = getString(body, "name")
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			if r.URL.Query().Get("keyword") != createdName {
+				t.Fatalf("keyword=%q, want %q", r.URL.Query().Get("keyword"), createdName)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+				map[string]any{"id": 12, "name": createdName, "key": "legacy-full-key", "remain_quota": 100, "group": "mix"},
+			}})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	created, err := svc.CreateTokenAndResolveKey(context.Background(), map[string]any{"name": "created-search"}, "")
+
+	if err != nil {
+		t.Fatalf("CreateTokenAndResolveKey err=%v", err)
+	}
+	if created.Key != "sk-legacy-full-key" || created.Token.ID != 12 || created.Token.Raw["key"] != "sk-legacy-full-key" {
+		t.Fatalf("created=%#v", created)
+	}
+}
+
+func TestCreateTokenAndResolveKeyFallsBackToKeyEndpointForMaskedSearchKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+				map[string]any{"id": 13, "name": "masked-search", "key": "sk-********abcd", "remain_quota": 100, "group": "mix"},
+			}})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/batch/keys":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"keys": map[string]any{"13": "resolved-key"}}})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	created, err := svc.CreateTokenAndResolveKey(context.Background(), map[string]any{"name": "masked-search"}, "")
+
+	if err != nil {
+		t.Fatalf("CreateTokenAndResolveKey err=%v", err)
+	}
+	if created.Key != "sk-resolved-key" || created.Token.ID != 13 || created.Token.Raw["key"] != "sk-resolved-key" {
+		t.Fatalf("created=%#v", created)
+	}
+}
+
+func TestCreateTokenAndResolveKeyFallsBackToTokenDetailWhenKeyEndpointsAreUnsupported(t *testing.T) {
+	paths := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+				map[string]any{"id": 14, "name": "legacy-detail", "key": "sk-********masked", "remain_quota": 100, "group": "mix"},
+			}})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/batch/keys":
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "Invalid URL (POST /api/token/batch/keys)"})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/14/key":
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "Invalid URL (POST /api/token/14/key)"})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/14":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{
+				"id": 14, "name": "legacy-detail", "key": "legacy-detail-full-key", "remain_quota": 100, "group": "mix",
+			}})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer server.Close()
+	svc := NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "x", UserID: "1"}))
+
+	created, err := svc.CreateTokenAndResolveKey(context.Background(), map[string]any{"name": "legacy-detail"}, "")
+
+	if err != nil {
+		t.Fatalf("CreateTokenAndResolveKey err=%v", err)
+	}
+	if created.Key != "sk-legacy-detail-full-key" || created.Token.ID != 14 || created.Token.Raw["key"] != "sk-legacy-detail-full-key" {
+		t.Fatalf("created=%#v", created)
+	}
+	got := strings.Join(paths, " | ")
+	for _, want := range []string{"POST /api/token/batch/keys", "POST /api/token/14/key", "GET /api/token/14"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("paths=%q, missing %q", got, want)
+		}
 	}
 }
 
@@ -294,6 +458,14 @@ func TestMutationMethodsReturnConfigurationErrorForNilService(t *testing.T) {
 		}},
 		{name: "CreateTokens", call: func() error {
 			_, _, err := svc.CreateTokens(context.Background(), 2, map[string]any{"name": "card"})
+			return err
+		}},
+		{name: "GetTokenKey", call: func() error {
+			_, err := svc.GetTokenKey(context.Background(), 1)
+			return err
+		}},
+		{name: "GetTokenKeysBatch", call: func() error {
+			_, err := svc.GetTokenKeysBatch(context.Background(), []int{1})
 			return err
 		}},
 		{name: "UpdateTokenRaw", call: func() error {

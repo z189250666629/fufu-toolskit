@@ -98,7 +98,7 @@ func TestToolSiteAdminShellIsIntegrated(t *testing.T) {
 	}
 }
 
-func TestToolSiteActivityAdminRemainsEmbeddedModule(t *testing.T) {
+func TestToolSiteActivityAdminRoutesRedirectToUnifiedAdmin(t *testing.T) {
 	root := t.TempDir()
 	writeToolSiteFixture(t, root)
 	if err := initRuntime(root); err != nil {
@@ -106,14 +106,21 @@ func TestToolSiteActivityAdminRemainsEmbeddedModule(t *testing.T) {
 	}
 	t.Cleanup(shutdownRuntime)
 
-	req := httptest.NewRequest(http.MethodGet, "/activity-admin", nil)
-	w := httptest.NewRecorder()
-	route(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("activity admin code=%d body=%s", w.Code, w.Body.String())
-	}
-	if !strings.Contains(w.Body.String(), "ADMIN PANEL") {
-		t.Fatalf("activity admin body %q does not contain ADMIN PANEL", w.Body.String())
+	for _, path := range []string{"/activity-admin", "/activity-admin/", "/activity-admin.html"} {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			route(w, req)
+			if w.Code != http.StatusFound {
+				t.Fatalf("%s code=%d body=%s", path, w.Code, w.Body.String())
+			}
+			if got := w.Header().Get("Location"); got != "/admin" {
+				t.Fatalf("%s Location=%q, want /admin", path, got)
+			}
+			if strings.Contains(w.Body.String(), "ADMIN PANEL") {
+				t.Fatalf("%s leaked raw activity admin body: %q", path, w.Body.String())
+			}
+		})
 	}
 }
 
@@ -130,7 +137,6 @@ func TestToolSiteServesActivityAssetsFromRootForMergedRoutes(t *testing.T) {
 		want string
 	}{
 		{path: "/activity-api.js", want: "window.activityApi"},
-		{path: "/admin-render.js", want: "window.adminRender"},
 		{path: "/activity/activity-api.js", want: "window.activityApi"},
 		{path: "/nav-ui-tokens.css", want: "fufu-navigation-ui-tokens"},
 		{path: "/assets/app.js", want: "fufu heroui app"},
@@ -144,6 +150,29 @@ func TestToolSiteServesActivityAssetsFromRootForMergedRoutes(t *testing.T) {
 			}
 			if !strings.Contains(w.Body.String(), tc.want) {
 				t.Fatalf("%s body %q does not contain %q", tc.path, w.Body.String(), tc.want)
+			}
+		})
+	}
+}
+
+func TestToolSiteDoesNotServeLegacyActivityAdminAssets(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	for _, path := range []string{"/admin-render.js", "/activity/admin-render.js"} {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			route(w, req)
+			if w.Code == http.StatusOK {
+				t.Fatalf("%s should not serve legacy activity admin asset: body=%s", path, w.Body.String())
+			}
+			if strings.Contains(w.Body.String(), "window.adminRender") {
+				t.Fatalf("%s leaked legacy activity admin asset body: %s", path, w.Body.String())
 			}
 		})
 	}

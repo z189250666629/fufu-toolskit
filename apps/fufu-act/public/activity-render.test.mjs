@@ -12,19 +12,21 @@ async function loadActivityRender() {
 
 test('activity render escapes history timestamp and coerces prize rows', async () => {
   const render = await loadActivityRender();
-  const symbols = { 1000: '<b>JP</b>', 5: '🍀' };
+  const symbols = { 5: '🍀' };
 
   const prizeHtml = render.buildPrizeTableHtml([
-    { dollars: '1000', pct: '0.40<script>' },
+    { dollars: '500', rank: 'jackpot', label: '<b>大奖</b>', pct: '0.40<script>' },
+    { dollars: '300', rank: 'second', label: '二等奖', pct: '1.20' },
     { dollars: 'not-a-number' }
   ], symbols);
 
   assert.match(prizeHtml, /class="prize-row jackpot"/);
-  assert.match(prizeHtml, /\$1000 JP/);
+  assert.match(prizeHtml, /&lt;b&gt;大奖&lt;\/b&gt; \$500 JP/);
+  assert.match(prizeHtml, /class="prize-row second"/);
+  assert.match(prizeHtml, /二等奖 \$300/);
   assert.match(prizeHtml, /0\.40&lt;script&gt;%/);
   assert.doesNotMatch(prizeHtml, /0\.40<script>%/);
-  assert.match(prizeHtml, /&lt;b&gt;JP&lt;\/b&gt;/);
-  assert.doesNotMatch(prizeHtml, /<b>JP<\/b>/);
+  assert.doesNotMatch(prizeHtml, /<b>大奖<\/b>/);
 
   const historyHtml = render.buildHistoryHtml([
     { prize_dollars: '5', created_at: '<img src=x onerror=alert(1)>' }

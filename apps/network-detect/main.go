@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"fufu/newapi"
+	"fufu/modelcore"
 	"fufu/webutil"
 )
 
@@ -48,81 +48,11 @@ type apiResult struct {
 	Error  string
 	Data   map[string]any
 }
-type LogRow struct {
-	ModelName string
-	TokenName string
-	Group     string
-	RequestID string
-	Quota     int64
-	CreatedAt int64
-	Status    int
-	Raw       map[string]any
-}
-type Channel struct {
-	ID           int
-	Name         string
-	Status       int
-	Models       []string
-	Groups       []string
-	ResponseTime int64
-	Raw          map[string]any
-}
-type Pricing struct {
-	Input    float64 `json:"input"`
-	Output   float64 `json:"output"`
-	Currency string  `json:"currency"`
-}
-type SiteStatus struct {
-	Site          newapi.PublicSite `json:"site"`
-	Groups        []string          `json:"groups"`
-	Status        string            `json:"status"`
-	RequestCount  int               `json:"requestCount"`
-	SuccessCount  int               `json:"successCount"`
-	FailureCount  int               `json:"failureCount"`
-	SuccessRate   *float64          `json:"successRate"`
-	LastSeenAt    int64             `json:"lastSeenAt"`
-	LogError      string            `json:"logError,omitempty"`
-	ChannelsError string            `json:"channelsError,omitempty"`
-	PricingError  string            `json:"pricingError,omitempty"`
-}
-type ModelCell struct {
-	Configured          bool                  `json:"configured"`
-	SiteName            string                `json:"siteName"`
-	Model               string                `json:"model"`
-	Status              string                `json:"status"`
-	RequestCount        int                   `json:"requestCount"`
-	SuccessCount        int                   `json:"successCount"`
-	FailureCount        int                   `json:"failureCount"`
-	SuccessRate         *float64              `json:"successRate"`
-	LastSuccessAt       int64                 `json:"lastSuccessAt"`
-	LastFailureAt       int64                 `json:"lastFailureAt"`
-	LastSeenAt          int64                 `json:"lastSeenAt"`
-	EnabledChannelCount int                   `json:"enabledChannelCount"`
-	TotalChannelCount   int                   `json:"totalChannelCount"`
-	Groups              []string              `json:"groups"`
-	GroupStats          map[string]*ModelCell `json:"groupStats,omitempty"`
-	Pricing             *Pricing              `json:"pricing,omitempty"`
-	ManualTest          any                   `json:"manualTest,omitempty"`
-	NextTestAllowedAt   int64                 `json:"nextTestAllowedAt,omitempty"`
-}
-type ModelRow struct {
-	Model            string                `json:"model"`
-	Status           string                `json:"status"`
-	OperationalSites int                   `json:"operationalSites"`
-	ConfiguredSites  int                   `json:"configuredSites"`
-	PerSite          map[string]*ModelCell `json:"perSite"`
-}
-type ModelStatus struct {
-	Configured          bool           `json:"configured"`
-	ConfigError         string         `json:"configError,omitempty"`
-	GeneratedAt         int64          `json:"generatedAt"`
-	ExpiresAt           int64          `json:"expiresAt"`
-	WindowSeconds       int            `json:"windowSeconds"`
-	RefreshEverySeconds int            `json:"refreshEverySeconds"`
-	Sites               []SiteStatus   `json:"sites"`
-	Models              []ModelRow     `json:"models"`
-	Totals              map[string]int `json:"totals"`
-}
+type LogRow = modelcore.LogRow
+type Channel = modelcore.Channel
+type Pricing = modelcore.Pricing
+type ModelCell = modelcore.ModelCell
+type ModelRow = modelcore.ModelRow
 
 type modelStatusBuildCall struct {
 	done   chan struct{}

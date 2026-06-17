@@ -56,7 +56,7 @@ func setupScratchLockTestDB(t *testing.T) {
 
 func seedScratchCard(t *testing.T, key string) {
 	t.Helper()
-	if _, err := db.Exec(`INSERT INTO cards (card_key, card_name, dollars, total_spins) VALUES (?,?,?,?)`, key, "scratch-test", 55, 0); err != nil {
+	if _, err := db.Exec(`INSERT INTO cards (card_key, card_name, dollars, total_spins) VALUES (?,?,?,?)`, key, "scratch-test", 55, 1); err != nil {
 		t.Fatal(err)
 	}
 }

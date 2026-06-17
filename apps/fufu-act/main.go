@@ -39,6 +39,7 @@ var startCreditWorker = func() {
 	go creditWorker()
 }
 
+const scratchCellCount = activity.ScratchCells
 const scratchMines = activity.ScratchMines
 const scratchMaxReveals = activity.ScratchMaxReveals
 
@@ -132,8 +133,11 @@ func initAll() error {
 }
 
 type spinResult struct {
-	Type    string
-	Dollars int
+	Type       string
+	Dollars    int
+	Rank       string
+	Label      string
+	Advertised bool
 }
 
 type httpErr struct {

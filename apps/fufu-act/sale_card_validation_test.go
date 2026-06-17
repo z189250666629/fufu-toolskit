@@ -10,7 +10,7 @@ import (
 )
 
 func validBaseSaleCardPlan() SaleCardPlan {
-	return SaleCardPlan{Count: 2, Quota: 55, IntervalUnit: 9, ItemID: 29, SKUID: 66}
+	return SaleCardPlan{Count: 2, Quota: 55, Group: saleCardDefaultTokenGroup, IntervalUnit: 9, ItemID: 29, SKUID: 66}
 }
 
 func TestValidateSaleCardPlanAcceptsCountOrTargetMode(t *testing.T) {
@@ -57,11 +57,12 @@ func TestValidateSaleCardPlanRejectsInvalidFields(t *testing.T) {
 
 func TestSaleCardPlanSlotMapsKnownAndUnknownPlans(t *testing.T) {
 	cases := map[string]string{
-		"fufu-mix-special-55": saleCardSlotSpecial55,
-		"fufu-mix-month-100":  saleCardSlotMonth,
-		"fufu-mix-month-1000": saleCardSlotMonth,
-		"unknown-plan":        "",
-		"":                    "",
+		"fufu-mix-special-55":                saleCardSlotSpecial55,
+		"fufu-mix-month-100":                 saleCardSlotMonth,
+		"fufu-mix-month-1000":                saleCardSlotMonth,
+		"fufu-mix-month-custom-not-template": "",
+		"unknown-plan":                       "",
+		"":                                   "",
 	}
 	for plan, want := range cases {
 		if got := saleCardPlanSlot(plan); got != want {
@@ -101,7 +102,7 @@ func TestSaleCardPlanFromRunRequestKeepsTemplateWhenOverridesZero(t *testing.T) 
 		t.Fatalf("error: %v", err)
 	}
 	// TargetStock not sent (0) -> template default (0) kept; item/sku from template.
-	if plan.TargetStock != 0 || plan.ItemID != 29 || plan.SKUID != 66 || plan.Quota != 55 {
+	if plan.TargetStock != 0 || plan.ItemID != 29 || plan.SKUID != 66 || plan.Quota != 55 || plan.IntervalUnit != 3 {
 		t.Fatalf("template fields should remain: %#v", plan)
 	}
 }

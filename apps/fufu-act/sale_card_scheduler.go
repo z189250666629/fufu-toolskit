@@ -3,6 +3,7 @@ package activityapp
 import (
 	"context"
 	"fmt"
+	"fufu/salecore"
 	"sync"
 	"time"
 	// Embed the IANA timezone database so time.LoadLocation works on any host
@@ -56,25 +57,33 @@ func runDueSaleCardSlots(now time.Time) {
 	hhmm := local.Format("15:04")
 	day := local.Format("2006-01-02")
 	for _, slot := range schedule.Slots {
-		if !slot.Enabled || slot.Time != hhmm {
+		if !slot.Enabled || !saleCardSlotDue(slot.Time, hhmm) {
 			continue
 		}
-		if !markSaleCardSlotFired(slot.Group, day) {
+		if !markSaleCardSlotFired(saleCardSlotFireKey(slot), day) {
 			continue
 		}
 		runSaleCardSlot(slot)
 	}
 }
 
+func saleCardSlotDue(slotTime, currentHHMM string) bool {
+	return salecore.SlotDue(slotTime, currentHHMM)
+}
+
+func saleCardSlotFireKey(slot SaleCardScheduleSlot) string {
+	return salecore.SlotFireKey(slot)
+}
+
 // markSaleCardSlotFired records that a slot fired on the given day and reports
 // whether this call won the race (true = caller should run the slot).
-func markSaleCardSlotFired(group, day string) bool {
+func markSaleCardSlotFired(key, day string) bool {
 	saleCardFiredGuard.Lock()
 	defer saleCardFiredGuard.Unlock()
-	if saleCardFiredGuard.day[group] == day {
+	if saleCardFiredGuard.day[key] == day {
 		return false
 	}
-	saleCardFiredGuard.day[group] = day
+	saleCardFiredGuard.day[key] = day
 	return true
 }
 

@@ -9,6 +9,7 @@ type ToolLink = {
 };
 
 type ToolCard = {
+  id?: string;
   stamp: string;
   title: string;
   description?: string;
@@ -17,56 +18,19 @@ type ToolCard = {
   links?: ToolLink[];
 };
 
-// fallback line urls if /api/nav/lines is empty or unreachable
-const STATIC_API_LINES: ToolLink[] = [
-  { label: '线路 一', href: 'https://api.fufuapi.top', ping: 'https://api.fufuapi.top' },
-  { label: '线路 二', href: 'https://api.fufuapi.online', ping: 'https://api.fufuapi.online' },
-  { label: '线路 三', href: 'https://api.fufuflower.top', ping: 'https://api.fufuflower.top' }
-];
+type NavToolsResponse = { cards?: ToolCard[] };
 
-const STATIC_TOKEN_LINES: ToolLink[] = [
-  { label: '线路 一', href: 'https://token.fufuapi.top', ping: 'https://token.fufuapi.top' },
-  { label: '线路 二', href: 'https://token.fufuapi.online', ping: 'https://token.fufuapi.online' },
-  { label: '线路 三', href: 'https://token.fufuflower.top', ping: 'https://token.fufuflower.top' }
-];
-
-const staticCards: ToolCard[] = [
-  {
-    stamp: '终端',
-    title: 'Web Terminal',
-    description: '服务器网页管理终端',
-    accent: 'moss',
-    links: [
-      { label: '线路 一', href: 'https://terminal.fufuapi.top', ping: 'https://terminal.fufuapi.top' },
-      { label: '线路 二', href: 'https://terminal.if.tc', ping: 'https://terminal.if.tc' }
-    ]
-  },
-  { stamp: '造物', title: 'Build', description: 'AI 画图生成', accent: 'stone', href: 'https://build.fufuapi.online' },
-  { stamp: '状态', title: 'API / 模型状态', description: '连通性检测、模型可用性与手动测试', accent: 'moss', href: '/status' },
-  { stamp: '合卡', title: '合卡工具', description: '自助合并额度卡，复用统一 NewAPI 配置', accent: 'clay', href: '/combine' },
-  { stamp: '活动', title: '活动前台', description: '抽奖、刮刮卡与福利入口', accent: 'stone', href: '/activity' }
-];
-
-type NavLine = { name: string; url: string };
-type NavCategory = { kind: string; name: string; lines: NavLine[] };
-
-function useNavLines() {
-  const [cats, setCats] = useState<NavCategory[] | null>(null);
+function useNavTools() {
+  const [cards, setCards] = useState<ToolCard[] | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/nav/lines', { signal: controller.signal })
+    fetch('/api/nav/tools', { signal: controller.signal })
       .then((response) => response.json())
-      .then((data) => setCats(Array.isArray(data.categories) ? data.categories : []))
-      .catch(() => setCats(null));
+      .then((data: NavToolsResponse) => setCards(Array.isArray(data.cards) ? data.cards : []))
+      .catch(() => setCards(null));
     return () => controller.abort();
   }, []);
-  return cats;
-}
-
-function linesFor(cats: NavCategory[] | null, kind: string, fallback: ToolLink[]): ToolLink[] {
-  const lines = cats?.find((cat) => cat.kind === kind)?.lines ?? [];
-  if (!lines.length) return fallback;
-  return lines.map((line, index) => ({ label: line.name || `线路 ${index + 1}`, href: line.url, ping: line.url }));
+  return cards;
 }
 
 function latencyClass(ms: number) {
@@ -100,7 +64,7 @@ function useLatency(url?: string) {
 }
 
 function LatencyAnchor({ link }: { link: ToolLink }) {
-  const latency = useLatency(link.ping);
+  const latency = useLatency(link.ping || link.href);
   return (
     <a className="tool-link" href={link.href}>
       <span>{link.label}</span>
@@ -116,7 +80,7 @@ function NavigationCard({ card, index }: { card: ToolCard; index: number }) {
       <BlueprintStamp>{card.stamp}</BlueprintStamp>
       <Card.Title className="tool-card-title">{card.title}</Card.Title>
       {card.description ? <Card.Description className="tool-card-description">{card.description}</Card.Description> : null}
-      {card.links ? (
+      {card.links?.length ? (
         <div className="tool-links">
           {card.links.map((link) => <LatencyAnchor key={link.href} link={link} />)}
         </div>
@@ -138,12 +102,7 @@ function NavigationCard({ card, index }: { card: ToolCard; index: number }) {
 }
 
 export function HomePage() {
-  const navCats = useNavLines();
-  const toolCards: ToolCard[] = [
-    { stamp: '次数', title: 'API 次数站', accent: 'clay', links: linesFor(navCats, 'api', STATIC_API_LINES) },
-    { stamp: '额度', title: 'Token 站', accent: 'moss', links: linesFor(navCats, 'token', STATIC_TOKEN_LINES) },
-    ...staticCards
-  ];
+  const toolCards = useNavTools() ?? [];
   return (
     <>
       <TopActions>
@@ -153,7 +112,7 @@ export function HomePage() {
       <main className="blueprint-page home-page">
         <BlueprintHeader title="fufu 工 具 站" subtitle="导 航 · 状 态 · 合 卡 · 活 动" />
         <section className="tool-grid" aria-label="fufu 工具导航">
-          {toolCards.map((card, index) => <NavigationCard key={card.title} card={card} index={index} />)}
+          {toolCards.map((card, index) => <NavigationCard key={card.id || card.title} card={card} index={index} />)}
         </section>
       </main>
     </>

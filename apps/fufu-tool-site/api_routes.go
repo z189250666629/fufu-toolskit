@@ -13,6 +13,7 @@ var networkAPIRoutes = []networkAPIRouteSpec{
 	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/connectivity/targets")},
 	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/newapi/sites")},
 	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/nav/lines")},
+	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/nav/tools")},
 	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/newapi/model-status")},
 	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/newapi/overview")},
 	{Method: http.MethodPost, Match: exactNetworkAPIPath("/api/newapi/model-status/test")},

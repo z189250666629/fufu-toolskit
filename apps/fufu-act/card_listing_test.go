@@ -12,21 +12,26 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestGenerateAndUploadSaleCardsCreatesTokensAndUploadsEncryptedMCY(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=test")
+	setSaleCardNowForTest(t, time.Date(2026, 6, 16, 12, 34, 56, 0, time.UTC))
 
+	var createHits atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/token/tokens" || r.URL.Query().Get("tokenCount") != "2" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
 			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
 		}
 		var body map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("decode NewAPI body: %v", err)
 		}
-		if name := strings.TrimSpace(fmt.Sprint(body["name"])); !strings.HasPrefix(name, "daily-special-") {
-			t.Fatalf("token name = %q, want daily-special-*", name)
+		idx := createHits.Add(1)
+		wantName := fmt.Sprintf("daily-speci-20260616-123456-%02d", idx)
+		if name := strings.TrimSpace(fmt.Sprint(body["name"])); name != wantName {
+			t.Fatalf("token name = %q, want %q", name, wantName)
 		}
 		if got, want := int64(body["remain_quota"].(float64)), int64(55_000); got != want {
 			t.Fatalf("remain_quota=%d, want %d; body=%#v", got, want, body)
@@ -34,15 +39,16 @@ func TestGenerateAndUploadSaleCardsCreatesTokensAndUploadsEncryptedMCY(t *testin
 		if got, want := int64(body["interval_quota"].(float64)), int64(55_000); got != want {
 			t.Fatalf("interval_quota=%d, want %d; body=%#v", got, want, body)
 		}
-		if body["group"] != "mix" || int(body["interval_unit"].(float64)) != 9 || body["unlimited_quota"] != false {
+		if body["group"] != "mix" || int(body["interval_unit"].(float64)) != 3 || body["unlimited_quota"] != false {
 			t.Fatalf("unexpected token create body: %#v", body)
+		}
+		key := "generated-a"
+		if idx == 2 {
+			key = "sk-generated-b"
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"success": true,
-			"data": []any{
-				map[string]any{"id": 1, "key": "generated-a", "name": "x", "remain_quota": 55_000, "interval_unit": 9, "status": 1},
-				map[string]any{"id": 2, "key": "sk-generated-b", "name": "x", "remain_quota": 55_000, "interval_unit": 9, "status": 1},
-			},
+			"data":    map[string]any{"id": idx, "key": key, "name": body["name"], "remain_quota": 55_000, "interval_unit": 3, "status": 1},
 		})
 	}))
 	t.Cleanup(tokenSrv.Close)
@@ -92,7 +98,7 @@ func TestGenerateAndUploadSaleCardsCreatesTokensAndUploadsEncryptedMCY(t *testin
 		Count:         2,
 		Quota:         55,
 		Group:         "mix",
-		IntervalUnit:  9,
+		IntervalUnit:  3,
 		ItemID:        29,
 		SKUID:         66,
 		Remark:        "FuFu 55次混合特惠卡",
@@ -116,18 +122,15 @@ func TestGenerateAndUploadSaleCardsRestockTopsUpToTargetByMCYStock(t *testing.T)
 
 	var createHits, stockHits, uploadHits atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/token/tokens" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
 			t.Fatalf("unexpected NewAPI request %s", r.URL.Path)
 		}
-		createHits.Add(1)
-		if got := r.URL.Query().Get("tokenCount"); got != "3" {
-			t.Fatalf("tokenCount=%q, want 3 (target 5 - MCY stock 2)", got)
+		idx := createHits.Add(1)
+		keys := []string{"restock-a", "restock-b", "restock-c"}
+		if idx < 1 || idx > int32(len(keys)) {
+			t.Fatalf("unexpected create hit %d", idx)
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
-			map[string]any{"id": 1, "key": "restock-a"},
-			map[string]any{"id": 2, "key": "restock-b"},
-			map[string]any{"id": 3, "key": "restock-c"},
-		}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"id": idx, "key": keys[idx-1]}})
 	}))
 	t.Cleanup(tokenSrv.Close)
 
@@ -170,8 +173,223 @@ func TestGenerateAndUploadSaleCardsRestockTopsUpToTargetByMCYStock(t *testing.T)
 	if result.CurrentStock != 2 || result.TargetStock != 5 || result.ToUpload != 3 || result.Uploaded != 3 {
 		t.Fatalf("restock result=%#v, want current=2 target=5 toUpload=3 uploaded=3", result)
 	}
-	if stockHits.Load() != 1 || createHits.Load() != 1 || uploadHits.Load() != 1 {
-		t.Fatalf("stockHits=%d createHits=%d uploadHits=%d, want 1/1/1", stockHits.Load(), createHits.Load(), uploadHits.Load())
+	if stockHits.Load() != 1 || createHits.Load() != 3 || uploadHits.Load() != 1 {
+		t.Fatalf("stockHits=%d createHits=%d uploadHits=%d, want 1/3/1", stockHits.Load(), createHits.Load(), uploadHits.Load())
+	}
+}
+
+func TestGenerateAndUploadSaleCardsFetchesKeyWhenCreateResponseOmitsIt(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=test")
+	setSaleCardNowForTest(t, time.Date(2026, 6, 16, 12, 34, 56, 0, time.UTC))
+
+	createdByName := map[string]int{}
+	var createHits, keyHits atomic.Int32
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			id := int(createHits.Add(1))
+			createdByName[strings.TrimSpace(fmt.Sprint(body["name"]))] = id
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			name := r.URL.Query().Get("keyword")
+			id := createdByName[name]
+			items := []any{}
+			if id > 0 {
+				items = append(items, map[string]any{"id": id, "name": name, "key": "sk-********masked"})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/batch/keys":
+			keyHits.Add(1)
+			var body map[string][]int
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			keys := map[string]any{}
+			for _, id := range body["ids"] {
+				keys[fmt.Sprint(id)] = "official-key-" + fmt.Sprint(id)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"keys": keys}})
+		default:
+			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(tokenSrv.Close)
+
+	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/plugin/virtual-card-ship/card/add" {
+			t.Fatalf("unexpected MCY request %s", r.URL.Path)
+		}
+		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
+		if got := payload["card"]; got != "sk-official-key-1\nsk-official-key-2" {
+			t.Fatalf("uploaded card=%q", got)
+		}
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+	}))
+	t.Cleanup(mcySrv.Close)
+	t.Setenv("MCY_BASE_URL", mcySrv.URL)
+
+	svc := tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+	result, err := generateAndUploadSaleCards(context.Background(), svc, SaleCardPlan{
+		ID:            "official-flow",
+		Name:          "Official flow",
+		Count:         2,
+		Quota:         55,
+		Group:         "mix",
+		IntervalUnit:  9,
+		ItemID:        29,
+		SKUID:         66,
+		TokenNameSlug: "official-flow",
+	})
+
+	if err != nil {
+		t.Fatalf("generateAndUploadSaleCards error: %v", err)
+	}
+	if result.Generated != 2 || result.Uploaded != 2 || strings.Join(result.Keys, ",") != "sk-official-key-1,sk-official-key-2" {
+		t.Fatalf("result=%#v", result)
+	}
+	if createHits.Load() != 2 || keyHits.Load() != 2 {
+		t.Fatalf("createHits=%d keyHits=%d, want 2/2", createHits.Load(), keyHits.Load())
+	}
+}
+
+func TestGenerateAndUploadSaleCardsUsesUnmaskedSearchKeyForLegacyNewAPI(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=test")
+	setSaleCardNowForTest(t, time.Date(2026, 6, 16, 12, 34, 56, 0, time.UTC))
+
+	createdByName := map[string]int{}
+	var createHits, searchHits atomic.Int32
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			createdByName[strings.TrimSpace(fmt.Sprint(body["name"]))] = 40104
+			createHits.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			searchHits.Add(1)
+			name := r.URL.Query().Get("keyword")
+			items := []any{}
+			if id := createdByName[name]; id > 0 {
+				items = append(items, map[string]any{"id": id, "name": name, "key": "legacy-search-key"})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
+		case strings.HasPrefix(r.URL.Path, "/api/token/") && strings.HasSuffix(r.URL.Path, "/key"):
+			t.Fatalf("legacy NewAPI search returned full key; single key endpoint should not be requested")
+		case r.URL.Path == "/api/token/batch/keys":
+			t.Fatalf("legacy NewAPI search returned full key; batch key endpoint should not be requested")
+		default:
+			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(tokenSrv.Close)
+
+	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
+		if got := payload["card"]; got != "sk-legacy-search-key" {
+			t.Fatalf("uploaded card=%q", got)
+		}
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+	}))
+	t.Cleanup(mcySrv.Close)
+	t.Setenv("MCY_BASE_URL", mcySrv.URL)
+
+	svc := tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+	result, err := generateAndUploadSaleCards(context.Background(), svc, SaleCardPlan{
+		ID:            "legacy-flow",
+		Name:          "Legacy flow",
+		Count:         1,
+		Quota:         55,
+		Group:         "mix",
+		IntervalUnit:  9,
+		ItemID:        29,
+		SKUID:         66,
+		TokenNameSlug: "legacy-flow",
+	})
+
+	if err != nil {
+		t.Fatalf("generateAndUploadSaleCards error: %v", err)
+	}
+	if result.Generated != 1 || result.Uploaded != 1 || strings.Join(result.Keys, ",") != "sk-legacy-search-key" {
+		t.Fatalf("result=%#v", result)
+	}
+	if createHits.Load() != 1 || searchHits.Load() != 1 {
+		t.Fatalf("createHits=%d searchHits=%d, want 1/1", createHits.Load(), searchHits.Load())
+	}
+}
+
+func TestGenerateAndUploadSaleCardsFallsBackToSingleKeyEndpointWhenBatchUnavailable(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=test")
+	setSaleCardNowForTest(t, time.Date(2026, 6, 16, 12, 34, 56, 0, time.UTC))
+
+	createdByName := map[string]int{}
+	var batchHits, singleHits atomic.Int32
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			createdByName[strings.TrimSpace(fmt.Sprint(body["name"]))] = 7
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			name := r.URL.Query().Get("keyword")
+			items := []any{}
+			if id := createdByName[name]; id > 0 {
+				items = append(items, map[string]any{"id": id, "name": name, "key": "sk-********masked"})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/batch/keys":
+			batchHits.Add(1)
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": false, "message": "batch key endpoint missing"})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/7/key":
+			singleHits.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"key": "single-official-key"}})
+		default:
+			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(tokenSrv.Close)
+
+	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
+		if got := payload["card"]; got != "sk-single-official-key" {
+			t.Fatalf("uploaded card=%q", got)
+		}
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+	}))
+	t.Cleanup(mcySrv.Close)
+	t.Setenv("MCY_BASE_URL", mcySrv.URL)
+
+	svc := tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+	result, err := generateAndUploadSaleCards(context.Background(), svc, SaleCardPlan{
+		ID:            "fallback-flow",
+		Name:          "Fallback flow",
+		Count:         1,
+		Quota:         55,
+		Group:         "mix",
+		IntervalUnit:  9,
+		ItemID:        29,
+		SKUID:         66,
+		TokenNameSlug: "fallback-flow",
+	})
+
+	if err != nil {
+		t.Fatalf("generateAndUploadSaleCards error: %v", err)
+	}
+	if result.Generated != 1 || result.Uploaded != 1 || strings.Join(result.Keys, ",") != "sk-single-official-key" {
+		t.Fatalf("result=%#v", result)
+	}
+	if batchHits.Load() != 1 || singleHits.Load() != 1 {
+		t.Fatalf("batchHits=%d singleHits=%d, want 1/1", batchHits.Load(), singleHits.Load())
 	}
 }
 
@@ -216,7 +434,17 @@ func TestGenerateAndUploadSaleCardsRestockSkipsWhenMCYStockMeetsTarget(t *testin
 
 func TestGenerateAndUploadSaleCardsDoesNotUploadWhenNewAPIHasNoKeys(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=test")
-	tokenSrv := newSaleCardTokenServer(t, map[string]any{"success": true, "data": []any{}})
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{}})
+		default:
+			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(tokenSrv.Close)
 	var uploadHits atomic.Int32
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		uploadHits.Add(1)
@@ -280,7 +508,7 @@ func TestSaleCardPlanTemplatesIncludeSpecialAndMonthlyCards(t *testing.T) {
 	plans := saleCardPlanTemplates()
 
 	special := plans["fufu-mix-special-55"]
-	if special.ItemID != 29 || special.SKUID != 66 || special.Quota != 55 || special.IntervalUnit != 9 || special.Group != "mix" {
+	if special.ItemID != 29 || special.SKUID != 66 || special.Quota != 55 || special.IntervalUnit != 3 || special.Group != "mix" {
 		t.Fatalf("special plan mismatch: %#v", special)
 	}
 	monthly100 := plans["fufu-mix-month-100"]
@@ -297,7 +525,20 @@ func TestHandleAdminSaleCardsRunExecutesKnownPlan(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=test")
 	t.Setenv("ADMIN_TOKEN", "test-admin-token")
 
-	tokenSrv := newSaleCardTokenServer(t, map[string]any{"success": true, "data": []any{map[string]any{"id": 1, "key": "generated-a"}}})
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
+			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode NewAPI body: %v", err)
+		}
+		if got := int(body["interval_unit"].(float64)); got != 3 {
+			t.Fatalf("special 55 admin run interval_unit=%d, want 3; body=%#v", got, body)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{map[string]any{"id": 1, "key": "generated-a"}}})
+	}))
+	t.Cleanup(tokenSrv.Close)
 	oldTokenSvc := tokenSvc
 	oldTokenConfigErr := tokenConfigErr
 	t.Cleanup(func() {
@@ -335,10 +576,51 @@ func TestHandleAdminSaleCardsRunExecutesKnownPlan(t *testing.T) {
 	}
 }
 
+func TestHandleAdminSaleCardsRunReportsSanitizedNewAPIReason(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+
+	tokenSrv := newSaleCardTokenServer(t, map[string]any{
+		"success": false,
+		"message": `group mix missing for sk-secret-card-123456 Authorization: Bearer upstream-secret-token password="raw-password"`,
+	})
+	oldTokenSvc := tokenSvc
+	oldTokenConfigErr := tokenConfigErr
+	t.Cleanup(func() {
+		tokenSvc = oldTokenSvc
+		tokenConfigErr = oldTokenConfigErr
+	})
+	tokenConfigErr = nil
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/sale-cards/run", strings.NewReader(`{"plan":"fufu-mix-special-55","count":1}`))
+	req.Header.Set("Authorization", "Bearer test-admin-token")
+	w := httptest.NewRecorder()
+
+	apiRoute(w, req)
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	for _, want := range []string{"次数 fufu 生成卡密失败：", "group mix missing"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body=%q, want substring %q", body, want)
+		}
+	}
+	for _, leaked := range []string{"secret-card-123456", "upstream-secret-token", "raw-password"} {
+		if strings.Contains(body, leaked) {
+			t.Fatalf("body leaked %q: %s", leaked, body)
+		}
+	}
+	if !strings.Contains(body, "[REDACTED]") {
+		t.Fatalf("body should include redaction marker: %s", body)
+	}
+}
+
 func newSaleCardTokenServer(t *testing.T, payload map[string]any) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/token/tokens" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
 			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
 		}
 		_ = json.NewEncoder(w).Encode(payload)
@@ -352,4 +634,11 @@ func setMCYCookieForTest(t *testing.T, value string) {
 	old := getMCYCookie()
 	setMCYCookie(value)
 	t.Cleanup(func() { setMCYCookie(old) })
+}
+
+func setSaleCardNowForTest(t *testing.T, now time.Time) {
+	t.Helper()
+	old := saleCardNow
+	saleCardNow = func() time.Time { return now }
+	t.Cleanup(func() { saleCardNow = old })
 }

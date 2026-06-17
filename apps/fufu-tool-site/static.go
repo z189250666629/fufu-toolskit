@@ -97,7 +97,7 @@ func serveRootActivityStatic(w http.ResponseWriter, r *http.Request, path string
 		return false
 	}
 	publicDir := filepath.Join(activityDir, "public")
-	if !webutil.IsReferencedBrowserAsset(publicDir, path, []string{"/index.html", "/admin.html"}) {
+	if !webutil.IsReferencedBrowserAsset(publicDir, path, []string{"/index.html"}) {
 		return false
 	}
 	cloned := r.Clone(r.Context())

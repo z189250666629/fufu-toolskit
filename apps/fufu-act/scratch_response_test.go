@@ -11,6 +11,9 @@ import (
 func TestScratchStartIncludesMinesForFinishedGame(t *testing.T) {
 	setupScratchLockTestDB(t)
 	seedScratchCard(t, "scratch-card")
+	if _, err := db.Exec(`UPDATE cards SET used_spins=1 WHERE card_key=?`, "scratch-card"); err != nil {
+		t.Fatal(err)
+	}
 	seedScratchGame(t, "scratch-card", "[1,2]", "[0]", 0, "lost")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/scratch/start", strings.NewReader(`{"cardKey":"scratch-card"}`))

@@ -56,6 +56,9 @@ func TestHandleAdminStatsRejectsDefaultTokenWhenAdminTokenUnset(t *testing.T) {
 }
 
 func TestHandlePrizesReturnsActivityPoolWeights(t *testing.T) {
+	original := SnapshotRuntimeConfig()
+	t.Cleanup(func() { SetRuntimeConfig(original) })
+
 	req := httptest.NewRequest(http.MethodGet, "/api/prizes", nil)
 	w := httptest.NewRecorder()
 
@@ -64,13 +67,21 @@ func TestHandlePrizesReturnsActivityPoolWeights(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(w.Body.Bytes(), &raw); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := raw["tierPools"]; ok {
+		t.Fatalf("/api/prizes should expose one unified prize pool only, got %s", w.Body.String())
+	}
 	var body struct {
-		Prizes            []prizeWeightRow            `json:"prizes"`
-		TierPools         map[string][]prizeWeightRow `json:"tierPools"`
-		PostJackpotPrizes []prizeWeightRow            `json:"postJackpotPrizes"`
+		Prizes []prizeWeightRow `json:"prizes"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
+	}
+	if _, ok := raw["postJackpotPrizes"]; ok {
+		t.Fatalf("/api/prizes should not expose a second post-jackpot pool, got %s", w.Body.String())
 	}
 
 	defaultPrizePool := activity.DefaultPrizePool()
@@ -78,22 +89,50 @@ func TestHandlePrizesReturnsActivityPoolWeights(t *testing.T) {
 	if defaultDollar.Weight != defaultPrizePool[2].Weight || defaultDollar.TotalWeight != sumPrizeWeights(defaultPrizePool) {
 		t.Fatalf("default $1 row=%+v", defaultDollar)
 	}
-	defaultTierPools := activity.DefaultTierPools()
-	tierDollar := findPrizeRow(t, body.TierPools["100"], 1)
-	if tierDollar.Weight != defaultTierPools[100][2].Weight || tierDollar.TotalWeight != sumPrizeWeights(defaultTierPools[100]) {
-		t.Fatalf("tier $100 $1 row=%+v", tierDollar)
+	jackpot := findPrizeRow(t, body.Prizes, 1000)
+	if jackpot.Rank != "jackpot" || jackpot.Label != "大奖" || !jackpot.Advertised {
+		t.Fatalf("jackpot row should expose prompt metadata, got %+v", jackpot)
 	}
-	defaultPostJackpotPool := activity.DefaultPostJackpotPool()
-	postJackpotDollar := findPrizeRow(t, body.PostJackpotPrizes, 20)
-	if postJackpotDollar.Weight != defaultPostJackpotPool[5].Weight || postJackpotDollar.TotalWeight != sumPrizeWeights(defaultPostJackpotPool) {
-		t.Fatalf("post-jackpot $20 row=%+v", postJackpotDollar)
+}
+
+func TestHandlePrizesReturnsBalancedActivityPoolWeights(t *testing.T) {
+	original := SnapshotRuntimeConfig()
+	t.Cleanup(func() { SetRuntimeConfig(original) })
+
+	cfg := activity.DefaultConfig()
+	cfg.GameConfigs = []activity.GameConfig{{Game: activity.GameSlot, TargetExpectedValue: 4.5, ActualExpectedValue: 4.5}}
+	cfg.PrizePool = []activity.Prize{
+		{Type: "miss", Weight: 100},
+		{Type: "win", Dollars: 9, Weight: 1},
+	}
+	SetRuntimeConfig(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/prizes", nil)
+	w := httptest.NewRecorder()
+	handlePrizes(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Prizes []prizeWeightRow `json:"prizes"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	row := findPrizeRow(t, body.Prizes, 9)
+	if row.Weight != 1 || row.TotalWeight != 2 {
+		t.Fatalf("/api/prizes should expose balanced total weight 2, got %+v body=%s", row, w.Body.String())
 	}
 }
 
 type prizeWeightRow struct {
-	Dollars     int `json:"dollars"`
-	Weight      int `json:"weight"`
-	TotalWeight int `json:"totalWeight"`
+	Dollars     int    `json:"dollars"`
+	Weight      int    `json:"weight"`
+	TotalWeight int    `json:"totalWeight"`
+	Rank        string `json:"rank"`
+	Label       string `json:"label"`
+	Advertised  bool   `json:"advertised"`
 }
 
 func findPrizeRow(t *testing.T, rows []prizeWeightRow, dollars int) prizeWeightRow {

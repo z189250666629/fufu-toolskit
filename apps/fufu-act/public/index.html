@@ -1204,7 +1204,7 @@
   <div id="jackpot-overlay">
     <div class="jackpot-card">
       <div class="jackpot-text">JACKPOT!!</div>
-      <div class="jackpot-sub">$1000 GET</div>
+      <div class="jackpot-sub" id="jackpot-sub">$0 GET</div>
     </div>
   </div>
 
@@ -1220,6 +1220,7 @@
       1: '🍋', 5: '🍒', 10: '🍊', 20: '🍇',
       50: '💎', 100: '⭐', 200: '👑', 500: '🔥', 1000: '🏆'
     };
+    const RANK_SYMBOLS = { jackpot: '🏆', second: '👑', third: '⭐' };
     const ALL_SYMBOLS = Object.values(PRIZE_SYMBOLS);
     const STRIP_LENGTH = 40;
     function getSymbolHeight() {
@@ -1479,7 +1480,13 @@
         const rows = data.prizes.map(p => {
           const weight = Number(p.weight) || 0;
           const totalWeight = Number(p.totalWeight) || 0;
-          return { dollars: p.dollars, pct: totalWeight > 0 ? ((weight / totalWeight) * 100).toFixed(2) : '0.00' };
+          return {
+            dollars: p.dollars,
+            rank: p.rank,
+            label: p.label,
+            advertised: p.advertised,
+            pct: totalWeight > 0 ? ((weight / totalWeight) * 100).toFixed(2) : '0.00',
+          };
         });
         renderPrizeTable(rows);
       } catch (e) {
@@ -1573,7 +1580,7 @@
         const pick = () => pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
         symbols = [pick(), pick(), pick()];
       } else {
-        const sym = PRIZE_SYMBOLS[data.prize] || '🎁';
+        const sym = RANK_SYMBOLS[data.rank] || PRIZE_SYMBOLS[data.prize] || '🎁';
         symbols = [sym, sym, sym];
       }
 
@@ -1591,15 +1598,21 @@
         $('info-remaining').textContent = data.remainingSpins;
       } else {
         const prize = data.prize;
+        const rank = String(data.rank || '').trim();
+        const label = String(data.label || '').trim();
         reels.forEach(r => r.flashWin());
         const rect = $('reel2').getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
 
-        if (prize >= 1000) {
+        if (rank === 'jackpot') {
           $('result').className = 'result win-jackpot';
-          $('result').textContent = `🏆 JACKPOT $${prize}`;
+          $('result').textContent = `🏆 ${label || 'JACKPOT'} $${prize}`;
           triggerJackpot(prize, cx, cy);
+        } else if (rank === 'second' || rank === 'third') {
+          $('result').className = 'result';
+          $('result').textContent = `${label || 'BIG WIN'} +$${prize}`;
+          particles.emit(cx, cy, { count: 90 });
         } else if (prize >= 100) {
           $('result').className = 'result';
           $('result').textContent = `BIG WIN! +$${prize}`;
@@ -1637,6 +1650,7 @@
       document.body.classList.add('shake');
       setTimeout(() => document.body.classList.remove('shake'), 500);
       const ov = $('jackpot-overlay');
+      $('jackpot-sub').textContent = `$${prize} GET`;
       ov.classList.add('show');
       setTimeout(() => {
         particles.emit(window.innerWidth / 2, window.innerHeight * 0.4, {

@@ -4,7 +4,7 @@
 
 | 入口 | 目录 | 本地默认端口 | 生产对外端口 | 说明 |
 | --- | --- | ---: | ---: | --- |
-| fufu 工具站 | `apps/fufu-tool-site` | `8080` | `38473` | 首页导航 + API/模型状态 + 合卡 + 活动前台 + 活动后台 |
+| fufu 工具站 | `apps/fufu-tool-site` | `8080` | `38473` | 首页导航 + API/模型状态 + 合卡 + 活动前台 + 统一管理后台 |
 
 旧的独立生产入口 `y2k-nav:33148`、`fufu-act:18820` 已下线；`apps/y2k-nav` 与 `apps/fufu-act` 仍保留为嵌入式模块和测试边界。`fufu-combine` 已并入合卡模块，入口为 `/combine`。
 
@@ -16,8 +16,13 @@
 | `/status` | API / NewAPI 模型状态面板 |
 | `/combine` | 合卡工具 |
 | `/activity` | 活动前台 |
-| `/admin` / `/admin.html` | 活动后台 |
+| `/admin` / `/admin.html` | 统一管理后台 |
+| `/activity-admin` / `/activity-admin.html` | 旧 activity 后台兼容地址，重定向到 `/admin` |
 | `/api/health` | 健康检查 |
+
+## 需求整理
+
+项目整理先从需求和验收标准开始，详见 `docs/requirements.md`。
 
 ## 目录结构
 
@@ -67,6 +72,8 @@ npm run start:all
 > 唯一数据源，之后重新部署代码无需再次修改这些环境变量，直接在后台修改并保存即可。
 > 例外：`ADMIN_TOKEN` 始终用于后台登录鉴权，必须保留在环境变量中。旧版
 > `data/tool-config.json` 会在首次启动时自动迁移进数据库，并备份为 `tool-config.json.migrated`。
+> 首页工具入口（Web Terminal、Build、状态、合卡、活动等）同样由后台保存到
+> `tool-config.db`，首页通过 `/api/nav/tools` 读取；接口不可用时前端保留静态 fallback。
 
 ### NewAPI / 状态面板 / 合卡
 
@@ -88,7 +95,7 @@ $env:FUFU_API_BASE_URL = 'https://api.fufuflower.top'
 $env:FUFU_API_TOKEN = '<newapi-admin-token>'
 $env:FUFU_API_USER_ID = '1'
 $env:FUFU_QUOTA_UNIT = '500000'
-$env:ADMIN_TOKEN = '<activity-admin-token>'
+$env:ADMIN_TOKEN = '<admin-token>'
 ```
 
 可选 MCY 商城变量：

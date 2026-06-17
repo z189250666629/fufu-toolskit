@@ -29,7 +29,36 @@ export type PrizeRow = {
   type?: string;
   dollars?: number;
   weight?: number;
+  rank?: string;
+  label?: string;
+  advertised?: boolean;
   [key: string]: unknown;
+};
+
+export type ActivityGameRoute = {
+  dollars: number;
+  game: 'slot' | 'scratch' | string;
+  drawCount?: number;
+};
+
+export type ActivityGameConfig = {
+  game: 'slot' | 'scratch' | string;
+  targetExpectedValue?: number;
+};
+
+export type DynamicPrizePoolTier = {
+  dollars: number;
+  revenue?: number;
+  cost?: number;
+};
+
+export type DynamicPrizePoolConfig = {
+  enabled?: boolean;
+  contributionRate?: number;
+  jackpotRate?: number;
+  secondRate?: number;
+  thirdRate?: number;
+  tierEconomics?: DynamicPrizePoolTier[];
 };
 
 export type ActivityConfig = {
@@ -38,12 +67,12 @@ export type ActivityConfig = {
   startTS?: number;
   endTS?: number;
   targetExpectedValue?: number;
-  actualExpectedValue?: number;
   spinMap?: Record<string, number>;
+  gameConfigs?: ActivityGameConfig[];
   prizePool?: PrizeRow[];
-  tierPools?: Record<string, PrizeRow[]>;
-  postJackpotPrizes?: PrizeRow[];
+  dynamicPrizePool?: DynamicPrizePoolConfig;
   scratchRewards?: number[];
+  gameRoutes?: ActivityGameRoute[];
   scratchTiers?: number[];
   [key: string]: unknown;
 };
@@ -62,6 +91,7 @@ export type AdminConfig = {
   newapi: {
     sites: ManagedSite[];
   };
+  navigation: NavigationConfig;
   activity: ActivityConfig;
   mcy?: MCYConfig;
 };
@@ -79,15 +109,53 @@ export type RuntimeSitesResponse = {
   sites: PublicSite[];
 };
 
+export type NavLine = {
+  name?: string;
+  url?: string;
+};
+
+export type NavLineCategory = {
+  kind: string;
+  name?: string;
+  lines: NavLine[];
+};
+
+export type NavLinesResponse = {
+  categories: NavLineCategory[];
+};
+
+export type NavigationLink = {
+  label?: string;
+  href: string;
+  ping?: string;
+};
+
+export type NavigationCard = {
+  id?: string;
+  stamp: string;
+  title: string;
+  description?: string;
+  accent: 'clay' | 'moss' | 'stone' | string;
+  lineKind?: 'api' | 'token' | string;
+  href?: string;
+  links?: NavigationLink[];
+};
+
+export type NavigationConfig = {
+  cards: NavigationCard[];
+};
+
+export type NavigationToolsResponse = NavigationConfig;
+
 export type ActivityStats = Record<string, unknown>;
 
 export type SaleCardPlan = {
   id: string;
   name?: string;
   quota?: number;
-  intervalUnit?: string;
-  itemId?: string;
-  skuId?: string;
+  intervalUnit?: number | string;
+  itemId?: number | string;
+  skuId?: number | string;
   group?: string;
   slot?: string;
 };
@@ -139,4 +207,7 @@ export type SaleCardRunResult = {
   keys?: string[];
 };
 
-export type PrizeConfigResponse = ActivityConfig;
+export type PrizeConfigResponse = ActivityConfig & {
+  prizes?: PrizeRow[];
+  poolBalance?: number;
+};

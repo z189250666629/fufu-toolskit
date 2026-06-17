@@ -230,25 +230,18 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	errs := []string{}
 	for i := 0; i < p.Count; i++ {
 		uniqueName := fmt.Sprintf("gen-%d-%s", time.Now().UnixMilli(), randomBase36(6))
-		res, _, err := a.createToken(r.Context(), buildGeneratedTokenCreateBody(uniqueName, totalQuota, group, p.IntervalUnit))
+		created, err := a.createTokenAndResolveKey(r.Context(), buildGeneratedTokenCreateBody(uniqueName, totalQuota, group, p.IntervalUnit), uniqueName)
 		if err != nil {
 			errs = appendGenerateError(errs, i, "生成失败，请稍后重试", err)
 			continue
 		}
-		if !res.OK() {
-			errs = append(errs, fmt.Sprintf("#%d: 创建失败", i+1))
-			continue
-		}
-		token, err := a.searchTokenByName(r.Context(), uniqueName)
-		if err != nil {
-			errs = appendGenerateError(errs, i, "生成成功但查询失败，请稍后重试", err)
-			continue
-		}
-		if token == nil {
+		if created.Token.ID == 0 {
 			errs = append(errs, fmt.Sprintf("#%d: 创建成功但未找到", i+1))
 			continue
 		}
-		card := cloneMap(token.Raw)
+		card := cloneMap(created.Token.Raw)
+		card["id"] = created.Token.ID
+		card["key"] = created.Key
 		card["name"] = generateTokenFinalName(p.Quota)
 		if res, _, err := a.updateTokenRaw(r.Context(), card); err != nil {
 			errs = appendGenerateError(errs, i, "生成成功但重命名失败，请稍后重试", err)
@@ -262,6 +255,13 @@ func (a *App) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errs = appendGenerateError(errs, i, "生成成功但复查失败，请稍后重试", err)
 			continue
+		}
+		if created.Key != "" {
+			verifiedToken.Key = created.Key
+			if verifiedToken.Raw == nil {
+				verifiedToken.Raw = map[string]any{}
+			}
+			verifiedToken.Raw["key"] = created.Key
 		}
 		if err := a.upsertGeneratedToken(r.Context(), verifiedToken); err != nil {
 			log.Printf("generated token cache insert failed: %s", redactError(err))
