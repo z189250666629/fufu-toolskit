@@ -115,12 +115,9 @@ test('dragon boat fullscreen uses screen click then switches to peel phase after
   assert.match(source, /phase = 'fish'/);
   assert.match(source, /phase = 'peel'/);
   assert.match(source, /\$\('btn-dragon-peel'\)\.disabled = dragonBusy \|\| remaining > 0 \|\| ready <= 0/);
-  assert.match(source, /function handleDragonBoatScreenAction\(target\)/);
-  assert.match(source, /function dragonBoatCastTargetFromEvent\(e\)/);
-  assert.match(source, /function prepareDragonBoatCast\(target\)/);
+  assert.match(source, /function handleDragonBoatScreenAction\(\)/);
   assert.match(source, /function prepareDragonBoatReelTarget\(el\)/);
   assert.match(source, /function animateDragonBoatPayload\(el\)/);
-  assert.match(source, /const angle = Math\.max\(-42, Math\.min\(42, -Math\.atan2\(dx, Math\.max\(1, dy\)\) \* 180 \/ Math\.PI\)\)/);
   assert.match(source, /\.dragonboat-reel-source \{[\s\S]*opacity: 0 !important;[\s\S]*animation: none !important;/);
   assert.match(source, /\.dragonboat-reel-payload \{[\s\S]*animation: dragon-payload-reel/);
   assert.match(source, /clone\.classList\.add\('dragonboat-reel-payload'\)/);
@@ -128,16 +125,62 @@ test('dragon boat fullscreen uses screen click then switches to peel phase after
   assert.match(source, /zongzi\?\.classList\.add\('dragonboat-reel-source'\);\s*return;/);
   assert.match(source, /obstacle\?\.classList\.add\('dragonboat-reel-source'\);/);
   assert.match(source, /document\.querySelectorAll\('\.dragonboat-reel-payload'\)\.forEach\(el => el\.remove\(\)\)/);
-  assert.match(source, /setTimeout\(resolve,\s*980\)/);
-  assert.match(source, /if \(remaining > 0\) \{\s*fishDragonBoat\(target \|\| defaultDragonBoatTarget\(\)\);/);
+  assert.match(source, /setTimeout\(resolve,\s*960\)/);
+  assert.match(source, /if \(remaining > 0\) \{\s*launchDragonHook\(\);/);
   assert.match(source, /if \(ready > 0\) \{\s*peelDragonBoat\(\);/);
   assert.match(source, /function isDragonBoatControlClick\(target\)/);
   assert.match(source, /\$\('dragonboat-panel'\)\.onclick = \(e\) => \{/);
   assert.match(source, /if \(isDragonBoatControlClick\(e\.target\)\) return;/);
-  assert.match(source, /handleDragonBoatScreenAction\(dragonBoatCastTargetFromEvent\(e\)\)/);
-  assert.match(source, /data\.cast\?\.blockedBy/);
+  assert.match(source, /handleDragonBoatScreenAction\(\);/);
   assert.match(source, /\$\('dragon-result'\)\.textContent = '勾到障碍物'/);
   assert.match(source, /\$\('dragonboat-stage'\)\.onkeydown = \(e\) =>/);
+});
+
+test('dragon boat hook swings and launches along its angle (gold-miner), not at the mouse', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+
+  // shared, unit-tested geometry module is wired in
+  assert.match(source, /<script src="dragonboat-hook\.js"><\/script>/);
+  // the hook element is addressable by id (driven by JS swing + cast)
+  assert.match(source, /<div class="dragonboat-hook" id="dragonboat-hook"/);
+  // swing driven in JS so the exact angle is known at click time
+  assert.match(source, /function startDragonSwing\(fromAngle, descending\)/);
+  assert.match(source, /function stopDragonSwing\(\)/);
+  assert.match(source, /dragonboatHook\.swingAngle\(elapsed, DRAGON_SWING\)/);
+  assert.match(source, /dragonboatHook\.swingPhaseForAngle\(fromAngle, DRAGON_SWING, descending\)/);
+  // click launches at the CURRENT swing angle, target derived from that angle (not the cursor)
+  assert.match(source, /function launchDragonHook\(\)/);
+  assert.match(source, /const angle = dragonHookAngle;/);
+  assert.match(source, /dragonboatHook\.castTarget\(angle, dragonHookOrigin\(\), dragonHookDims\(\)\)/);
+  // the hook stops at the server-reported hit item's ray depth (no pass-through)
+  assert.match(source, /function dragonHookCastLength\(cast, angle, origin, dims, idle, maxLen\)/);
+  assert.match(source, /dragonboatHook\.rayDepthPx\(angle, origin, item, dims\)/);
+  assert.match(source, /stage\.style\.setProperty\('--dragon-hook-length', length\.toFixed\(0\) \+ 'px'\)/);
+  // hook pivot is anchored at the percentage origin so visual == server collision at any size
+  assert.match(source, /stage\.style\.setProperty\('--dragon-hook-left', origin\.x \+ '%'\)/);
+  assert.match(source, /stage\.style\.setProperty\('--dragon-hook-top', origin\.y \+ '%'\)/);
+  assert.match(source, /body\.dragonboat-fullscreen \.dragonboat-hook \{[\s\S]*top: var\(--dragon-hook-top, 18%\);/);
+  // swing only runs during the fishing phase and is stopped on logout
+  assert.match(source, /if \(phase === 'fish' && !dragonBusy\) startDragonSwing\(\);\s*else stopDragonSwing\(\);/);
+  assert.match(source, /\$\('btn-logout'\)\.onclick = \(\) => \{\s*currentCardKey = '';\s*stopDragonSwing\(\);/);
+  // swing resumes with continuous direction (no pendulum reversal after a cast)
+  assert.match(source, /dragonHookDescending = Math\.cos\(/);
+  assert.match(source, /dragonboatHook\.swingPhaseForAngle\(fromAngle, DRAGON_SWING, descending\)/);
+  assert.match(source, /const descending = dragonHookDescending;/);
+  // reel-payload timing must keep the caught item "riding home" inside the cast's retract window
+  assert.match(source, /animation: dragon-payload-reel 0\.42s steps\(7\) 1 forwards/);
+  assert.match(source, /animation-delay: 0\.52s/);
+  assert.match(source, /@keyframes hook-cast-full \{[\s\S]*54% \{ height: var\(--dragon-hook-length, 76%\);/);
+  // boat top is clamped so it can't go negative / overlap the skyline on short viewports
+  assert.match(source, /top: max\(40px, calc\(var\(--dragon-hook-top, 18%\) - 60px\)\)/);
+  // dead reel CSS removed
+  assert.doesNotMatch(source, /dragon-object-reel/);
+  assert.doesNotMatch(source, /\.dragonboat-zongzi\.caught \{/);
+  assert.doesNotMatch(source, /\.dragonboat-obstacle\.blocked \{/);
+  // the old mouse-aimed cast is gone
+  assert.doesNotMatch(source, /function dragonBoatCastTargetFromEvent/);
+  assert.doesNotMatch(source, /function prepareDragonBoatCast/);
+  assert.doesNotMatch(source, /-Math\.atan2\(dx, Math\.max\(1, dy\)\)/);
 });
 
 test('prize drawer reports load failures instead of silently swallowing them', async () => {

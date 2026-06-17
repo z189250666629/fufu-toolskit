@@ -1118,7 +1118,7 @@
       background: var(--c-chrome);
       transform-origin: top center;
       box-shadow: inset 3px 0 0 var(--c-chrome-hi), 0 0 0 2px var(--c-black);
-      animation: hook-swing 1.5s steps(6) infinite;
+      transform: rotate(var(--dragon-hook-angle, 0deg));
       --dragon-hook-idle: 72px;
     }
     .dragonboat-hook::after {
@@ -1135,8 +1135,8 @@
       animation: hook-cast 0.96s steps(8) 1;
     }
     @keyframes hook-swing {
-      0%, 100% { transform: rotate(-12deg); }
-      50% { transform: rotate(12deg); }
+      0%, 100% { transform: rotate(-72deg); }
+      50% { transform: rotate(72deg); }
     }
     @keyframes hook-cast {
       0% { height: var(--dragon-hook-idle, 72px); transform: rotate(var(--dragon-hook-angle, -10deg)); }
@@ -1204,10 +1204,6 @@
       background: var(--c-cyan);
       box-shadow: 0 0 0 3px var(--c-black);
     }
-    .dragonboat-obstacle.blocked {
-      filter: drop-shadow(0 0 10px var(--c-yellow));
-      animation: dragon-object-reel 0.92s steps(7) 1;
-    }
     .dragonboat-reel-source {
       opacity: 0 !important;
       animation: none !important;
@@ -1218,8 +1214,8 @@
       top: var(--dragon-payload-y, 50%) !important;
       z-index: 7 !important;
       pointer-events: none;
-      animation: dragon-payload-reel 0.96s steps(8) 1 forwards !important;
-      animation-delay: 0s !important;
+      animation: dragon-payload-reel 0.42s steps(7) 1 forwards !important;
+      animation-delay: 0.52s !important;
       filter: drop-shadow(0 0 12px var(--c-yellow)) drop-shadow(4px 4px 0 var(--c-black));
     }
     @keyframes obstacle-bob {
@@ -1289,23 +1285,13 @@
       box-shadow: 8px 0 0 #d9aa36;
       transform: rotate(54deg);
     }
-    .dragonboat-zongzi.caught {
-      filter: drop-shadow(0 0 12px var(--c-yellow)) drop-shadow(3px 3px 0 var(--c-black));
-      animation: dragon-object-reel 0.92s steps(7) 1;
-    }
     @keyframes dragon-zongzi-float {
       0%, 100% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1)); }
       50% { transform: translate(-50%, calc(-50% - 8px)) scale(var(--dragon-scale, 1)); }
     }
-    @keyframes dragon-object-reel {
-      0% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1)); opacity: 1; }
-      54% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1.08)); opacity: 1; }
-      100% { transform: translate(calc(-50% + var(--dragon-reel-x, 0px)), calc(-50% + var(--dragon-reel-y, -260px))) scale(0.72); opacity: 0; }
-    }
     @keyframes dragon-payload-reel {
       0% { transform: translate(-50%, -50%) scale(var(--dragon-scale, 1)); opacity: 1; }
-      58% { transform: translate(calc(-50% + var(--dragon-reel-x, 0px)), calc(-50% + var(--dragon-reel-y, -220px))) scale(0.84); opacity: 1; }
-      100% { transform: translate(calc(-50% + var(--dragon-reel-x, 0px)), calc(-50% + var(--dragon-reel-y, -220px))) scale(0.58); opacity: 0; }
+      100% { transform: translate(calc(-50% + var(--dragon-reel-x, 0px)), calc(-50% + var(--dragon-reel-y, -220px))) scale(0.62); opacity: 1; }
     }
     @keyframes zongzi-float {
       0%, 100% { transform: translateY(0); }
@@ -1479,12 +1465,13 @@
       bottom: 46px;
     }
     body.dragonboat-fullscreen .dragonboat-boat {
-      left: calc(50% - 78px);
-      top: 54px;
+      left: calc(var(--dragon-hook-left, 50%) - 78px);
+      /* 矮屏（横屏手机）下 18% 可能 < 60px 致船顶为负、贴边并压住天际线标题，下限 40px。 */
+      top: max(40px, calc(var(--dragon-hook-top, 18%) - 60px));
     }
     body.dragonboat-fullscreen .dragonboat-hook {
-      top: 102px;
-      left: 50%;
+      top: var(--dragon-hook-top, 18%);
+      left: var(--dragon-hook-left, 50%);
       height: 86px;
       --dragon-hook-idle: 86px;
     }
@@ -1749,7 +1736,7 @@
           <span id="dragon-ready">粽子 0</span>
         </div>
         <div class="dragonboat-boat" aria-hidden="true"></div>
-        <div class="dragonboat-hook" aria-hidden="true"></div>
+        <div class="dragonboat-hook" id="dragonboat-hook" aria-hidden="true"></div>
         <div class="dragonboat-mine-zone" aria-hidden="true"></div>
         <div class="dragonboat-obstacles" id="dragonboat-obstacles" aria-hidden="true"></div>
         <div class="dragonboat-zongzi-field" id="dragonboat-zongzi-field" aria-hidden="true"></div>
@@ -1804,6 +1791,7 @@
   <script src="activity-render.js"></script>
   <script src="activity-api.js"></script>
   <script src="scratch-card.js"></script>
+  <script src="dragonboat-hook.js"></script>
   <script>
     /* ============================================================
        Constants
@@ -2292,6 +2280,7 @@
        ============================================================ */
     $('btn-logout').onclick = () => {
       currentCardKey = '';
+      stopDragonSwing();
       $('login-panel').style.display = 'block';
       $('game-panel').style.display = 'none';
       $('scratch-panel').style.display = 'none';
@@ -2366,6 +2355,7 @@
       $('dragon-peel-count').textContent = ready;
       $('dragon-total-won').textContent = '$' + totalWon;
 
+      applyDragonHookOrigin();
       renderDragonBoatScene(dragonScene);
       updateDragonBoatButtons();
       updateDragonBoatPhase();
@@ -2420,6 +2410,9 @@
       $('dragonboat-panel').classList.remove('dragonboat-phase-fish', 'dragonboat-phase-peel', 'dragonboat-phase-done');
       $('dragonboat-panel').classList.add('dragonboat-phase-' + phase);
       $('dragonboat-stage').setAttribute('data-phase', phase);
+      // 仅在捕捞阶段且空闲时摆动钩子；剥粽/结束阶段钩子隐藏，停止 rAF。
+      if (phase === 'fish' && !dragonBusy) startDragonSwing();
+      else stopDragonSwing();
     }
 
     function renderDragonHistory(history) {
@@ -2434,12 +2427,12 @@
       $('btn-dragon-peel').disabled = dragonBusy || remaining > 0 || ready <= 0;
     }
 
-    function handleDragonBoatScreenAction(target) {
+    function handleDragonBoatScreenAction() {
       if (dragonBusy) return;
       const remaining = Number(dragonState?.remainingFish) || 0;
       const ready = Number(dragonState?.zongziReady) || 0;
       if (remaining > 0) {
-        fishDragonBoat(target || defaultDragonBoatTarget());
+        launchDragonHook();
         return;
       }
       if (ready > 0) {
@@ -2451,31 +2444,88 @@
       return Boolean(target?.closest?.('.logout, button, a, input, textarea, select'));
     }
 
-    function dragonBoatCastTargetFromEvent(e) {
-      const rect = $('dragonboat-stage').getBoundingClientRect();
-      if (!rect.width || !rect.height) return defaultDragonBoatTarget();
-      return {
-        x: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)),
-        y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
-      };
+    /* 黄金矿工式钩子：钩子持续摆动，点击只是「在当前角度发射」，方向由摆角决定
+       而非鼠标位置。命中物体由后端沿 origin->target 射线判定，钩子伸到第一个命中
+       物体处停下并把它拖回船上。几何函数见 dragonboat-hook.js（已单测）。 */
+    const DRAGON_SWING = { amplitudeDeg: 72, periodMs: 2600 };
+    let dragonSwingRaf = 0;
+    let dragonSwingStart = 0;
+    let dragonHookAngle = 0;
+    let dragonHookDescending = false; // 钩子当前是否正向左摆（用于续摆方向连续）
+
+    function dragonNow() {
+      return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
     }
 
-    function defaultDragonBoatTarget() {
-      const first = Array.isArray(dragonScene?.zongzi) ? dragonScene.zongzi[0] : null;
-      return first ? { x: Number(first.x) || 50, y: Number(first.y) || 82 } : { x: 50, y: 82 };
+    function dragonHookOrigin() {
+      const o = dragonScene?.hookOrigin;
+      return { x: Number(o?.x) || 50, y: Number(o?.y) || 18 };
     }
 
-    function prepareDragonBoatCast(target) {
+    function dragonHookDims() {
       const stage = $('dragonboat-stage');
-      const rect = stage.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      const origin = dragonScene?.hookOrigin || { x: 50, y: 18 };
-      const dx = ((Number(target.x) || 50) - (Number(origin.x) || 50)) * rect.width / 100;
-      const dy = ((Number(target.y) || 82) - (Number(origin.y) || 18)) * rect.height / 100;
-      const length = Math.max(120, Math.min(rect.height * 0.9, Math.hypot(dx, dy)));
-      const angle = Math.max(-42, Math.min(42, -Math.atan2(dx, Math.max(1, dy)) * 180 / Math.PI));
-      stage.style.setProperty('--dragon-hook-angle', `${angle.toFixed(2)}deg`);
-      stage.style.setProperty('--dragon-hook-length', `${length.toFixed(0)}px`);
+      return { width: stage.clientWidth || 1, height: stage.clientHeight || 1 };
+    }
+
+    function dragonHookIdleLen() {
+      const px = parseFloat(getComputedStyle($('dragonboat-hook')).getPropertyValue('--dragon-hook-idle'));
+      return Number.isFinite(px) && px > 0 ? px : 86;
+    }
+
+    function applyDragonHookOrigin() {
+      const origin = dragonHookOrigin();
+      const stage = $('dragonboat-stage');
+      stage.style.setProperty('--dragon-hook-left', origin.x + '%');
+      stage.style.setProperty('--dragon-hook-top', origin.y + '%');
+    }
+
+    function dragonSwingFrame(now) {
+      if (!dragonSwingStart) dragonSwingStart = now;
+      const elapsed = now - dragonSwingStart;
+      dragonHookAngle = dragonboatHook.swingAngle(elapsed, DRAGON_SWING);
+      dragonHookDescending = Math.cos((2 * Math.PI * elapsed) / DRAGON_SWING.periodMs) < 0;
+      $('dragonboat-stage').style.setProperty('--dragon-hook-angle', dragonHookAngle.toFixed(2) + 'deg');
+      dragonSwingRaf = requestAnimationFrame(dragonSwingFrame);
+    }
+
+    function startDragonSwing(fromAngle, descending) {
+      stopDragonSwing();
+      const hook = $('dragonboat-hook');
+      if (hook) hook.style.height = '';
+      // 续摆：从给定角度+方向对应的相位接着摆，位置与方向都连续，不瞬跳/不反向。
+      dragonSwingStart = Number.isFinite(fromAngle)
+        ? dragonNow() - dragonboatHook.swingPhaseForAngle(fromAngle, DRAGON_SWING, descending)
+        : 0;
+      dragonSwingRaf = requestAnimationFrame(dragonSwingFrame);
+    }
+
+    function stopDragonSwing() {
+      if (dragonSwingRaf) { cancelAnimationFrame(dragonSwingRaf); dragonSwingRaf = 0; }
+    }
+
+    function launchDragonHook() {
+      if (dragonBusy || Number(dragonState?.remainingFish || 0) <= 0) return;
+      const angle = dragonHookAngle;            // 当前摆角（rAF 实时维护）
+      const descending = dragonHookDescending;  // 当前摆动方向（用于续摆方向连续）
+      stopDragonSwing();                         // 冻结摆动，钩子在此角度发射
+      const target = dragonboatHook.castTarget(angle, dragonHookOrigin(), dragonHookDims());
+      fishDragonBoat(target, angle, descending);
+    }
+
+    function findDragonSceneObject(kind, id) {
+      const list = kind === 'zongzi' ? dragonScene?.zongzi : dragonScene?.obstacles;
+      return Array.isArray(list) ? (list.find(it => String(it.id) === String(id)) || null) : null;
+    }
+
+    // 钩子伸出长度：命中粽子/障碍则伸到该物体在射线上的投影深度处停下（不穿透）；
+    // 空钩则伸到边界长度再收回。
+    function dragonHookCastLength(cast, angle, origin, dims, idle, maxLen) {
+      let item = null;
+      if (cast.hit && cast.zongziId) item = findDragonSceneObject('zongzi', cast.zongziId);
+      else if (cast.blockedBy) item = findDragonSceneObject('obstacle', cast.blockedBy);
+      if (!item) return maxLen;
+      const depth = dragonboatHook.rayDepthPx(angle, origin, item, dims);
+      return Math.max(idle, Math.min(maxLen, depth));
     }
 
     function markDragonBoatCast(cast) {
@@ -2562,12 +2612,17 @@
       });
     }
 
-    async function fishDragonBoat(target) {
-      if (dragonBusy || Number(dragonState?.remainingFish || 0) <= 0) return;
-      target = target || defaultDragonBoatTarget();
-      prepareDragonBoatCast(target);
+    async function fishDragonBoat(target, angle, descending) {
+      if (dragonBusy || Number(dragonState?.remainingFish || 0) <= 0) { startDragonSwing(angle, descending); return; }
+      angle = Number(angle) || 0;
+      const origin = dragonHookOrigin();
+      const dims = dragonHookDims();
+      const idle = dragonHookIdleLen();
+      const maxLen = Math.max(idle, dragonboatHook.rayDepthPx(angle, origin, target, dims));
+      const stage = $('dragonboat-stage');
       dragonSetBusy(true);
-      $('dragonboat-stage').classList.add('casting');
+      // 锁定发射角度；钩子在网络等待期间定格在该角度，响应到达后再伸出。
+      stage.style.setProperty('--dragon-hook-angle', angle.toFixed(2) + 'deg');
       $('dragon-result').className = 'dragonboat-result';
       $('dragon-result').textContent = '捕捞中...';
       try {
@@ -2577,14 +2632,18 @@
           body: JSON.stringify({ cardKey: currentCardKey, target }),
         });
         const data = await readDragonBoatApi(res, '捕捞失败，请稍后重试', '捕捞失败');
-        markDragonBoatCast(data.cast || {});
-        await new Promise(resolve => setTimeout(resolve, 980));
+        const cast = data.cast || {};
+        const length = dragonHookCastLength(cast, angle, origin, dims, idle, maxLen);
+        stage.style.setProperty('--dragon-hook-length', length.toFixed(0) + 'px');
+        stage.classList.add('casting');     // 伸钩 -> 命中处停下 -> 收回
+        markDragonBoatCast(cast);
+        await new Promise(resolve => setTimeout(resolve, 960));
         renderDragonBoatState(data, true);
         dragonStageBurst(Boolean(data.hit));
         if (data.hit) {
           $('dragon-result').className = 'dragonboat-result win';
           $('dragon-result').textContent = '捞到粽子';
-        } else if (data.cast?.blockedBy) {
+        } else if (cast.blockedBy) {
           $('dragon-result').className = 'dragonboat-result';
           $('dragon-result').textContent = '勾到障碍物';
         } else {
@@ -2595,9 +2654,13 @@
         $('dragon-result').className = 'dragonboat-result';
         $('dragon-result').textContent = activityApi.safeErrorMessage(e, '捕捞失败，请稍后重试');
       } finally {
-        $('dragonboat-stage').classList.remove('casting');
+        stage.classList.remove('casting');
         clearDragonBoatCastMarks();
         dragonSetBusy(false);
+        // 续摆（若中途登出则面板已隐藏，不再恢复 rAF，避免泄漏）
+        if (Number(dragonState?.remainingFish || 0) > 0 && document.body.classList.contains('dragonboat-fullscreen')) {
+          startDragonSwing(angle, descending);
+        }
       }
     }
 
@@ -2663,16 +2726,16 @@
       }
     }
 
-    $('btn-dragon-fish').onclick = () => fishDragonBoat(defaultDragonBoatTarget());
+    $('btn-dragon-fish').onclick = () => launchDragonHook();
     $('btn-dragon-peel').onclick = () => peelDragonBoat();
     $('dragonboat-panel').onclick = (e) => {
       if (isDragonBoatControlClick(e.target)) return;
-      handleDragonBoatScreenAction(dragonBoatCastTargetFromEvent(e));
+      handleDragonBoatScreenAction();
     };
     $('dragonboat-stage').onkeydown = (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        handleDragonBoatScreenAction(defaultDragonBoatTarget());
+        handleDragonBoatScreenAction();
       }
     };
 
