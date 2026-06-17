@@ -78,6 +78,29 @@ test('dragon boat stage renders zongzi as page-native art instead of generic emo
   assert.match(source, /function spawnDragonPrizePop\(text, isMiss\)/);
   assert.match(source, /spawnDragonPrizePop\(`\+\$\$\{dollars\}`, false\)/);
   assert.match(source, /spawnDragonPrizePop\('空粽', true\)/);
+});
+
+test('dragon boat peel results are a navigable carousel over persisted peels', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+
+  // markup: prev/next arrows + result label
+  assert.match(source, /<button class="dragon-peel-nav prev" id="dragon-peel-prev"/);
+  assert.match(source, /<button class="dragon-peel-nav next" id="dragon-peel-next"/);
+  assert.match(source, /<div class="dragonboat-peel-label" id="dragon-peel-label">/);
+  // carousel reads the persisted per-key peel list
+  assert.match(source, /function renderDragonPeelCarousel\(\)/);
+  assert.match(source, /Array\.isArray\(dragonState\?\.peels\) \? dragonState\.peels : \[\]/);
+  // < shows only when there is an earlier result; > only when there is a later one
+  assert.match(source, /prev\.style\.display = dragonPeelView > 0 \? '' : 'none'/);
+  assert.match(source, /next\.style\.display = dragonPeelView < n - 1 \? '' : 'none'/);
+  // 空粽 vs +$N rendering
+  assert.match(source, /dollars > 0 \? '\+\$' \+ dollars : '空粽'/);
+  // peel triggered by clicking the zongzi body; arrows only navigate
+  assert.match(source, /\$\('dragon-big-zongzi'\)\.onclick = \(e\) => \{[\s\S]*peelDragonBoat\(\);/);
+  assert.match(source, /\$\('dragon-peel-prev'\)\.onclick/);
+  assert.match(source, /\$\('dragon-peel-next'\)\.onclick/);
+  // panel tap only fishes now (peel moved to the zongzi)
+  assert.match(source, /\$\('dragonboat-panel'\)\.onclick = \(e\) => \{\s*if \(isDragonBoatControlClick\(e\.target\)\) return;\s*if \(Number\(dragonState\?\.remainingFish \|\| 0\) > 0\) launchDragonHook\(\);/);
   assert.match(source, /function dragonBoatSceneObjectStyle\(item,\s*index\)/);
   assert.match(source, /<span class="zongzi-rice"><\/span><span class="zongzi-rope"><\/span>/);
   assert.match(source, /\.dragonboat-zongzi::before/);

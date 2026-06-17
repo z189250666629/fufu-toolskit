@@ -38,7 +38,11 @@ func respondCard(w http.ResponseWriter, card Card) {
 			return
 		}
 		if ok {
-			dg = dragonBoatAppResponse(g, card)
+			dg, err = dragonBoatAppResponseWithPeels(g, card)
+			if err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "服务器错误")
+				return
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, buildLoginCardResponse(card, hist, sg, dg, cfg))

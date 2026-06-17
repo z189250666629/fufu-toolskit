@@ -61,6 +61,19 @@ func dragonBoatAppResponse(game DragonBoatGame, card Card) map[string]any {
 	}
 }
 
+// dragonBoatAppResponseWithPeels is the standard dragon-boat response plus the
+// per-zongzi reward list (for the result carousel). Loaded from spin_log so it
+// persists across reloads.
+func dragonBoatAppResponseWithPeels(game DragonBoatGame, card Card) (map[string]any, error) {
+	out := dragonBoatAppResponse(game, card)
+	peels, err := loadDragonPeels(card.CardKey)
+	if err != nil {
+		return nil, err
+	}
+	out["peels"] = peels
+	return out, nil
+}
+
 func dragonBoatPrizeMap(prize spinResult) map[string]any {
 	return map[string]any{
 		"type":       prize.Type,

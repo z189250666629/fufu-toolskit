@@ -41,7 +41,7 @@ func handleDragonBoatStart(w http.ResponseWriter, r *http.Request) {
 				return nil, httpErr{500, "服务器错误"}
 			}
 		}
-		return dragonBoatAppResponse(game, card), nil
+		return dragonBoatAppResponseWithPeels(game, card)
 	})
 	if err != nil {
 		writeHTTPError(w, err)
@@ -106,7 +106,10 @@ func handleDragonBoatFish(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{500, "服务器错误"}
 		}
-		out := dragonBoatAppResponse(next, card)
+		out, err := dragonBoatAppResponseWithPeels(next, card)
+		if err != nil {
+			return nil, err
+		}
 		out["hit"] = result.Hit
 		out["cast"] = cast
 		return out, nil
@@ -179,7 +182,10 @@ func handleDragonBoatPeel(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return nil, httpErr{500, "服务器错误"}
 		}
-		out := dragonBoatAppResponse(next, updated)
+		out, err := dragonBoatAppResponseWithPeels(next, updated)
+		if err != nil {
+			return nil, err
+		}
 		out["prizeResult"] = dragonBoatPrizeMap(prize)
 		out["totalWon"] = updated.TotalWon
 		return out, nil

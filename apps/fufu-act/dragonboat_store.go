@@ -22,6 +22,27 @@ func insertDragonBoatGame(key string) error {
 	return err
 }
 
+// loadDragonPeels returns every peeled-zongzi result for the key in peel order
+// (oldest first). Each dragon peel writes exactly one spin_log row, so this is
+// the per-zongzi reward list (prize 0 = 空粽). Used to drive the result carousel.
+func loadDragonPeels(key string) ([]map[string]any, error) {
+	peels := []map[string]any{}
+	rows, err := db.Query(`SELECT prize_dollars, created_at FROM spin_log WHERE card_key=? AND is_retry=0 ORDER BY id ASC`, key)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p int
+		var at string
+		if err := rows.Scan(&p, &at); err != nil {
+			return nil, err
+		}
+		peels = append(peels, map[string]any{"prize_dollars": p, "created_at": at})
+	}
+	return peels, rows.Err()
+}
+
 func updateDragonBoatFishing(key string, fishingUsed, zongziCaught int, status, removedObjects string) error {
 	return withTx(func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`UPDATE dragonboat_games SET fishing_used=?, zongzi_caught=?, status=?, removed_objects=?, updated_at=datetime('now') WHERE card_key=?`, fishingUsed, zongziCaught, status, removedObjects, key); err != nil {

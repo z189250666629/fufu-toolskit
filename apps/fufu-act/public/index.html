@@ -1457,6 +1457,64 @@
       color: var(--c-yellow);
       text-shadow: 3px 3px 0 var(--c-black);
     }
+    /* 开奖结果轮播：< / > 翻看已拆粽子，点粽子本体拆下一个 */
+    .dragonboat-peel-screen .dragonboat-big-zongzi { pointer-events: auto; }
+    .dragonboat-peel-screen .dragonboat-big-zongzi.peelable { cursor: pointer; }
+    .dragon-peel-nav {
+      position: absolute;
+      top: 38%;
+      transform: translateY(-50%);
+      z-index: 8;
+      pointer-events: auto;
+      width: 46px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--c-bg-2);
+      color: var(--c-yellow);
+      border: none;
+      cursor: pointer;
+      font-family: var(--pixel-font);
+      font-size: 26px;
+      box-shadow:
+        inset 3px 3px 0 0 var(--c-purple),
+        inset -3px -3px 0 0 var(--c-frame-lo),
+        0 0 0 3px var(--c-black);
+    }
+    .dragon-peel-nav.prev { left: 5%; }
+    .dragon-peel-nav.next { right: 5%; }
+    .dragon-peel-nav:active { transform: translateY(-50%) translate(2px, 2px); }
+    .dragonboat-peel-label {
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+      min-height: 30px;
+    }
+    .dragon-peel-idx {
+      font-family: var(--cn-font);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--c-cyan);
+    }
+    .dragon-peel-prize {
+      font-family: var(--pixel-font);
+      font-size: 20px;
+    }
+    .dragon-peel-prize.win {
+      color: var(--c-yellow);
+      text-shadow: 2px 2px 0 var(--c-black);
+    }
+    .dragon-peel-prize.miss { color: var(--c-cyan); }
+    .dragon-peel-hint {
+      font-family: var(--cn-font);
+      font-size: 12px;
+      letter-spacing: 2px;
+      color: var(--c-cyan);
+    }
     #dragonboat-panel.dragonboat-phase-peel .dragonboat-peel-screen,
     #dragonboat-panel.dragonboat-phase-done .dragonboat-peel-screen {
       display: flex;
@@ -1804,8 +1862,11 @@
         <div class="dragonboat-obstacles" id="dragonboat-obstacles" aria-hidden="true"></div>
         <div class="dragonboat-zongzi-field" id="dragonboat-zongzi-field" aria-hidden="true"></div>
         <div class="dragonboat-peel-screen" id="dragonboat-peel-screen" aria-hidden="true">
+          <button class="dragon-peel-nav prev" id="dragon-peel-prev" type="button" aria-label="上一个">‹</button>
           <div class="dragonboat-big-zongzi" id="dragon-big-zongzi"><i></i></div>
-          <div class="dragonboat-peel-count">× <span id="dragon-peel-count">0</span></div>
+          <button class="dragon-peel-nav next" id="dragon-peel-next" type="button" aria-label="下一个">›</button>
+          <div class="dragonboat-peel-label" id="dragon-peel-label"></div>
+          <div class="dragonboat-peel-count" id="dragon-peel-count-line">还剩 <span id="dragon-peel-count">0</span> 个待拆</div>
         </div>
       </div>
 
@@ -2364,6 +2425,7 @@
     let dragonBusy = false;
     let dragonState = null;
     let dragonScene = null;
+    let dragonPeelView = 0; // 开奖结果轮播当前下标（指向 dragonState.peels）
 
     function showDragonBoat(data) {
       $('login-panel').style.display = 'none';
@@ -2375,6 +2437,8 @@
       renderDragonHistory(data.history);
       if (data.dragonBoatGame) {
         renderDragonBoatState(data.dragonBoatGame);
+        dragonPeelLatest();          // 进入时默认展示最近一次开奖
+        renderDragonPeelCarousel();
       } else {
         startDragonBoatGame();
       }
@@ -2422,6 +2486,7 @@
       renderDragonBoatScene(dragonScene);
       updateDragonBoatButtons();
       updateDragonBoatPhase();
+      renderDragonPeelCarousel();
 
       if (preserveResult) return;
       if (remaining > 0) {
@@ -2434,6 +2499,46 @@
         $('dragon-result').className = 'dragonboat-result';
         $('dragon-result').textContent = '捕捞结束';
       }
+    }
+
+    function dragonPeelList() {
+      return Array.isArray(dragonState?.peels) ? dragonState.peels : [];
+    }
+
+    function dragonPeelLatest() {
+      dragonPeelView = Math.max(0, dragonPeelList().length - 1);
+    }
+
+    // 开奖结果轮播：展示当前下标的已拆粽子结果；< 上一颗 / > 下一颗（无则隐藏）。
+    function renderDragonPeelCarousel() {
+      const peels = dragonPeelList();
+      const ready = Number(dragonState?.zongziReady) || 0;
+      const n = peels.length;
+      dragonPeelView = Math.max(0, Math.min(dragonPeelView, n - 1));
+
+      const label = $('dragon-peel-label');
+      const prev = $('dragon-peel-prev');
+      const next = $('dragon-peel-next');
+      const big = $('dragon-big-zongzi');
+      const countLine = $('dragon-peel-count-line');
+
+      big.classList.toggle('peelable', ready > 0);
+      countLine.style.display = ready > 0 ? '' : 'none';
+
+      if (n === 0) {
+        label.innerHTML = ready > 0 ? '<span class="dragon-peel-hint">点粽子拆开</span>' : '';
+        prev.style.display = 'none';
+        next.style.display = 'none';
+        return;
+      }
+
+      const cur = peels[dragonPeelView] || {};
+      const dollars = Number(cur.prize_dollars) || 0;
+      label.innerHTML =
+        `<span class="dragon-peel-idx">第 ${dragonPeelView + 1} / ${n} 个</span>` +
+        `<span class="dragon-peel-prize ${dollars > 0 ? 'win' : 'miss'}">${dollars > 0 ? '+$' + dollars : '空粽'}</span>`;
+      prev.style.display = dragonPeelView > 0 ? '' : 'none';
+      next.style.display = dragonPeelView < n - 1 ? '' : 'none';
     }
 
     function renderDragonBoatScene(scene) {
@@ -2766,6 +2871,8 @@
           new Promise(resolve => setTimeout(resolve, 440)), // 等开壳到「爆开」那一刻再揭晓
         ]);
         renderDragonBoatState(data, true);
+        dragonPeelLatest();            // 跳到刚拆开的这一颗
+        renderDragonPeelCarousel();
         const prize = data.prizeResult || {};
         const dollars = Number(prize.prize) || 0;
         const rank = String(prize.rank || '').trim();
@@ -2819,9 +2926,26 @@
 
     $('btn-dragon-fish').onclick = () => launchDragonHook();
     $('btn-dragon-peel').onclick = () => peelDragonBoat();
+    // 捕捞阶段：点屏幕任意处发射钩子。剥粽阶段不在这里触发（改为点粽子本体）。
     $('dragonboat-panel').onclick = (e) => {
       if (isDragonBoatControlClick(e.target)) return;
-      handleDragonBoatScreenAction();
+      if (Number(dragonState?.remainingFish || 0) > 0) launchDragonHook();
+    };
+    // 点粽子本体 = 拆下一个（剥粽阶段）。
+    $('dragon-big-zongzi').onclick = (e) => {
+      e.stopPropagation();
+      if (dragonBusy) return;
+      if (Number(dragonState?.remainingFish || 0) > 0) return;
+      if (Number(dragonState?.zongziReady || 0) > 0) peelDragonBoat();
+    };
+    // < / > 翻看历史开奖，不触发拆粽。
+    $('dragon-peel-prev').onclick = (e) => {
+      e.stopPropagation();
+      if (dragonPeelView > 0) { dragonPeelView--; renderDragonPeelCarousel(); }
+    };
+    $('dragon-peel-next').onclick = (e) => {
+      e.stopPropagation();
+      if (dragonPeelView < dragonPeelList().length - 1) { dragonPeelView++; renderDragonPeelCarousel(); }
     };
     $('dragonboat-stage').onkeydown = (e) => {
       if (e.key === 'Enter' || e.key === ' ') {

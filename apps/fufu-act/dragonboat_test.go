@@ -40,6 +40,33 @@ func seedDragonBoatCard(t *testing.T, key string, dollars float64, draws int) {
 	}
 }
 
+func TestLoadDragonPeelsReturnsAllPeelsInOrder(t *testing.T) {
+	setupScratchLockTestDB(t)
+	key := "dragon-peels-order-test"
+	for _, p := range []int{88, 0, 200} { // 含一个空粽(0)
+		if _, err := db.Exec(`INSERT INTO spin_log (card_key, prize_dollars, is_retry) VALUES (?,?,0)`, key, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 重试行不应进入开奖列表
+	if _, err := db.Exec(`INSERT INTO spin_log (card_key, prize_dollars, is_retry) VALUES (?,?,1)`, key, 999); err != nil {
+		t.Fatal(err)
+	}
+	peels, err := loadDragonPeels(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(peels) != 3 {
+		t.Fatalf("want 3 peels, got %d", len(peels))
+	}
+	for i, want := range []int{88, 0, 200} {
+		got, _ := peels[i]["prize_dollars"].(int)
+		if got != want {
+			t.Fatalf("peel[%d]=%d want %d (order/空粽 not preserved)", i, got, want)
+		}
+	}
+}
+
 func postDragonBoat(t *testing.T, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
