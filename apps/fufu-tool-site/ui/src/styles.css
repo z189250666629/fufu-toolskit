@@ -673,6 +673,31 @@ select {
   gap: 26px;
 }
 
+/* 网格项默认 min-width:auto，会被 560px 宽表格的 min-content 撑开，导致整页
+   横向溢出（body overflow-x:hidden 直接裁掉，移动端右侧内容看不到）。允许这些
+   网格项收缩到 0，配合 .table-wrap 的 overflow-x:auto 让表格在卡片内横向滚动。 */
+.admin-tabs > *,
+.admin-tab-panel,
+.admin-tab-panel > *,
+.bp-card,
+.bp-card-body,
+.business-stack,
+.business-stack > *,
+.metrics,
+.dynamic-pool-panel,
+.table-root,
+.blueprint-table,
+.site-groups > * {
+  min-width: 0;
+}
+
+/* 任何 HeroUI 表格(.table-root)在卡片内横向滚动，不撑破整页（含未套 blueprint
+   样式的裸表格，如奖池/期望值表）。 */
+.table-root {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .admin-panel {
   padding: 0 !important;
   background: var(--blueprint-panel) !important;
@@ -1125,6 +1150,8 @@ tr:last-child td {
 .game-route-editor {
   display: grid;
   gap: 6px;
+  min-width: 0;
+  overflow-x: auto; /* 固定 8 列的路线表在窄屏内横向滚动，避免撑破整页 */
 }
 
 .game-route-row {
@@ -1420,8 +1447,14 @@ tr:last-child td {
   .metrics,
   .business-grid,
   .dynamic-pool-controls,
-  .sale-job-row {
+  .sale-job-row,
+  .sale-slot-card .sale-job-row {
     grid-template-columns: 1fr;
+  }
+
+  /* 这些行内控件组在窄屏换行，避免固定宽度撑破 */
+  .sale-slot-controls {
+    flex-wrap: wrap;
   }
 
   .site-url-row {
