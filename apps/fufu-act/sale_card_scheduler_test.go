@@ -133,7 +133,7 @@ func TestRunDueSaleCardSlotsFiresSlotsIndependently(t *testing.T) {
 	}
 }
 
-func TestRunDueSaleCardSlotsCatchesUpEarlierEnabledSpecial55Slot(t *testing.T) {
+func TestRunDueSaleCardSlotsDoesNotCatchUpEarlierEnabledSpecial55Slot(t *testing.T) {
 	setupSaleCardConfigTestRoot(t)
 	resetSaleCardFiredGuard(t)
 	stockQ, create, upload := restockBackend(t, 1)
@@ -152,12 +152,16 @@ func TestRunDueSaleCardSlotsCatchesUpEarlierEnabledSpecial55Slot(t *testing.T) {
 
 	runDueSaleCardSlots(time.Date(2026, 6, 16, 19, 58, 0, 0, time.FixedZone("CST", 8*60*60)))
 
-	if stockQ.Load() != 1 || create.Load() != 1 || upload.Load() != 1 {
-		t.Fatalf("special55 should catch up after its configured minute: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
+	if stockQ.Load() != 0 || create.Load() != 0 || upload.Load() != 0 {
+		t.Fatalf("special55 should not catch up after its configured minute: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
 	}
-	runDueSaleCardSlots(time.Date(2026, 6, 16, 20, 1, 0, 0, time.FixedZone("CST", 8*60*60)))
+	runDueSaleCardSlots(time.Date(2026, 6, 16, 23, 30, 0, 0, time.FixedZone("CST", 8*60*60)))
+	if stockQ.Load() != 1 || create.Load() != 9 || upload.Load() != 1 {
+		t.Fatalf("month should fire only at its configured minute: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
+	}
+	runDueSaleCardSlots(time.Date(2026, 6, 16, 23, 31, 0, 0, time.FixedZone("CST", 8*60*60)))
 	if stockQ.Load() != 1 {
-		t.Fatalf("same-day catch-up should still be deduped, stock=%d", stockQ.Load())
+		t.Fatalf("same-day after-minute run must not refire, stock=%d", stockQ.Load())
 	}
 }
 
@@ -177,7 +181,7 @@ func TestRunDueSaleCardSlotsRefiresWhenSpecial55TimeChangesSameDay(t *testing.T)
 		t.Fatalf("saveSaleCardSchedule: %v", err)
 	}
 
-	runDueSaleCardSlots(time.Date(2026, 6, 16, 20, 0, 0, 0, time.FixedZone("CST", 8*60*60)))
+	runDueSaleCardSlots(time.Date(2026, 6, 16, 19, 54, 0, 0, time.FixedZone("CST", 8*60*60)))
 	if stockQ.Load() != 1 || create.Load() != 1 || upload.Load() != 1 {
 		t.Fatalf("initial special55 fire failed: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
 	}

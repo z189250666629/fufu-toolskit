@@ -105,8 +105,8 @@ func TestScheduleTimeAndDueRules(t *testing.T) {
 			t.Fatalf("%s should be invalid schedule time", value)
 		}
 	}
-	if !SlotDue("09:00", "09:30") || !SlotDue("09:00", "09:00") {
-		t.Fatal("slot should be due at or after configured time")
+	if SlotDue("09:00", "09:30") || !SlotDue("09:00", "09:00") {
+		t.Fatal("slot should be due only during the configured minute")
 	}
 	if SlotDue("09:30", "09:00") || SlotDue("bad", "09:00") {
 		t.Fatal("slot should not be due before time or with invalid input")

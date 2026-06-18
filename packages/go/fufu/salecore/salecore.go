@@ -288,7 +288,7 @@ func ValidScheduleTime(value string) bool {
 }
 
 func SlotDue(slotTime, currentHHMM string) bool {
-	return ValidScheduleTime(slotTime) && ValidScheduleTime(currentHHMM) && slotTime <= currentHHMM
+	return ValidScheduleTime(slotTime) && ValidScheduleTime(currentHHMM) && slotTime == currentHHMM
 }
 
 func SlotFireKey(slot ScheduleSlot) string {

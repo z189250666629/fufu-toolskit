@@ -45,8 +45,10 @@ func saleCardScheduler() {
 	}
 }
 
-// runDueSaleCardSlots fires every enabled slot whose configured time has arrived
-// in the schedule's timezone and that has not yet fired today.
+// runDueSaleCardSlots fires every enabled slot whose configured HH:MM matches
+// the current minute in the schedule's timezone and that has not yet fired
+// today. It intentionally does not catch up missed slots: MCY stock is queried
+// only at the configured补卡 minute (or by the logged-in admin stock panel).
 func runDueSaleCardSlots(now time.Time) {
 	schedule, err := loadSaleCardSchedule()
 	if err != nil || !schedule.Enabled {
