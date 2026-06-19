@@ -36,6 +36,7 @@ var activityDir string
 var combineApp http.Handler
 var activityApp http.Handler
 var combineConfigErr error
+var combineRuntimeMu sync.RWMutex
 var modelCache = struct {
 	sync.Mutex
 	Value             *ModelStatus
@@ -113,9 +114,9 @@ func initRuntime(wd string) error {
 	navDir = firstExistingDir(filepath.Join(rootDir, "nav"), filepath.Clean(filepath.Join(rootDir, "..", "y2k-nav")))
 	adminDir = filepath.Join(rootDir, "admin")
 	activityDir = firstExistingDir(filepath.Join(rootDir, "activity"), filepath.Clean(filepath.Join(rootDir, "..", "fufu-act")))
-	combineApp = nil
+	closeCombineRuntime()
+	resetAdminLoginLimiter()
 	activityApp = nil
-	combineConfigErr = nil
 	if err := os.MkdirAll(filepath.Join(rootDir, "data"), 0755); err != nil {
 		return fmt.Errorf("create data directory: %w", err)
 	}
@@ -146,10 +147,7 @@ func firstExistingDir(candidates ...string) string {
 }
 
 func shutdownRuntime() {
-	if closer, ok := combineApp.(interface{ Close() error }); ok {
-		_ = closer.Close()
-	}
-	combineApp = nil
+	closeCombineRuntime()
 	_ = activityapp.Close()
 	activityApp = nil
 	if unifiedConfig != nil {

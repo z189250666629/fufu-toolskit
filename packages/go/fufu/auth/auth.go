@@ -1,6 +1,10 @@
 package auth
 
-import "strings"
+import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"strings"
+)
 
 type Role string
 
@@ -25,5 +29,11 @@ func AdminToken(configured, fallback string) string {
 
 func CheckAdminToken(got, configured, fallback string) bool {
 	expected := AdminToken(configured, fallback)
-	return expected != "" && strings.TrimSpace(got) == expected
+	got = strings.TrimSpace(got)
+	if expected == "" || got == "" {
+		return false
+	}
+	gotSum := sha256.Sum256([]byte(got))
+	expectedSum := sha256.Sum256([]byte(expected))
+	return subtle.ConstantTimeCompare(gotSum[:], expectedSum[:]) == 1
 }

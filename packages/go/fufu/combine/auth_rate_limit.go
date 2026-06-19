@@ -1,10 +1,9 @@
 package combine
 
 import (
-	"net"
+	"fufu/webutil"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -51,18 +50,7 @@ func (a *App) clearAuthFailures(r *http.Request) {
 }
 
 func authClientKey(r *http.Request) string {
-	for _, header := range []string{"Cf-Connecting-Ip", "X-Real-Ip", "X-Forwarded-For"} {
-		if value := strings.TrimSpace(r.Header.Get(header)); value != "" {
-			return strings.TrimSpace(strings.Split(value, ",")[0])
-		}
-	}
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil && host != "" {
-		return host
-	}
-	if strings.TrimSpace(r.RemoteAddr) != "" {
-		return strings.TrimSpace(r.RemoteAddr)
-	}
-	return "unknown"
+	return webutil.ClientIP(r)
 }
 
 func retryAfterSeconds(until, now time.Time) string {

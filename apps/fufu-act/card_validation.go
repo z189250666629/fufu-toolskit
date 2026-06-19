@@ -6,10 +6,11 @@ import (
 )
 
 func requireCurrentTokenActive(ctx context.Context, key string) error {
-	if tokenSvc == nil {
+	service, _ := snapshotTokenRuntime()
+	if service == nil {
 		return httpErr{http.StatusServiceUnavailable, "NewAPI 未配置"}
 	}
-	token, err := tokenSvc.SearchTokenByKey(ctx, key)
+	token, err := service.SearchTokenByKey(ctx, key)
 	if err != nil {
 		return err
 	}

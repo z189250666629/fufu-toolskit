@@ -41,19 +41,14 @@ func queryMCYUsableStock(ctx context.Context, itemID, skuID int) (int, error) {
 	return mcyCardGetTotal(data), nil
 }
 
-// mcyCardGet performs an encrypted card/get, re-authenticating once on either an
-// HTTP auth error or a body-level 登录已过期 (the shop signals an expired session
-// with HTTP 200 + code!=200, not a 401).
+// mcyCardGet performs an encrypted card/get. It re-authenticates once for the
+// shop's body-level 登录已过期 signal (HTTP 200 + code!=200); HTTP 401/403 is
+// treated as a credential/configuration problem and surfaced to the admin.
 func mcyCardGet(ctx context.Context, payload map[string]any) (map[string]any, error) {
 	staleCookie := getMCYCookie()
 	data, err := mcyEncryptedPost(ctx, mcyCardGetEndpoint, payload)
 	if err != nil {
-		if !isMCYAuthError(err) {
-			return nil, classifyShopRequestError(err)
-		}
-		if data, err = mcyRetryCardGetAfterRelogin(ctx, staleCookie, payload); err != nil {
-			return nil, err
-		}
+		return nil, classifyShopRequestError(err)
 	}
 	if mcyPayloadOK(data) {
 		return data, nil

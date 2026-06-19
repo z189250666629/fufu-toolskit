@@ -116,7 +116,7 @@ func TestExtractPurchaseTimeTrimsAndDropsBlankValues(t *testing.T) {
 	}
 }
 
-func TestFindShopPurchaseRefreshesExpiredCookie(t *testing.T) {
+func TestFindShopPurchaseReportsHTTPAuthAsCredentialFailure(t *testing.T) {
 	oldCookie := mcyCookie
 	t.Cleanup(func() { mcyCookie = oldCookie })
 	mcyCookie = "mcy_session=expired"
@@ -131,12 +131,8 @@ func TestFindShopPurchaseRefreshesExpiredCookie(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
 		case r.Method == http.MethodPost && r.URL.Path == "/plugin/virtual-card-ship/card/get":
 			postAttempts++
-			if r.Header.Get("Cookie") != "mcy_session=fresh" {
-				w.WriteHeader(http.StatusUnauthorized)
-				_ = json.NewEncoder(w).Encode(map[string]any{"error": "expired"})
-				return
-			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"list": []any{map[string]any{"purchase_time": "2026-06-10 12:00:00"}}}})
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`unauthorized`))
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -146,13 +142,13 @@ func TestFindShopPurchaseRefreshesExpiredCookie(t *testing.T) {
 	t.Setenv("MCY_USERNAME", "u")
 	t.Setenv("MCY_PASSWORD", "p")
 
-	got, err := findShopPurchase(context.Background(), "card-1")
+	_, err := findShopPurchase(context.Background(), "card-1")
 
-	if err != nil || got.PurchaseTime != "2026-06-10 12:00:00" {
-		t.Fatalf("purchase = %#v err=%v", got, err)
+	if err == nil || !errors.Is(err, ErrShopCredentialInvalid) || !strings.Contains(err.Error(), "请检查商城账号或密码") {
+		t.Fatalf("err=%v, want credential hint", err)
 	}
-	if postAttempts != 2 || loginAttempts != 1 {
-		t.Fatalf("postAttempts=%d loginAttempts=%d", postAttempts, loginAttempts)
+	if postAttempts != 1 || loginAttempts != 0 {
+		t.Fatalf("HTTP 401 should not trigger relogin: postAttempts=%d loginAttempts=%d", postAttempts, loginAttempts)
 	}
 }
 
@@ -395,6 +391,65 @@ func TestMCYLoginReturnsErrorForHTTPFailure(t *testing.T) {
 	}
 	if mcyCookie != "" {
 		t.Fatalf("mcyCookie should stay empty on login failure, got %q", mcyCookie)
+	}
+}
+
+func TestMCYLoginReturnsCredentialHintForUnauthorized(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = ""
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`bad password`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "wrong")
+
+	err := mcyLogin(context.Background())
+	if err == nil || !errors.Is(err, ErrShopCredentialInvalid) || !strings.Contains(err.Error(), "请检查商城账号或密码") {
+		t.Fatalf("err=%v, want credential hint", err)
+	}
+	if hits.Load() != 1 {
+		t.Fatalf("401 login should not fall back through extra endpoints, hits=%d", hits.Load())
+	}
+	if mcyCookie != "" {
+		t.Fatalf("mcyCookie should stay empty on credential failure, got %q", mcyCookie)
+	}
+}
+
+func TestMCYLoginReturnsCredentialHintForEncryptedPasswordPayload(t *testing.T) {
+	oldCookie := mcyCookie
+	t.Cleanup(func() { mcyCookie = oldCookie })
+	mcyCookie = ""
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		switch r.URL.Path {
+		case "/admin/login":
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": 404, "msg": "not found"})
+		case "/admin":
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 401, "msg": "密码错误"})
+		default:
+			t.Fatalf("unexpected request %s", r.URL.Path)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "wrong")
+	t.Setenv("MCY_LOGIN_ENDPOINT", "/admin/login")
+
+	err := mcyLogin(context.Background())
+	if err == nil || !errors.Is(err, ErrShopCredentialInvalid) || !strings.Contains(err.Error(), "请检查商城账号或密码") {
+		t.Fatalf("err=%v, want credential hint", err)
+	}
+	if hits.Load() != 2 {
+		t.Fatalf("encrypted credential failure should stop after first encrypted endpoint, hits=%d", hits.Load())
 	}
 }
 

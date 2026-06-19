@@ -385,6 +385,45 @@ func TestHandleAdminSaleCardsStockRequiresAdminToken(t *testing.T) {
 	}
 }
 
+func TestHandleAdminSaleCardsStockReportsMCYCredentialHint(t *testing.T) {
+	t.Setenv("ADMIN_TOKEN", "test-admin-token")
+	setMCYCookieForTest(t, "manage_token=stale")
+
+	var loginHits atomic.Int32
+	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/plugin/virtual-card-ship/card/get":
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`unauthorized`))
+		case "/admin/login", "/admin":
+			loginHits.Add(1)
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`bad password`))
+		default:
+			t.Fatalf("unexpected MCY request %s", r.URL.Path)
+		}
+	}))
+	t.Cleanup(mcySrv.Close)
+	t.Setenv("MCY_BASE_URL", mcySrv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "wrong")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
+	req.Header.Set("Authorization", "Bearer test-admin-token")
+	w := httptest.NewRecorder()
+	apiRoute(w, req)
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "请检查商城账号或密码") {
+		t.Fatalf("credential hint missing: %s", w.Body.String())
+	}
+	if loginHits.Load() != 0 {
+		t.Fatalf("HTTP 401 from MCY card/get should not trigger relogin, got %d login hits", loginHits.Load())
+	}
+}
+
 func setupSaleCardConfigTestRoot(t *testing.T) string {
 	t.Helper()
 	oldRoot := rootDir

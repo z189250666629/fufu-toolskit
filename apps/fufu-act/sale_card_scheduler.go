@@ -98,7 +98,8 @@ func saleCardScheduleLocation(timezone string) *time.Location {
 
 // runSaleCardSlot restocks every enabled job in the slot to its target stock.
 func runSaleCardSlot(slot SaleCardScheduleSlot) {
-	if tokenSvc == nil {
+	service, _ := snapshotTokenRuntime()
+	if service == nil {
 		fmt.Printf("[sale-card] slot %s skipped: 次数 fufu 未配置\n", slot.Group)
 		return
 	}
@@ -121,7 +122,7 @@ func runSaleCardSlot(slot SaleCardScheduleSlot) {
 		plan.TargetStock = job.TargetStock
 		plan.Count = 0
 		ctx, cancel := context.WithTimeout(context.Background(), saleCardRestockTimeout)
-		result, err := generateAndUploadSaleCards(ctx, tokenSvc, plan)
+		result, err := generateAndUploadSaleCards(ctx, service, plan)
 		cancel()
 		if err != nil {
 			fmt.Printf("[sale-card] restock %s failed: %v\n", job.Plan, err)

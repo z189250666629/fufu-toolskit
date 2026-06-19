@@ -58,6 +58,9 @@ func mcyLoginJSON(ctx context.Context, base, login, user, pass string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			return mcyCredentialError()
+		}
 		return mcyHTTPError{status: resp.StatusCode}
 	}
 	if setMCYCookieFromHTTPCookies(resp.Cookies(), "") {
@@ -73,10 +76,17 @@ func mcyLoginJSON(ctx context.Context, base, login, user, pass string) error {
 func mcyLoginEncrypted(ctx context.Context, base, endpoint, user, pass string) error {
 	data, cookies, err := mcyEncryptedRequest(ctx, base, endpoint, map[string]any{"email": user, "password": pass}, "")
 	if err != nil {
+		if isMCYAuthError(err) {
+			return mcyCredentialError()
+		}
 		return err
 	}
 	if !mcyPayloadOK(data) {
-		return fmt.Errorf("%w: %s", ErrShopLoginFailed, mcyPayloadMessage(data, "MCY encrypted login failed"))
+		message := mcyPayloadMessage(data, "MCY encrypted login failed")
+		if mcyMessageLooksCredentialInvalid(message) {
+			return mcyCredentialError()
+		}
+		return fmt.Errorf("%w: %s", ErrShopLoginFailed, message)
 	}
 	setMCYCookieFromHTTPCookies(cookies, mcyLoginToken(data))
 	return nil
@@ -105,6 +115,9 @@ func encryptedMCYLoginEndpoints(login string) []string {
 func shouldTryEncryptedMCYLogin(err error) bool {
 	if err == nil {
 		return true
+	}
+	if errors.Is(err, ErrShopCredentialInvalid) {
+		return false
 	}
 	if errors.Is(err, ErrShopInvalidResponse) || errors.Is(err, ErrShopLoginFailed) {
 		return true

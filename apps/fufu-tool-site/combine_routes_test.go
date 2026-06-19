@@ -27,10 +27,10 @@ func (h *fakeCombineHandler) ServeHTTPAsRole(w http.ResponseWriter, r *http.Requ
 
 func TestServeCombineAPIUsesUnifiedAdminSessionAsCombineAdmin(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
-	previous := combineApp
+	previousApp, previousErr := combineApp, combineConfigErr
 	fake := &fakeCombineHandler{}
-	combineApp = fake
-	t.Cleanup(func() { combineApp = previous })
+	replaceCombineRuntime(fake, nil)
+	t.Cleanup(func() { replaceCombineRuntime(previousApp, previousErr) })
 
 	req := httptest.NewRequest(http.MethodPost, "/api/generate", nil)
 	req.AddCookie(newUnifiedAdminSessionCookie(time.Now()))
@@ -47,10 +47,10 @@ func TestServeCombineAPIUsesUnifiedAdminSessionAsCombineAdmin(t *testing.T) {
 }
 
 func TestServeCombineAPIKeepsOriginalCombineAuthWithoutUnifiedSession(t *testing.T) {
-	previous := combineApp
+	previousApp, previousErr := combineApp, combineConfigErr
 	fake := &fakeCombineHandler{}
-	combineApp = fake
-	t.Cleanup(func() { combineApp = previous })
+	replaceCombineRuntime(fake, nil)
+	t.Cleanup(func() { replaceCombineRuntime(previousApp, previousErr) })
 
 	req := httptest.NewRequest(http.MethodPost, "/api/generate", nil)
 	rec := httptest.NewRecorder()

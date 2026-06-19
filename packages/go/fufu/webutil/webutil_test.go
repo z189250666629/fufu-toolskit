@@ -225,6 +225,22 @@ func TestResolvePortUsesDefaultTrimsAndRejectsInvalidValues(t *testing.T) {
 	}
 }
 
+func TestClientIPTrustsForwardedHeadersOnlyFromPrivateProxy(t *testing.T) {
+	proxied := httptest.NewRequest(http.MethodGet, "/", nil)
+	proxied.RemoteAddr = "172.18.0.2:45678"
+	proxied.Header.Set("X-Forwarded-For", "203.0.113.10, 172.18.0.2")
+	if got := ClientIP(proxied); got != "203.0.113.10" {
+		t.Fatalf("proxied ClientIP=%q", got)
+	}
+
+	direct := httptest.NewRequest(http.MethodGet, "/", nil)
+	direct.RemoteAddr = "198.51.100.20:45678"
+	direct.Header.Set("X-Forwarded-For", "203.0.113.99")
+	if got := ClientIP(direct); got != "198.51.100.20" {
+		t.Fatalf("direct ClientIP should ignore spoofable forwarded header, got %q", got)
+	}
+}
+
 func TestServeFileSupportsHeadAndCachePolicy(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "index.html")

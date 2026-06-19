@@ -19,13 +19,14 @@ func (e loginRateLimitError) Error() string {
 }
 
 func lookupLoginToken(ctx context.Context, key, client string, now time.Time) (*tokens.Token, error) {
-	if tokenSvc == nil {
+	service, _ := snapshotTokenRuntime()
+	if service == nil {
 		return nil, httpErr{http.StatusServiceUnavailable, "NewAPI 未配置"}
 	}
 	if blockedUntil, allowed := unknownLoginLimiter.allow(client, key, now); !allowed {
 		return nil, loginRateLimitError{Until: blockedUntil}
 	}
-	t, err := tokenSvc.SearchTokenByKey(ctx, key)
+	t, err := service.SearchTokenByKey(ctx, key)
 	if err != nil {
 		return nil, err
 	}
@@ -39,8 +40,8 @@ func lookupLoginToken(ctx context.Context, key, client string, now time.Time) (*
 
 func loginTokenQuotaUnit() int64 {
 	unit := int64(newapi.DefaultQuotaUnit)
-	if tokenSvc != nil && tokenSvc.QuotaUnit > 0 {
-		unit = tokenSvc.QuotaUnit
+	if service, _ := snapshotTokenRuntime(); service != nil && service.QuotaUnit > 0 {
+		unit = service.QuotaUnit
 	}
 	return unit
 }

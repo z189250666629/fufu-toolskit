@@ -52,6 +52,9 @@ func mcyEncryptedRequest(ctx context.Context, base, endpoint string, payload map
 		return nil, nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return nil, resp.Cookies(), mcyHTTPError{status: resp.StatusCode}
+	}
 	data, err := decodeMCYEncryptedResponse(resp)
 	if err != nil {
 		return data, resp.Cookies(), err

@@ -1,32 +1,46 @@
 package main
 
 import (
+	"fmt"
 	"fufu/combine"
 	"net/http"
 	"path/filepath"
 )
 
 func setupCombine() {
+	app, err := buildCombineApp()
+	replaceCombineRuntime(app, err)
+}
+
+func buildCombineApp() (http.Handler, error) {
 	site, err := primarySiteForCombine()
 	if err != nil {
-		combineConfigErr = err
-		return
+		return nil, err
 	}
 	db, err := combine.InitTraceDB(filepath.Join(rootDir, "data", "combine-trace.db"))
 	if err != nil {
-		combineConfigErr = err
-		return
+		return nil, err
 	}
 	cfg := combine.Config{Name: site.Name, URL: site.URL, Token: site.Token, UserID: site.UserID, QuotaUnit: site.QuotaUnit}
-	combineApp = combine.NewApp(cfg, db)
+	return combine.NewApp(cfg, db), nil
+}
+
+func replaceCombineRuntime(app http.Handler, configErr error) {
+	combineRuntimeMu.Lock()
+	old := combineApp
+	combineApp = app
+	combineConfigErr = configErr
+	combineRuntimeMu.Unlock()
+	if closer, ok := old.(interface{ Close() error }); ok {
+		_ = closer.Close()
+	}
+}
+
+func closeCombineRuntime() {
+	replaceCombineRuntime(nil, nil)
 }
 
 func rebuildCombine() {
-	if closer, ok := combineApp.(interface{ Close() error }); ok {
-		_ = closer.Close()
-	}
-	combineApp = nil
-	combineConfigErr = nil
 	setupCombine()
 }
 
@@ -43,6 +57,16 @@ type trustedCombineHandler interface {
 }
 
 func serveCombineAPI(w http.ResponseWriter, r *http.Request) {
+	combineRuntimeMu.RLock()
+	defer combineRuntimeMu.RUnlock()
+	if combineApp == nil {
+		message := "combine is not configured"
+		if combineConfigErr != nil {
+			message = fmt.Sprintf("combine is not configured: %v", combineConfigErr)
+		}
+		writeJSONError(w, http.StatusServiceUnavailable, message)
+		return
+	}
 	if validUnifiedAdminSession(r) {
 		if handler, ok := combineApp.(trustedCombineHandler); ok {
 			handler.ServeHTTPAsRole(w, r, combine.RoleAdmin)

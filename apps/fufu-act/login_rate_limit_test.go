@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -94,6 +95,43 @@ func TestHandleLoginUnknownLimitScopesByClientAndCardKey(t *testing.T) {
 	wantSearches := int32(unknownLoginFailureLimit + 2)
 	if got := searchHits.Load(); got != wantSearches {
 		t.Fatalf("upstream searches = %d, want %d", got, wantSearches)
+	}
+}
+
+func TestHandleLoginRateLimitsUnknownCardEnumerationByClient(t *testing.T) {
+	setupScratchLockTestDB(t)
+	t.Setenv("MCY_BASE_URL", "")
+	t.Setenv("SHOP_BASE_URL", "")
+
+	var searchHits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/token/search" {
+			t.Fatalf("unexpected token request %s %s", r.Method, r.URL.String())
+		}
+		searchHits.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{}})
+	}))
+	t.Cleanup(server.Close)
+	oldTokenSvc := tokenSvc
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "token", UserID: "1"}))
+	t.Cleanup(func() { tokenSvc = oldTokenSvc })
+
+	client := "203.0.113.73:5000"
+	for i := 0; i < unknownLoginClientLimit; i++ {
+		rec := postLoginCardForRateLimitTest("sk-unknown-enum-"+strconv.Itoa(i), client)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("attempt %d code=%d body=%s", i+1, rec.Code, rec.Body.String())
+		}
+	}
+	blocked := postLoginCardForRateLimitTest("sk-unknown-enum-next", client)
+	if blocked.Code != http.StatusTooManyRequests {
+		t.Fatalf("client-wide limiter code=%d body=%s", blocked.Code, blocked.Body.String())
+	}
+	if got := searchHits.Load(); got != int32(unknownLoginClientLimit) {
+		t.Fatalf("blocked enumeration attempt should not query upstream, got %d searches", got)
+	}
+	if rec := postLoginCardForRateLimitTest("sk-unknown-enum-next", "198.51.100.73:5000"); rec.Code != http.StatusNotFound {
+		t.Fatalf("another client should not be limited by enumeration, code=%d body=%s", rec.Code, rec.Body.String())
 	}
 }
 

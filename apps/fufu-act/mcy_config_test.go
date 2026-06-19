@@ -46,6 +46,20 @@ func TestSetMCYRuntimeConfigDropsCookieOnCredentialChange(t *testing.T) {
 	}
 }
 
+func TestSetMCYRuntimeConfigDropsCachedCookieWhenExplicitCookieCleared(t *testing.T) {
+	t.Cleanup(func() { SetMCYRuntimeConfig(MCYRuntimeConfig{}) })
+
+	SetMCYRuntimeConfig(MCYRuntimeConfig{BaseURL: "https://a.example.test", Username: "u", Password: "p", Cookie: "manual-cookie"})
+	if getMCYCookie() != "manual-cookie" {
+		t.Fatalf("explicit cookie should be applied, got %q", getMCYCookie())
+	}
+
+	SetMCYRuntimeConfig(MCYRuntimeConfig{BaseURL: "https://a.example.test", Username: "u", Password: "p"})
+	if getMCYCookie() != "" {
+		t.Fatalf("clearing explicit cookie should drop cached cookie, got %q", getMCYCookie())
+	}
+}
+
 func TestMCYUploadEndpointPrefersRuntimeThenEnvThenDefault(t *testing.T) {
 	t.Setenv("MCY_UPLOAD_ENDPOINT", "")
 	SetMCYRuntimeConfig(MCYRuntimeConfig{})

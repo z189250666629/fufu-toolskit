@@ -124,6 +124,47 @@ func TestAdminLoginRejectedWhenTokenUnset(t *testing.T) {
 	}
 }
 
+func TestAdminSessionLoginRateLimitsRepeatedFailures(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	for i := 0; i < adminLoginFailureLimit; i++ {
+		req := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "wrong-password"})
+		req.RemoteAddr = "203.0.113.88:5000"
+		w := httptest.NewRecorder()
+		route(w, req)
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d code=%d body=%s", i+1, w.Code, w.Body.String())
+		}
+	}
+	blockedReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "secret-admin-token"})
+	blockedReq.RemoteAddr = "203.0.113.88:5000"
+	blockedW := httptest.NewRecorder()
+	route(blockedW, blockedReq)
+	if blockedW.Code != http.StatusTooManyRequests {
+		t.Fatalf("blocked login code=%d body=%s", blockedW.Code, blockedW.Body.String())
+	}
+	if blockedW.Header().Get("Retry-After") == "" {
+		t.Fatal("rate-limited admin login should include Retry-After")
+	}
+	if !strings.Contains(blockedW.Body.String(), "管理员登录尝试过多") {
+		t.Fatalf("unexpected rate-limit body: %s", blockedW.Body.String())
+	}
+
+	otherReq := jsonRequest(t, http.MethodPost, "/api/admin/session", map[string]any{"token": "secret-admin-token"})
+	otherReq.RemoteAddr = "198.51.100.88:5000"
+	otherW := httptest.NewRecorder()
+	route(otherW, otherReq)
+	if otherW.Code != http.StatusOK {
+		t.Fatalf("another client should not be rate limited, code=%d body=%s", otherW.Code, otherW.Body.String())
+	}
+}
+
 func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 	html := readToolSiteUISource(t)
 	for _, want := range []string{

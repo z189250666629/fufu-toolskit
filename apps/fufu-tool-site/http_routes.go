@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fufu/newapi"
 	"fufu/webutil"
-	"net"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -129,10 +128,6 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 			webutil.RequireMethodMessage(w, r, method, "Only "+method)
 			return
 		}
-		if combineApp == nil {
-			writeJSONError(w, 503, "combine is not configured")
-			return
-		}
 		serveCombineAPI(w, r)
 		return
 	}
@@ -231,15 +226,5 @@ func readJSON(r *http.Request, out any) error {
 }
 
 func clientIP(r *http.Request) string {
-	for _, h := range []string{"Cf-Connecting-Ip", "X-Real-Ip", "X-Forwarded-For"} {
-		v := strings.TrimSpace(r.Header.Get(h))
-		if v != "" {
-			return strings.TrimSpace(strings.Split(v, ",")[0])
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err == nil {
-		return host
-	}
-	return r.RemoteAddr
+	return webutil.ClientIP(r)
 }

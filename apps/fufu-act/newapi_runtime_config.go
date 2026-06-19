@@ -14,10 +14,8 @@ func SetNewAPIRuntimeSite(site newapi.Site) {
 	site.URL = strings.TrimRight(strings.TrimSpace(site.URL), "/")
 	site.Token = strings.TrimSpace(site.Token)
 	if site.URL == "" || site.Token == "" {
-		tokenSvc = nil
-		tokenConfigErr = errors.New("NewAPI 未配置")
+		setTokenRuntime(nil, errors.New("NewAPI 未配置"))
 		return
 	}
-	tokenSvc = tokens.NewService(newapi.NewClient(site))
-	tokenConfigErr = nil
+	setTokenRuntime(tokens.NewService(newapi.NewClient(site)), nil)
 }

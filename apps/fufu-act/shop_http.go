@@ -46,6 +46,9 @@ func mcyPost(ctx context.Context, endpoint string, payload any) (map[string]any,
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return nil, mcyHTTPError{status: resp.StatusCode}
+	}
 	var data map[string]any
 	if err := decodeMCYResponse(resp.Body, &data); err != nil {
 		return nil, err

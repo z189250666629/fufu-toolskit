@@ -30,6 +30,12 @@ func handleUnifiedAdminSessionAPI(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"authenticated": validUnifiedAdminSession(r)})
 	case http.MethodPost:
+		client := clientIP(r)
+		now := time.Now()
+		if blockedUntil, allowed := adminLoginLimiter.allow(client, now); !allowed {
+			writeAdminLoginRateLimited(w, blockedUntil)
+			return
+		}
 		var body adminSessionLoginRequest
 		if err := readJSON(r, &body); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "登录格式错误")
@@ -37,10 +43,12 @@ func handleUnifiedAdminSessionAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		// 管理员口令即 ADMIN_TOKEN（由部署环境/GitHub 配置注入）。未配置时无人能登录。
 		if !auth.CheckAdminToken(body.Token, os.Getenv("ADMIN_TOKEN"), "") {
+			adminLoginLimiter.recordFailure(client, now)
 			clearUnifiedAdminSession(w)
 			writeJSONError(w, http.StatusUnauthorized, "管理员口令不正确")
 			return
 		}
+		adminLoginLimiter.clear(client)
 		http.SetCookie(w, newUnifiedAdminSessionCookie(time.Now()))
 		writeJSON(w, http.StatusOK, map[string]any{"authenticated": true})
 	case http.MethodDelete:

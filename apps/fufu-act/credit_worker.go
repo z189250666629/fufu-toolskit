@@ -12,10 +12,11 @@ func creditWorker() {
 }
 
 func processCredits() {
-	if tokenSvc == nil || db == nil {
+	service, _ := snapshotTokenRuntime()
+	if service == nil || db == nil {
 		return
 	}
-	processCreditsWith(newSQLiteCreditProcessorStore(db), newAPICreditQuotaAdapter{service: tokenSvc}, maxCreditRetries)
+	processCreditsWith(newSQLiteCreditProcessorStore(db), newAPICreditQuotaAdapter{service: service}, maxCreditRetries)
 }
 
 func processCreditsWith(store creditProcessorStore, quota creditQuotaAdapter, maxRetries int) {

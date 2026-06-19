@@ -12,4 +12,7 @@ func TestCheckAdminToken(t *testing.T) {
 	if !CheckAdminToken("fallback", "", "fallback") {
 		t.Fatal("fallback should pass when no configured token exists")
 	}
+	if CheckAdminToken(" ", "secret", "") {
+		t.Fatal("blank input must not pass")
+	}
 }

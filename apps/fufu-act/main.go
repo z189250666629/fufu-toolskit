@@ -125,8 +125,7 @@ func newHTTPServer(port string, handler http.Handler) *http.Server {
 	return webutil.NewHTTPServer("0.0.0.0:"+port, handler)
 }
 func initAll() error {
-	tokenSvc = nil
-	tokenConfigErr = nil
+	setTokenRuntime(nil, nil)
 	var err error
 	db, err = initDB(filepath.Join(rootDir, "data", "slot.db"))
 	if err != nil {
@@ -134,9 +133,9 @@ func initAll() error {
 	}
 	site, err := config.LoadPrimarySite(rootDir)
 	if err != nil {
-		tokenConfigErr = err
+		setTokenRuntime(nil, err)
 	} else {
-		tokenSvc = tokens.NewService(newapi.NewClient(site))
+		setTokenRuntime(tokens.NewService(newapi.NewClient(site)), nil)
 	}
 	setMCYCookie(config.Env("MCY_COOKIE"))
 	return nil

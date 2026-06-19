@@ -1,7 +1,7 @@
 package activityapp
 
 import (
-	"net"
+	"fufu/webutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +11,7 @@ import (
 
 const (
 	unknownLoginFailureLimit   = 5
+	unknownLoginClientLimit    = 10
 	unknownLoginFailureWindow  = 5 * time.Minute
 	unknownLoginFailureLockout = time.Minute
 )
@@ -18,8 +19,9 @@ const (
 var unknownLoginLimiter = newLoginUnknownRateLimiter()
 
 type loginUnknownRateLimiter struct {
-	mu       sync.Mutex
-	failures map[string]loginUnknownFailureRecord
+	mu             sync.Mutex
+	cardFailures   map[string]loginUnknownFailureRecord
+	clientFailures map[string]loginUnknownFailureRecord
 }
 
 type loginUnknownFailureRecord struct {
@@ -29,7 +31,10 @@ type loginUnknownFailureRecord struct {
 }
 
 func newLoginUnknownRateLimiter() *loginUnknownRateLimiter {
-	return &loginUnknownRateLimiter{failures: map[string]loginUnknownFailureRecord{}}
+	return &loginUnknownRateLimiter{
+		cardFailures:   map[string]loginUnknownFailureRecord{},
+		clientFailures: map[string]loginUnknownFailureRecord{},
+	}
 }
 
 func (l *loginUnknownRateLimiter) allow(client, cardKey string, now time.Time) (time.Time, bool) {
@@ -38,13 +43,13 @@ func (l *loginUnknownRateLimiter) allow(client, cardKey string, now time.Time) (
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	key := unknownLoginFailureKey(client, cardKey)
-	rec := l.failures[key]
-	if !rec.BlockedUntil.IsZero() && now.Before(rec.BlockedUntil) {
-		return rec.BlockedUntil, false
+	clientKey := unknownLoginClientKey(client)
+	if blockedUntil, blocked := l.blockedUntil(l.clientFailures, clientKey, now); blocked {
+		return blockedUntil, false
 	}
-	if !rec.FirstAttempt.IsZero() && now.Sub(rec.FirstAttempt) > unknownLoginFailureWindow {
-		delete(l.failures, key)
+	cardFailureKey := unknownLoginFailureKey(client, cardKey)
+	if blockedUntil, blocked := l.blockedUntil(l.cardFailures, cardFailureKey, now); blocked {
+		return blockedUntil, false
 	}
 	return time.Time{}, true
 }
@@ -55,16 +60,8 @@ func (l *loginUnknownRateLimiter) recordUnknown(client, cardKey string, now time
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	key := unknownLoginFailureKey(client, cardKey)
-	rec := l.failures[key]
-	if rec.FirstAttempt.IsZero() || now.Sub(rec.FirstAttempt) > unknownLoginFailureWindow {
-		rec = loginUnknownFailureRecord{FirstAttempt: now}
-	}
-	rec.Count++
-	if rec.Count >= unknownLoginFailureLimit {
-		rec.BlockedUntil = now.Add(unknownLoginFailureLockout)
-	}
-	l.failures[key] = rec
+	l.record(l.clientFailures, unknownLoginClientKey(client), now, unknownLoginClientLimit)
+	l.record(l.cardFailures, unknownLoginFailureKey(client, cardKey), now, unknownLoginFailureLimit)
 }
 
 func (l *loginUnknownRateLimiter) clear(client, cardKey string) {
@@ -73,24 +70,42 @@ func (l *loginUnknownRateLimiter) clear(client, cardKey string) {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	delete(l.failures, unknownLoginFailureKey(client, cardKey))
+	delete(l.cardFailures, unknownLoginFailureKey(client, cardKey))
+}
+
+func (l *loginUnknownRateLimiter) blockedUntil(records map[string]loginUnknownFailureRecord, key string, now time.Time) (time.Time, bool) {
+	rec := records[key]
+	if !rec.BlockedUntil.IsZero() && now.Before(rec.BlockedUntil) {
+		return rec.BlockedUntil, true
+	}
+	if !rec.FirstAttempt.IsZero() && now.Sub(rec.FirstAttempt) > unknownLoginFailureWindow {
+		delete(records, key)
+	}
+	return time.Time{}, false
+}
+
+func (l *loginUnknownRateLimiter) record(records map[string]loginUnknownFailureRecord, key string, now time.Time, limit int) {
+	rec := records[key]
+	if rec.FirstAttempt.IsZero() || now.Sub(rec.FirstAttempt) > unknownLoginFailureWindow {
+		rec = loginUnknownFailureRecord{FirstAttempt: now}
+	}
+	rec.Count++
+	if rec.Count >= limit {
+		rec.BlockedUntil = now.Add(unknownLoginFailureLockout)
+	}
+	records[key] = rec
 }
 
 func unknownLoginFailureKey(client, cardKey string) string {
-	return strings.TrimSpace(client) + "\x00" + strings.TrimSpace(cardKey)
+	return unknownLoginClientKey(client) + "\x00" + strings.TrimSpace(cardKey)
+}
+
+func unknownLoginClientKey(client string) string {
+	return strings.TrimSpace(client)
 }
 
 func loginClientIP(r *http.Request) string {
-	for _, header := range []string{"Cf-Connecting-Ip", "X-Real-Ip", "X-Forwarded-For"} {
-		value := strings.TrimSpace(r.Header.Get(header))
-		if value != "" {
-			return strings.TrimSpace(strings.Split(value, ",")[0])
-		}
-	}
-	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil && host != "" {
-		return host
-	}
-	return strings.TrimSpace(r.RemoteAddr)
+	return webutil.ClientIP(r)
 }
 
 func writeUnknownLoginRateLimited(w http.ResponseWriter, until time.Time) {

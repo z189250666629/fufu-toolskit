@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mime"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -225,6 +226,46 @@ func NewHTTPServer(addr string, handler http.Handler) *http.Server {
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+}
+
+// ClientIP returns the best-effort client IP for rate limiting and diagnostics.
+// Forwarded headers are trusted only when the direct peer is a local/private
+// proxy. This prevents a directly exposed service from accepting spoofed
+// X-Forwarded-For values while still working behind nginx/Caddy/Docker proxies.
+func ClientIP(r *http.Request) string {
+	if r == nil {
+		return "unknown"
+	}
+	remoteHost := remoteAddrHost(r.RemoteAddr)
+	if trustForwardedClientHeaders(remoteHost) {
+		for _, header := range []string{"Cf-Connecting-Ip", "X-Real-Ip", "X-Forwarded-For"} {
+			if value := strings.TrimSpace(r.Header.Get(header)); value != "" {
+				return strings.TrimSpace(strings.Split(value, ",")[0])
+			}
+		}
+	}
+	if remoteHost != "" {
+		return remoteHost
+	}
+	if value := strings.TrimSpace(r.RemoteAddr); value != "" {
+		return value
+	}
+	return "unknown"
+}
+
+func remoteAddrHost(remoteAddr string) string {
+	if host, _, err := net.SplitHostPort(strings.TrimSpace(remoteAddr)); err == nil && host != "" {
+		return host
+	}
+	return strings.TrimSpace(remoteAddr)
+}
+
+func trustForwardedClientHeaders(remoteHost string) bool {
+	ip := net.ParseIP(strings.TrimSpace(remoteHost))
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified()
 }
 
 // ResolvePort normalizes a service port string and rejects values that would

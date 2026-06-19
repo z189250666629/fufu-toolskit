@@ -7,6 +7,7 @@ import (
 	"fufu/auth"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -39,7 +40,8 @@ func handleAdminSaleCardsRun(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")
 		return
 	}
-	if tokenConfigErr != nil || tokenSvc == nil {
+	service, configErr := snapshotTokenRuntime()
+	if configErr != nil || service == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "次数 fufu 未配置")
 		return
 	}
@@ -57,7 +59,7 @@ func handleAdminSaleCardsRun(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	result, err := generateAndUploadSaleCards(r.Context(), tokenSvc, plan)
+	result, err := generateAndUploadSaleCards(r.Context(), service, plan)
 	if err != nil {
 		writeSaleCardRunError(w, err)
 		return
@@ -70,7 +72,8 @@ func handleAdminSaleCardsTestKey(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")
 		return
 	}
-	if tokenConfigErr != nil || tokenSvc == nil {
+	service, configErr := snapshotTokenRuntime()
+	if configErr != nil || service == nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "次数 fufu 未配置")
 		return
 	}
@@ -92,7 +95,7 @@ func handleAdminSaleCardsTestKey(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	result, err := generateSaleCardTestKeys(r.Context(), tokenSvc, plan, req.Count, SnapshotRuntimeConfig())
+	result, err := generateSaleCardTestKeys(r.Context(), service, plan, req.Count, SnapshotRuntimeConfig())
 	if err != nil {
 		writeSaleCardRunError(w, err)
 		return
@@ -170,7 +173,7 @@ func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 			// Surface the actual MCY reason (admin-only) instead of a generic message
 			// so the failure is diagnosable.
 			fmt.Printf("[sale-card] stock query failed: %v\n", err)
-			writeJSONError(w, http.StatusBadGateway, "查询库存失败: "+err.Error())
+			writeJSONError(w, http.StatusBadGateway, "查询库存失败: "+saleCardShopErrorMessage(err))
 			return
 		}
 		out[i] = saleCardStockEntry{
@@ -188,7 +191,7 @@ func writeSaleCardRunError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrSaleCardInvalidPlan):
 		writeJSONError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, ErrShopLoginFailed), errors.Is(err, ErrShopRequestFailed), errors.Is(err, ErrShopInvalidResponse):
-		writeJSONError(w, http.StatusBadGateway, "MCY 上架失败")
+		writeJSONError(w, http.StatusBadGateway, "MCY 上架失败: "+saleCardShopErrorMessage(err))
 	case errors.Is(err, ErrSaleCardGenerationFailed):
 		message := saleCardGenerationFailureMessage(err)
 		fmt.Printf("[sale-card] token generation failed: %s\n", message)
@@ -196,4 +199,25 @@ func writeSaleCardRunError(w http.ResponseWriter, err error) {
 	default:
 		writeJSONError(w, http.StatusInternalServerError, "服务器错误")
 	}
+}
+
+func saleCardShopErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, ErrShopCredentialInvalid):
+		return "MCY 登录失败：请检查商城账号或密码"
+	case errors.Is(err, ErrShopLoginFailed):
+		return "MCY 登录失败，请检查商城配置"
+	case errors.Is(err, ErrShopInvalidResponse):
+		return "MCY 返回格式异常"
+	case errors.Is(err, ErrShopRequestFailed):
+		msg := err.Error()
+		prefix := ErrShopRequestFailed.Error() + ": "
+		if strings.HasPrefix(msg, prefix) {
+			msg = strings.TrimSpace(strings.TrimPrefix(msg, prefix))
+		}
+		if msg != "" {
+			return msg
+		}
+	}
+	return "请稍后重试"
 }

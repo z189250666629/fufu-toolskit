@@ -36,13 +36,14 @@ func SetMCYRuntimeConfig(c MCYRuntimeConfig) {
 	credsChanged := mcyRuntimeConfig.BaseURL != c.BaseURL ||
 		mcyRuntimeConfig.Username != c.Username ||
 		mcyRuntimeConfig.Password != c.Password
+	cookieCleared := mcyRuntimeConfig.Cookie != "" && c.Cookie == ""
 	mcyRuntimeConfig = c
 	mcyConfigMu.Unlock()
 
 	switch {
 	case c.Cookie != "":
 		setMCYCookie(c.Cookie)
-	case credsChanged:
+	case credsChanged || cookieCleared:
 		setMCYCookie("")
 	}
 }
