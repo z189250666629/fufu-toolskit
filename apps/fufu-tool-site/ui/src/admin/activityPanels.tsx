@@ -202,14 +202,14 @@ export function ActivityConfigEditor({
       </div>
 
       <div className="config-subhead">卡档配置（来自 MCY 上架配置）</div>
-      <p className="inline-help">卡档读取自动补卡里的 MCY 套餐配置；这里维护每个卡档的玩法、抽奖次数、售价和成本。</p>
+      <p className="inline-help">卡档读取补卡卡档配置；这里维护每个卡档的玩法、抽奖次数、售价和成本。</p>
       <div className="sale-test-key-toolbar">
         <label className="field field--inline">测试数量<Input className="mini-input blueprint-input sale-test-key-count" type="number" min={1} max={20} value={String(testKeyCount)} onChange={(event) => updateTestKeyCount(event.target.value)} /></label>
         <span className="inline-help">测试 key 只创建 NewAPI token，不上传 MCY；token 名会带活动测试标记。</span>
       </div>
       <div className="game-route-editor">
         <div className="game-route-row game-route-row--head"><span>MCY 卡档</span><span>玩法</span><span>抽奖次数</span><span>售价</span><span>成本</span><span>净利润</span><span>入池</span><span>测试 key</span></div>
-        {saleTierOptions.length === 0 ? <p className="inline-help">未加载到 MCY 卡档配置，先检查自动补卡配置。</p> : null}
+        {saleTierOptions.length === 0 ? <p className="inline-help">未加载到 MCY 卡档配置，先检查补卡卡档配置。</p> : null}
         {saleTierOptions.map((option) => {
           const tier = dynamicTierForQuota(dynamicPool, option.quota);
           const revenue = numberValue(tier.revenue);

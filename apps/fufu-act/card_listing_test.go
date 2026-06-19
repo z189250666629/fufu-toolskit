@@ -521,22 +521,14 @@ func TestSaleCardPlanTemplatesIncludeSpecialAndMonthlyCards(t *testing.T) {
 	}
 }
 
-func TestHandleAdminSaleCardsRunExecutesKnownPlan(t *testing.T) {
+func TestHandleAdminSaleCardsRunPausedDoesNotCallIntegrations(t *testing.T) {
 	setMCYCookieForTest(t, "manage_token=test")
 	t.Setenv("ADMIN_TOKEN", "test-admin-token")
 
+	var tokenHits atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
-			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
-		}
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode NewAPI body: %v", err)
-		}
-		if got := int(body["interval_unit"].(float64)); got != 3 {
-			t.Fatalf("special 55 admin run interval_unit=%d, want 3; body=%#v", got, body)
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{map[string]any{"id": 1, "key": "generated-a"}}})
+		tokenHits.Add(1)
+		t.Fatalf("paused sale-card run must not call NewAPI, got %s %s", r.Method, r.URL.String())
 	}))
 	t.Cleanup(tokenSrv.Close)
 	oldTokenSvc := tokenSvc
@@ -548,12 +540,10 @@ func TestHandleAdminSaleCardsRunExecutesKnownPlan(t *testing.T) {
 	tokenConfigErr = nil
 	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
 
+	var mcyHits atomic.Int32
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
-		if got := payload["card"]; got != "sk-generated-a" {
-			t.Fatalf("uploaded card=%q", got)
-		}
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
+		mcyHits.Add(1)
+		t.Fatalf("paused sale-card run must not call MCY, got %s", r.URL.Path)
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
@@ -564,44 +554,19 @@ func TestHandleAdminSaleCardsRunExecutesKnownPlan(t *testing.T) {
 
 	apiRoute(w, req)
 
-	if w.Code != http.StatusOK {
+	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
-	var body SaleCardListingResult
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v; body=%s", err, w.Body.String())
+	if body := w.Body.String(); !strings.Contains(body, "暂时下线") || !strings.Contains(body, "不对接商城") {
+		t.Fatalf("paused response missing hint: %s", body)
 	}
-	if body.Uploaded != 1 || strings.Join(body.Keys, ",") != "sk-generated-a" || body.PlanID != "fufu-mix-special-55" {
-		t.Fatalf("response=%#v", body)
+	if tokenHits.Load() != 0 || mcyHits.Load() != 0 {
+		t.Fatalf("paused run should not call integrations: token=%d mcy=%d", tokenHits.Load(), mcyHits.Load())
 	}
 }
 
-func TestHandleAdminSaleCardsRunReportsSanitizedNewAPIReason(t *testing.T) {
-	t.Setenv("ADMIN_TOKEN", "test-admin-token")
-
-	tokenSrv := newSaleCardTokenServer(t, map[string]any{
-		"success": false,
-		"message": `group mix missing for sk-secret-card-123456 Authorization: Bearer upstream-secret-token password="raw-password"`,
-	})
-	oldTokenSvc := tokenSvc
-	oldTokenConfigErr := tokenConfigErr
-	t.Cleanup(func() {
-		tokenSvc = oldTokenSvc
-		tokenConfigErr = oldTokenConfigErr
-	})
-	tokenConfigErr = nil
-	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
-
-	req := httptest.NewRequest(http.MethodPost, "/api/admin/sale-cards/run", strings.NewReader(`{"plan":"fufu-mix-special-55","count":1}`))
-	req.Header.Set("Authorization", "Bearer test-admin-token")
-	w := httptest.NewRecorder()
-
-	apiRoute(w, req)
-
-	if w.Code != http.StatusBadGateway {
-		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
-	}
-	body := w.Body.String()
+func TestSaleCardGenerationFailureMessageRedactsNewAPIReason(t *testing.T) {
+	body := saleCardGenerationFailureMessage(fmt.Errorf("%w: group mix missing for sk-secret-card-123456 Authorization: Bearer upstream-secret-token password=\"raw-password\"", ErrSaleCardGenerationFailed))
 	for _, want := range []string{"次数 fufu 生成卡密失败：", "group mix missing"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("body=%q, want substring %q", body, want)

@@ -169,11 +169,10 @@ func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 	html := readToolSiteUISource(t)
 	for _, want := range []string{
 		"活动统计",
-		"自动补卡",
+		"补卡 / MCY 库存检测（暂时下线）",
 		"当前奖池中奖率",
 		"/api/admin/stats",
 		"/api/admin/sale-cards/config",
-		"/api/admin/sale-cards/run",
 		"/api/admin/sale-cards/test-key",
 		"/api/prizes",
 		"/api/newapi/sites",
@@ -199,6 +198,7 @@ func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 		}
 	}
 	for _, notWant := range []string{
+		"/api/admin/sale-cards/run",
 		`id="admin-token"`,
 		"输入 ADMIN_TOKEN",
 		"Authorization: 'Bearer '",
@@ -233,10 +233,10 @@ func TestProductionAdminShellGroupsOverlappingConfigIntoTwoTabs(t *testing.T) {
 	html := readToolSiteUISource(t)
 	for _, want := range []string{
 		`site-replenish`,
-		"状态页 / 合卡 / 自动补货",
+		"状态页 / 合卡 / 活动卡档",
 		"状态页实际站点",
 		"NewAPI 站点配置",
-		"自动补卡",
+		"补卡 / MCY 库存检测（暂时下线）",
 		`activity`,
 		"活动统计",
 		"当前奖池中奖率",
@@ -440,8 +440,8 @@ func TestAdminConfigSavesNewAPISitesForStatusAndCombine(t *testing.T) {
 	})
 	runW := httptest.NewRecorder()
 	route(runW, runReq)
-	if runW.Code != http.StatusBadRequest || !strings.Contains(runW.Body.String(), "未知上架计划") {
-		t.Fatalf("sale-card run should reuse admin NewAPI config and reach plan validation, code=%d body=%s", runW.Code, runW.Body.String())
+	if runW.Code != http.StatusServiceUnavailable || !strings.Contains(runW.Body.String(), "暂时下线") {
+		t.Fatalf("sale-card run should be paused before touching integrations, code=%d body=%s", runW.Code, runW.Body.String())
 	}
 }
 

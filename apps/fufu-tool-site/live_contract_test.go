@@ -101,20 +101,8 @@ func TestLiveToolSiteMCYStockContract(t *testing.T) {
 	req.AddCookie(cookie)
 	rec := httptest.NewRecorder()
 	route(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("live MCY stock status=%d error=%q", rec.Code, liveErrorFromRecorder(rec))
-	}
-	var body struct {
-		Plans []struct {
-			PlanID       string `json:"planId"`
-			CurrentStock int    `json:"currentStock"`
-		} `json:"plans"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode live MCY stock response: %v", err)
-	}
-	if len(body.Plans) == 0 {
-		t.Fatal("live MCY stock returned zero plans")
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(liveErrorFromRecorder(rec), "暂时下线") {
+		t.Fatalf("live MCY stock should be paused, status=%d error=%q", rec.Code, liveErrorFromRecorder(rec))
 	}
 }
 
@@ -134,19 +122,8 @@ func TestLiveToolSiteSaleCardRunContract(t *testing.T) {
 	req.AddCookie(cookie)
 	rec := httptest.NewRecorder()
 	route(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("live sale-card run status=%d error=%q", rec.Code, liveErrorFromRecorder(rec))
-	}
-	var body struct {
-		Generated int      `json:"generated"`
-		Uploaded  int      `json:"uploaded"`
-		Keys      []string `json:"keys"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode live sale-card run response: %v", err)
-	}
-	if body.Generated != count || body.Uploaded != count || len(body.Keys) != count {
-		t.Fatalf("live sale-card counts generated=%d uploaded=%d keys=%d want=%d", body.Generated, body.Uploaded, len(body.Keys), count)
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(liveErrorFromRecorder(rec), "暂时下线") {
+		t.Fatalf("live sale-card run should be paused, status=%d error=%q", rec.Code, liveErrorFromRecorder(rec))
 	}
 }
 

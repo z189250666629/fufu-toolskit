@@ -47,7 +47,7 @@ export function MCYConfigEditor({
         <Button className="blueprint-primary-button" onPress={save} isDisabled={saving}>{saving ? '保存中…' : '保存 MCY 配置'}</Button>
       </div>
       {saveMsg.text ? <MessageLine tone={saveMsg.tone}>{saveMsg.text}</MessageLine> : null}
-      <p className="inline-help">补卡查询库存与上架卡密都用这套 MCY 商城登录。存数据库，密码仅后台可见，留空表示沿用原值。</p>
+      <p className="inline-help">MCY 商城登录仍用于活动核销等现有流程；自动补卡与库存检测已暂时下线，不会从这里触发对接。存数据库，密码仅后台可见，留空表示沿用原值。</p>
     </div>
   );
 }

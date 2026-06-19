@@ -18,7 +18,6 @@ import type {
   PrizeConfigResponse,
   RuntimeSitesResponse,
   SaleCardConfig,
-  SaleCardRunResult,
   SaleCardTestKeyResult
 } from './types';
 
@@ -185,15 +184,6 @@ export function AdminPage() {
     setConfig((current) => ({ ...current, mcy: next.mcy ?? current.mcy }));
   }
 
-  async function saveSaleSchedule(schedule: NonNullable<SaleCardConfig['schedule']>) {
-    const next = await sendJSON<SaleCardConfig>('/api/admin/sale-cards/config', 'POST', { schedule });
-    setSaleCards(next);
-  }
-
-  async function runSalePlan(plan: string, targetStock: number): Promise<SaleCardRunResult> {
-    return sendAdminActionJSON<SaleCardRunResult>('/api/admin/sale-cards/run', 'POST', { plan, targetStock });
-  }
-
   async function generateSaleCardTestKey(plan: string, count: number): Promise<SaleCardTestKeyResult> {
     return sendAdminActionJSON<SaleCardTestKeyResult>('/api/admin/sale-cards/test-key', 'POST', { plan, count });
   }
@@ -236,7 +226,7 @@ export function AdminPage() {
               </div>
               <Tabs.List className="admin-tab-list">
                 <Tabs.Tab id="site-replenish" className="admin-tab-card">
-                  <span className="admin-tab-title">状态页 / 合卡 / 自动补货</span>
+                  <span className="admin-tab-title">状态页 / 合卡 / 活动卡档</span>
                 </Tabs.Tab>
                 <Tabs.Tab id="activity" className="admin-tab-card">
                   <span className="admin-tab-title">活动统计 / 奖池 / 期望值</span>
@@ -279,11 +269,11 @@ export function AdminPage() {
                   onChange={(sites) => setConfig({ ...config, newapi: { sites } })}
                 />
               </ConfigCard>
-              <ConfigCard title="MCY 商城登录" description="补卡查询库存与上架卡密所用的商城账号；存数据库（env 仅首次种子），密码仅后台可见。">
+              <ConfigCard title="MCY 商城登录" description="商城账号仍用于活动核销等既有流程；自动补卡与库存检测暂时下线，不从后台触发对接。">
                 <MCYConfigEditor mcy={config.mcy ?? {}} onChange={(mcy) => setConfig({ ...config, mcy })} onSave={saveMCY} />
               </ConfigCard>
-              <ConfigCard title="自动补卡" description="按时段把库存补齐到目标：查询 MCY 商城当前可用卡量，补 目标-当前 张并推送到商城。月次卡与 55 次混合特惠卡各一个独立时段。">
-                <SaleCardManager config={saleCards} onSave={saveSaleSchedule} onRun={runSalePlan} />
+              <ConfigCard title="补卡 / MCY 库存检测（暂时下线）" description="暂不启动自动补卡，也不查询 MCY 商城库存；仅保留卡档给活动配置和测试 key 使用。">
+                <SaleCardManager config={saleCards} />
               </ConfigCard>
             </Tabs.Panel>
 

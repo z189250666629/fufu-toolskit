@@ -183,6 +183,29 @@ func TestRunDoesNotStartCreditWorkerWhenListenFails(t *testing.T) {
 	}
 }
 
+func TestStartWorkersKeepsSaleCardSchedulerPaused(t *testing.T) {
+	oldStartCreditWorker := startCreditWorker
+	oldStartSaleCardScheduler := startSaleCardScheduler
+	t.Cleanup(func() {
+		startCreditWorker = oldStartCreditWorker
+		startSaleCardScheduler = oldStartSaleCardScheduler
+	})
+
+	creditStarted := false
+	schedulerStarted := false
+	startCreditWorker = func() { creditStarted = true }
+	startSaleCardScheduler = func() { schedulerStarted = true }
+
+	StartWorkers()
+
+	if !creditStarted {
+		t.Fatal("credit worker should still start")
+	}
+	if schedulerStarted {
+		t.Fatal("sale-card scheduler should stay paused while auto restock is offline")
+	}
+}
+
 func TestHTTPServerHasTimeouts(t *testing.T) {
 	server := newHTTPServer("18820", http.NewServeMux())
 	if server.Addr != "0.0.0.0:18820" {

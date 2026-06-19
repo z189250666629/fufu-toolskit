@@ -259,13 +259,13 @@ test('tool-site UI preserves actual business API wiring in React source', async 
     '/api/admin/config',
     '/api/admin/stats',
     '/api/admin/sale-cards/config',
-    '/api/admin/sale-cards/run',
     '/api/admin/sale-cards/test-key',
     '/api/prizes',
     '/api/newapi/sites'
   ]) {
     assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+  assert.doesNotMatch(source, /\/api\/admin\/sale-cards\/run/);
   assert.doesNotMatch(source, /Authorization:\s*['"`]Bearer/);
   assert.doesNotMatch(source, /ADMIN_TOKEN/);
   assert.doesNotMatch(source, /登录后加载/);
@@ -383,46 +383,43 @@ test('tool-site activity prize editor exposes calculated unified prize pool only
   assert.doesNotMatch(activity, /postJackpot/);
 });
 
-test('tool-site sale card manual run exposes execution state beside the button', async () => {
+test('tool-site sale card panel makes paused MCY integration explicit', async () => {
   const saleCard = await readText('ui/src/admin/saleCardPanel.tsx');
-  const saleCardCore = await readText('ui/src/admin/saleCardConfigCore.ts');
   const adminPage = await readText('ui/src/admin/AdminPage.tsx');
 
-  assert.match(saleCard, /const STOCK_REFRESH_INTERVAL_MS = 5 \* 60 \* 1000;/);
-  assert.match(saleCard, /refreshingRef = useRef\(false\)/);
-  assert.match(saleCard, /window\.setInterval\(\(\) => \{\s*void refreshStock\(\);\s*\}, STOCK_REFRESH_INTERVAL_MS\)/s);
-  assert.match(saleCard, /window\.clearInterval\(timer\)/);
+  assert.match(saleCard, /PAUSED_MESSAGE/);
+  assert.match(saleCard, /自动补卡和 MCY 库存检测已暂时下线/);
+  assert.match(saleCard, /当前不查询库存，也不对接商城上架/);
+  assert.match(saleCard, /卡档参考（不查询 MCY 库存）/);
+  assert.match(saleCard, /状态 <b>未对接<\/b>/);
   assert.match(saleCard, /from '\.\/saleCardConfigCore'/);
-  assert.match(saleCardCore, /function buildSlotState/);
-  assert.match(saleCardCore, /function buildSaleCardSchedule/);
-  assert.match(saleCardCore, /function validateTargetStock/);
-  assert.match(adminPage, /\/api\/admin\/sale-cards\/run/);
-  assert.match(adminPage, /new APIError\(maybeMessage \|\| `请求失败（\$\{response\.status\}）`, response\.status, body\)/);
-  assert.match(saleCard, /async function runNow\(\)/);
-  assert.match(saleCard, /setRunning\(true\)/);
-  assert.match(saleCard, /isDisabled=\{!runPlan \|\| running\}/);
-  assert.match(saleCard, /\{running \? '补卡中…' : '立即补卡'\}/);
-  assert.match(saleCard, /<MessageLine tone=\{runMessage\.tone\}>\{runMessage\.text\}<\/MessageLine>/);
-  assert.match(saleCard, /messageFromError\(error, '补卡执行失败'\)/);
+  assert.match(adminPage, /<SaleCardManager config=\{saleCards\} \/>/);
+  assert.match(adminPage, /补卡 \/ MCY 库存检测（暂时下线）/);
+
+  assert.doesNotMatch(saleCard, /STOCK_REFRESH_INTERVAL_MS/);
+  assert.doesNotMatch(saleCard, /refreshStock/);
+  assert.doesNotMatch(saleCard, /window\.setInterval/);
+  assert.doesNotMatch(saleCard, /async function runNow/);
+  assert.doesNotMatch(saleCard, /\/api\/admin\/sale-cards\/stock/);
+  assert.doesNotMatch(adminPage, /\/api\/admin\/sale-cards\/run/);
+  assert.doesNotMatch(adminPage, /onRun=\{runSalePlan\}/);
 });
 
-test('tool-site sale card save and run messages stay inside the sale-card panel', async () => {
+test('tool-site sale card paused panel does not keep save or run handlers wired', async () => {
   const saleCard = await readText('ui/src/admin/saleCardPanel.tsx');
   const adminPage = await readText('ui/src/admin/AdminPage.tsx');
-  const saveStart = adminPage.indexOf('async function saveSaleSchedule');
-  const runStart = adminPage.indexOf('async function runSalePlan');
-  const saleHandlers = adminPage.slice(saveStart, adminPage.indexOf('const siteCount'));
-  const runHandler = adminPage.slice(runStart, adminPage.indexOf('const siteCount'));
 
-  assert.match(saleCard, /const \[scheduleMessage, setScheduleMessage\]/);
-  assert.match(saleCard, /async function saveSchedule\(\)/);
-  assert.match(saleCard, /补卡计划已保存/);
-  assert.match(saleCard, /<MessageLine tone=\{scheduleMessage\.tone\}>\{scheduleMessage\.text\}<\/MessageLine>/);
-  assert.doesNotMatch(saleCard, /错误信息见顶部提示/);
-  assert.doesNotMatch(saleHandlers, /setMessage\(\{ text: '正在保存补卡计划/);
-  assert.doesNotMatch(saleHandlers, /setMessage\(\{ text: '补卡计划已保存/);
-  assert.doesNotMatch(runHandler, /setMessage\(\{ text: '正在执行补卡/);
-  assert.doesNotMatch(runHandler, /补卡完成：当前/);
+  assert.match(saleCard, /<MessageLine tone="error">\{PAUSED_MESSAGE\}<\/MessageLine>/);
+  assert.match(saleCard, /保留卡档数据用于活动配置与测试 key/);
+  assert.doesNotMatch(saleCard, /setScheduleMessage/);
+  assert.doesNotMatch(saleCard, /async function saveSchedule/);
+  assert.doesNotMatch(saleCard, /补卡计划已保存/);
+  assert.doesNotMatch(saleCard, /runMessage/);
+  assert.doesNotMatch(saleCard, /messageFromError\(error, '补卡执行失败'\)/);
+  assert.doesNotMatch(adminPage, /async function saveSaleSchedule/);
+  assert.doesNotMatch(adminPage, /async function runSalePlan/);
+  assert.doesNotMatch(adminPage, /onSave=\{saveSaleSchedule\}/);
+  assert.doesNotMatch(adminPage, /onRun=\{runSalePlan\}/);
 });
 
 test('home page gets API and token line fallbacks from backend config only', async () => {

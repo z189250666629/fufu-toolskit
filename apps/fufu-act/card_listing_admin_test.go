@@ -264,100 +264,56 @@ func TestHandleAdminSaleCardsTestKeyRequiresAdminToken(t *testing.T) {
 	}
 }
 
-func TestHandleAdminSaleCardsStockReportsCurrentPerPlan(t *testing.T) {
+func TestHandleAdminSaleCardsRunTemporarilyDisabledDoesNotCallNewAPIOrMCY(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "test-admin-token")
-	setMCYCookieForTest(t, "manage_token=test")
+	oldTokenSvc := tokenSvc
+	oldTokenConfigErr := tokenConfigErr
+	t.Cleanup(func() {
+		tokenSvc = oldTokenSvc
+		tokenConfigErr = oldTokenConfigErr
+	})
+	tokenConfigErr = nil
 
-	var stockHits atomic.Int32
+	var createHits atomic.Int32
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		createHits.Add(1)
+		t.Fatalf("paused sale-card run must not call NewAPI, got %s", r.URL.Path)
+	}))
+	t.Cleanup(tokenSrv.Close)
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+
+	var mcyHits atomic.Int32
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/plugin/virtual-card-ship/card/get" {
-			t.Fatalf("stock query should only hit MCY card/get, got %s", r.URL.Path)
-		}
-		stockHits.Add(1)
-		// Each plan is a precise equal-* query; the shop narrows data.total per sku.
-		// 55卡 (sku66) reports 7; month-100 (sku65) reports 3; every other sku 0.
-		payload := testDecodeMCYRequest(t, r.Body, r.Header.Get("Secret"))
-		if int(payload["equal-status"].(float64)) != 0 {
-			t.Fatalf("stock query must filter equal-status=0, got %v", payload["equal-status"])
-		}
-		total := 0
-		switch int(payload["equal-sku_id"].(float64)) {
-		case 66:
-			total = 7
-		case 65:
-			total = 3
-		}
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": total, "list": []any{}}})
+		mcyHits.Add(1)
+		t.Fatalf("paused sale-card run must not call MCY, got %s", r.URL.Path)
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/sale-cards/run", strings.NewReader(`{"plan":"fufu-mix-special-55","targetStock":20}`))
 	req.Header.Set("Authorization", "Bearer test-admin-token")
 	w := httptest.NewRecorder()
 	apiRoute(w, req)
 
-	if w.Code != http.StatusOK {
+	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
-	var body struct {
-		Stock []struct {
-			PlanID       string `json:"planId"`
-			Slot         string `json:"slot"`
-			CurrentStock int    `json:"currentStock"`
-		} `json:"stock"`
+	if !strings.Contains(w.Body.String(), "暂时下线") || !strings.Contains(w.Body.String(), "不对接商城") {
+		t.Fatalf("paused message missing: %s", w.Body.String())
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v; body=%s", err, w.Body.String())
-	}
-	if len(body.Stock) < 6 {
-		t.Fatalf("expected stock for all plans, got %#v", body.Stock)
-	}
-	var special, month100, month500 int = -1, -1, -1
-	for _, s := range body.Stock {
-		switch s.PlanID {
-		case "fufu-mix-special-55":
-			special = s.CurrentStock
-			if s.Slot != "special55" {
-				t.Fatalf("special slot=%q", s.Slot)
-			}
-		case "fufu-mix-month-100":
-			month100 = s.CurrentStock
-		case "fufu-mix-month-500":
-			month500 = s.CurrentStock
-		}
-	}
-	if special != 7 || month100 != 3 {
-		t.Fatalf("per-plan stock wrong: special=%d month100=%d", special, month100)
-	}
-	// A SKU with no unsold cards must read 0, not the global total.
-	if month500 != 0 {
-		t.Fatalf("month500 (no unsold cards) stock=%d, want 0", month500)
-	}
-	if got, want := int(stockHits.Load()), len(saleCardPlanList()); got != want {
-		t.Fatalf("expected one precise query per plan: %d hits for %d plans", got, want)
+	if createHits.Load() != 0 || mcyHits.Load() != 0 {
+		t.Fatalf("paused run should not call integrations: newapi=%d mcy=%d", createHits.Load(), mcyHits.Load())
 	}
 }
 
-// TestHandleAdminSaleCardsStockQueriesSequentially proves the per-plan stock
-// queries run one at a time — the shop rejects concurrent requests on a single
-// session with 登录已过期.
-func TestHandleAdminSaleCardsStockQueriesSequentially(t *testing.T) {
+func TestHandleAdminSaleCardsStockTemporarilyDisabledDoesNotCallMCY(t *testing.T) {
 	t.Setenv("ADMIN_TOKEN", "test-admin-token")
 	setMCYCookieForTest(t, "manage_token=test")
 
-	var inFlight, maxInFlight atomic.Int32
+	var mcyHits atomic.Int32
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cur := inFlight.Add(1)
-		for {
-			m := maxInFlight.Load()
-			if cur <= m || maxInFlight.CompareAndSwap(m, cur) {
-				break
-			}
-		}
-		time.Sleep(15 * time.Millisecond) // hold the request so any overlap is observable
-		inFlight.Add(-1)
-		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 1, "list": []any{}}})
+		mcyHits.Add(1)
+		t.Fatalf("paused stock endpoint must not call MCY, got %s", r.URL.Path)
 	}))
 	t.Cleanup(mcySrv.Close)
 	t.Setenv("MCY_BASE_URL", mcySrv.URL)
@@ -367,11 +323,14 @@ func TestHandleAdminSaleCardsStockQueriesSequentially(t *testing.T) {
 	w := httptest.NewRecorder()
 	apiRoute(w, req)
 
-	if w.Code != http.StatusOK {
+	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
-	if got := maxInFlight.Load(); got != 1 {
-		t.Fatalf("stock queries must be sequential (shop rejects concurrency), max concurrent=%d", got)
+	if !strings.Contains(w.Body.String(), "暂时下线") || !strings.Contains(w.Body.String(), "不对接商城") {
+		t.Fatalf("paused message missing: %s", w.Body.String())
+	}
+	if mcyHits.Load() != 0 {
+		t.Fatalf("paused stock should not call MCY, got %d hits", mcyHits.Load())
 	}
 }
 
@@ -382,45 +341,6 @@ func TestHandleAdminSaleCardsStockRequiresAdminToken(t *testing.T) {
 	apiRoute(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("unauthorized stock query should be 401, got %d", w.Code)
-	}
-}
-
-func TestHandleAdminSaleCardsStockReportsMCYCredentialHint(t *testing.T) {
-	t.Setenv("ADMIN_TOKEN", "test-admin-token")
-	setMCYCookieForTest(t, "manage_token=stale")
-
-	var loginHits atomic.Int32
-	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/plugin/virtual-card-ship/card/get":
-			w.WriteHeader(http.StatusUnauthorized)
-			_, _ = w.Write([]byte(`unauthorized`))
-		case "/admin/login", "/admin":
-			loginHits.Add(1)
-			w.WriteHeader(http.StatusUnauthorized)
-			_, _ = w.Write([]byte(`bad password`))
-		default:
-			t.Fatalf("unexpected MCY request %s", r.URL.Path)
-		}
-	}))
-	t.Cleanup(mcySrv.Close)
-	t.Setenv("MCY_BASE_URL", mcySrv.URL)
-	t.Setenv("MCY_USERNAME", "u")
-	t.Setenv("MCY_PASSWORD", "wrong")
-
-	req := httptest.NewRequest(http.MethodGet, "/api/admin/sale-cards/stock", nil)
-	req.Header.Set("Authorization", "Bearer test-admin-token")
-	w := httptest.NewRecorder()
-	apiRoute(w, req)
-
-	if w.Code != http.StatusBadGateway {
-		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
-	}
-	if !strings.Contains(w.Body.String(), "请检查商城账号或密码") {
-		t.Fatalf("credential hint missing: %s", w.Body.String())
-	}
-	if loginHits.Load() != 0 {
-		t.Fatalf("HTTP 401 from MCY card/get should not trigger relogin, got %d login hits", loginHits.Load())
 	}
 }
 

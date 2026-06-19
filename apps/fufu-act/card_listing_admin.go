@@ -1,14 +1,12 @@
 package activityapp
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"fufu/auth"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 )
 
 type saleCardRunRequest struct {
@@ -35,36 +33,14 @@ type saleCardAdminConfigRequest struct {
 	Schedule SaleCardScheduleConfig `json:"schedule"`
 }
 
+const saleCardMCYIntegrationPausedMessage = "自动补卡和 MCY 库存检测已暂时下线，当前不对接商城"
+
 func handleAdminSaleCardsRun(w http.ResponseWriter, r *http.Request) {
 	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")
 		return
 	}
-	service, configErr := snapshotTokenRuntime()
-	if configErr != nil || service == nil {
-		writeJSONError(w, http.StatusServiceUnavailable, "次数 fufu 未配置")
-		return
-	}
-	var req saleCardRunRequest
-	if err := readBody(r, &req); err != nil {
-		if errors.Is(err, errRequestBodyTooLarge) {
-			writeJSONError(w, http.StatusRequestEntityTooLarge, "请求体过大")
-			return
-		}
-		writeJSONError(w, http.StatusBadRequest, "请求格式错误")
-		return
-	}
-	plan, err := saleCardPlanFromRunRequest(req)
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	result, err := generateAndUploadSaleCards(r.Context(), service, plan)
-	if err != nil {
-		writeSaleCardRunError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, result)
+	writeJSONError(w, http.StatusServiceUnavailable, saleCardMCYIntegrationPausedMessage)
 }
 
 func handleAdminSaleCardsTestKey(w http.ResponseWriter, r *http.Request) {
@@ -142,48 +118,14 @@ func handleAdminSaleCardsConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type saleCardStockEntry struct {
-	PlanID       string `json:"planId"`
-	PlanName     string `json:"planName"`
-	Slot         string `json:"slot"`
-	CurrentStock int    `json:"currentStock"`
-}
-
-// saleCardStockTimeout bounds the whole stock scan so a slow or unreachable MCY
-// shop can't hang the admin refresh.
-var saleCardStockTimeout = 30 * time.Second
-
-// handleAdminSaleCardsStock reports the current MCY shop stock for every plan so
-// the admin can see live counts before deciding restock targets. Each plan is a
-// precise per-SKU card/get (equal-* filter → data.total). The queries run
-// SEQUENTIALLY — the shop rejects concurrent requests on one session with
-// 登录已过期 — which is fast enough (~one round-trip per plan after login).
+// handleAdminSaleCardsStock is intentionally paused with the auto-restock
+// integration. It must not contact MCY while the feature is offline.
 func handleAdminSaleCardsStock(w http.ResponseWriter, r *http.Request) {
 	if !auth.CheckAdminToken(adminBearerToken(r), os.Getenv("ADMIN_TOKEN"), "") {
 		writeJSONError(w, http.StatusUnauthorized, "未授权")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), saleCardStockTimeout)
-	defer cancel()
-	plans := saleCardPlanList()
-	out := make([]saleCardStockEntry, len(plans))
-	for i, plan := range plans {
-		current, err := queryMCYUsableStock(ctx, plan.ItemID, plan.SKUID)
-		if err != nil {
-			// Surface the actual MCY reason (admin-only) instead of a generic message
-			// so the failure is diagnosable.
-			fmt.Printf("[sale-card] stock query failed: %v\n", err)
-			writeJSONError(w, http.StatusBadGateway, "查询库存失败: "+saleCardShopErrorMessage(err))
-			return
-		}
-		out[i] = saleCardStockEntry{
-			PlanID:       plan.ID,
-			PlanName:     plan.Name,
-			Slot:         plan.Slot,
-			CurrentStock: current,
-		}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"stock": out})
+	writeJSONError(w, http.StatusServiceUnavailable, saleCardMCYIntegrationPausedMessage)
 }
 
 func writeSaleCardRunError(w http.ResponseWriter, err error) {

@@ -171,9 +171,9 @@ tr:last-child td { border-bottom: 0; }
       <nav class="admin-tabs" data-slot="tabs" aria-label="后台配置分组" role="tablist">
         <button class="nav-card admin-tab is-active card" data-slot="tab" type="button" role="tab" aria-selected="true" data-tab-target="site-replenish" style="--accent: var(--moss);">
           <span class="card-stamp">站点</span>
-          <span class="card-title">状态页 / 合卡 / 自动补货</span>
+          <span class="card-title">状态页 / 合卡 / 活动卡档</span>
           <span class="chip chip--accent" data-slot="chip">HeroUI</span>
-          <span class="card-desc">NewAPI base_url、合卡主站复用、销售卡每日上架放在同一组。</span>
+          <span class="card-desc">NewAPI base_url、合卡主站复用、活动卡档参考放在同一组。</span>
         </button>
         <button class="nav-card admin-tab card" data-slot="tab" type="button" role="tab" aria-selected="false" data-tab-target="activity" style="--accent: var(--clay);">
           <span class="card-stamp">活动</span>
@@ -210,11 +210,11 @@ tr:last-child td { border-bottom: 0; }
           <section class="panel card" data-slot="card">
             <div class="panel-head">
               <div class="panel-title">
-                <b>销售卡上架</b>
-                <small>自动补货计划和手动上架直接对接 /api/admin/sale-cards/config 与 /api/admin/sale-cards/run。</small>
+                <b>补卡 / MCY 库存检测（暂时下线）</b>
+                <small>暂不启动自动补卡，也不查询 MCY 商城库存；仅保留卡档给活动配置和测试 key 使用。</small>
               </div>
             </div>
-            <div id="sale-card-manager" class="business-stack muted-box">登录后加载销售卡上架配置。</div>
+            <div id="sale-card-manager" class="business-stack muted-box">登录后加载卡档参考。</div>
           </section>
         </section>
 
@@ -597,69 +597,22 @@ function renderActivityStats(data = {}) {
       ${rowOrEmpty(data.scratchRows, 3, row => `<tr><td><span class="badge">${esc(row.status)}</span></td><td>${num(row.count)}</td><td>$${num(row.total)}</td></tr>`)}
     </table></div>`;
 }
-function renderSaleCards(config = {}, result = null) {
+function renderSaleCards(config = {}) {
   const plans = Array.isArray(config.plans) ? config.plans : [];
   const schedule = config.schedule || {};
-  const jobs = new Map((Array.isArray(schedule.jobs) ? schedule.jobs : []).map(job => [String(job.plan), job]));
-  const options = plans.map(plan => `<option value="${esc(plan.id)}">${esc(plan.name || plan.id)} · $${esc(plan.quota)}</option>`).join('');
+  const savedEnabled = Boolean(schedule.enabled || (Array.isArray(schedule.slots) && schedule.slots.some(slot => slot.enabled)));
   $('sale-card-manager').className = 'business-stack';
   $('sale-card-manager').innerHTML = `
-    <div class="action-row">
-      <label class="action-row"><input id="sale-card-enabled" data-slot="input" type="checkbox" ${schedule.enabled ? 'checked' : ''}> 启用每日自动上架</label>
-      <label class="action-row">时间 <input id="sale-card-time" class="mini-input" data-slot="input" value="${esc(schedule.time || '09:00')}"></label>
-      <label class="action-row">时区 <input id="sale-card-timezone" class="mini-input" data-slot="input" value="${esc(schedule.timezone || 'Asia/Shanghai')}"></label>
-      <button id="sale-card-save" class="button" data-slot="button" type="button">保存上架计划</button>
+    <p class="status-line alert alert--error">自动补卡和 MCY 库存检测已暂时下线，当前不查询库存，也不对接商城上架。</p>
+    <p class="inline-help">保留卡档数据用于活动配置与测试 key；后台不会启动自动补卡任务，页面也不会触发 MCY 库存检测。</p>
+    <div class="business-grid">
+      <div class="metric"><span>卡档数量</span><b>${num(plans.length)}</b></div>
+      <div class="metric"><span>自动计划</span><b>${savedEnabled ? '已保存但不运行' : '未启用'}</b></div>
     </div>
     <div class="table-wrap"><table>
-      <tr><th>计划</th><th>额度</th><th>周期</th><th>每日数量</th><th>启用</th></tr>
-      ${rowOrEmpty(plans, 5, plan => {
-        const job = jobs.get(String(plan.id)) || {};
-        return `<tr data-sale-card-plan="${esc(plan.id)}"><td><div class="sale-plan-name">${esc(plan.name || plan.id)}</div><div class="sale-plan-meta">ITEM ${esc(plan.itemId)} / SKU ${esc(plan.skuId)} / ${esc(plan.group || 'mix')}</div></td><td>$${esc(plan.quota)}</td><td>${esc(plan.intervalUnit)}</td><td><input class="sale-card-job-count mini-input" data-slot="input" type="number" min="1" max="100" value="${esc(job.count || '')}"></td><td><input class="sale-card-job-enabled" data-slot="input" type="checkbox" ${job.enabled ? 'checked' : ''}></td></tr>`;
-      })}
-    </table></div>
-    <div class="action-row">
-      <select id="sale-card-plan" data-slot="select-trigger">${options || '<option value="">暂无计划</option>'}</select>
-      <input id="sale-card-run-count" class="mini-input" data-slot="input" type="number" min="1" max="100" value="1">
-      <button id="sale-card-run" class="button button--primary" data-slot="button" type="button">立即上架</button>
-      <span id="sale-card-message" class="inline-help">${result ? `上次执行：${esc(JSON.stringify(result))}` : ''}</span>
-    </div>`;
-  $('sale-card-save')?.addEventListener('click', saveSaleCardSchedule);
-  $('sale-card-run')?.addEventListener('click', runSaleCardPlan);
-}
-function collectSaleCardSchedule() {
-  const jobs = [...document.querySelectorAll('[data-sale-card-plan]')].map(row => ({
-    plan: row.getAttribute('data-sale-card-plan'),
-    count: Number(row.querySelector('.sale-card-job-count')?.value || 0),
-    enabled: Boolean(row.querySelector('.sale-card-job-enabled')?.checked)
-  })).filter(job => job.enabled || job.count > 0);
-  return {
-    enabled: Boolean($('sale-card-enabled')?.checked),
-    time: $('sale-card-time')?.value.trim() || '09:00',
-    timezone: $('sale-card-timezone')?.value.trim() || 'Asia/Shanghai',
-    jobs
-  };
-}
-async function saveSaleCardSchedule() {
-  try {
-    const data = await apiFetch('/api/admin/sale-cards/config', {
-      method: 'POST', headers: jsonHeaders(true), body: JSON.stringify({ schedule: collectSaleCardSchedule() })
-    });
-    state.saleCardConfig = data;
-    renderSaleCards(data, state.saleCardResult);
-    setMessage('销售卡上架计划已保存。', 'ok');
-  } catch (error) { setMessage(error.message, 'error'); }
-}
-async function runSaleCardPlan() {
-  try {
-    const plan = $('sale-card-plan')?.value.trim();
-    const count = Number($('sale-card-run-count')?.value || 1);
-    const data = await apiFetch('/api/admin/sale-cards/run', {
-      method: 'POST', headers: jsonHeaders(true), body: JSON.stringify({ plan, count })
-    });
-    state.saleCardResult = data;
-    renderSaleCards(state.saleCardConfig || {}, data);
-    setMessage('销售卡立即上架任务已执行。', 'ok');
-  } catch (error) { setMessage(error.message, 'error'); }
+      <tr><th>计划</th><th>额度</th><th>周期</th><th>状态</th></tr>
+      ${rowOrEmpty(plans, 4, plan => `<tr><td><div class="sale-plan-name">${esc(plan.name || plan.id)}</div><div class="sale-plan-meta">ITEM ${esc(plan.itemId)} / SKU ${esc(plan.skuId)} / ${esc(plan.group || 'mix')}</div></td><td>$${esc(plan.quota)}</td><td>${esc(plan.intervalUnit)}</td><td>未对接</td></tr>`)}
+    </table></div>`;
 }
 function renderPrizeRuntime(data = {}) {
   $('current-prizes').className = 'business-stack';
