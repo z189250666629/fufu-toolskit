@@ -42,6 +42,11 @@ func managedSiteCacheEnvNames() []string {
 		"NEWAPI_TOKEN_SITE_URL",
 		"NEWAPI_TOKEN_SITE_TOKEN",
 		"NEWAPI_TOKEN_SITE_ACCESS_TOKEN",
+		"CONNECTIVITY_TARGETS",
+		"CONNECTIVITY_API_URLS",
+		"FUFU_API_URLS",
+		"CONNECTIVITY_TOKEN_URLS",
+		"FUFU_TOKEN_URLS",
 	}
 	for i := 1; i <= 10; i++ {
 		prefix := fmt.Sprintf("NEWAPI_MANAGED_SITE_%d", i)

@@ -23,22 +23,36 @@ test('spin flow uses safe API parsing instead of exposing raw response errors', 
 test('login flow masks server errors instead of rendering raw data.error', async () => {
   const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const loginStart = source.indexOf("$('btn-login').onclick = async () =>");
-  const loginEnd = source.indexOf("$('card-input').onkeydown");
+  const loginEnd = source.indexOf("$('user-id-input').onkeydown");
   const loginSource = source.slice(loginStart, loginEnd);
 
+  assert.match(source, /请问购买卡的站点是？/);
+  assert.match(source, /1\) 次数站/);
+  assert.match(source, /透过shop站点购买/);
+  assert.match(source, /2\) token站/);
+  assert.match(source, /透过订阅购买/);
+  assert.match(source, /id="card-key-input"/);
+  assert.match(source, /id="subscription-login-fields"/);
+  assert.match(source, /function getSelectedLoginMode\(\)/);
+  assert.match(source, /function currentLoginPayload\(mode = getSelectedLoginMode\(\)\)/);
+  assert.match(source, /return \{ cardKey \}/);
+  assert.match(source, /return \{ userId: Number\(userIdText\), username \}/);
   assert.match(loginSource, /activityApi\.readApiJson\(res,\s*\{/);
   assert.match(loginSource, /serverErrorMessage: '登录失败，请稍后重试'/);
-  assert.match(loginSource, /clientErrorMessage: 'INVALID KEY'/);
+  assert.match(loginSource, /clientErrorMessage: loginMode === LOGIN_MODE_CARD \? '卡密校验失败' : '账号校验失败'/);
   assert.match(loginSource, /activityApi\.safeErrorMessage\(e,\s*'登录失败，请稍后重试'\)/);
+  assert.match(loginSource, /body: JSON\.stringify\(loginPayload\)/);
   assert.doesNotMatch(loginSource, /const data = await res\.json\(\)/);
   assert.doesNotMatch(loginSource, /\$\('login-error'\)\.textContent = data\.error/);
   assert.doesNotMatch(loginSource, /\$\('login-error'\)\.textContent = 'NETWORK ERROR'/);
+  assert.match(loginSource, /currentCardKey = data\.cardKey/);
+  assert.match(loginSource, /btn\.textContent = loginButtonLabel\(\)/);
 });
 
 test('login flow routes dragon boat cards by backend game mode', async () => {
   const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const loginStart = source.indexOf("$('btn-login').onclick = async () =>");
-  const loginEnd = source.indexOf("$('card-input').onkeydown");
+  const loginEnd = source.indexOf("$('user-id-input').onkeydown");
   const loginSource = source.slice(loginStart, loginEnd);
 
   assert.match(source, /id="dragonboat-panel"/);
@@ -202,6 +216,8 @@ test('dragon boat hook swings and launches along its angle (gold-miner), not at 
   // swing only runs during the fishing phase and is stopped on logout
   assert.match(source, /if \(phase === 'fish' && !dragonBusy\) startDragonSwing\(\);\s*else stopDragonSwing\(\);/);
   assert.match(source, /\$\('btn-logout'\)\.onclick = \(\) => \{\s*currentCardKey = '';\s*stopDragonSwing\(\);/);
+  assert.match(source, /\$\('user-id-input'\)\.value = '';/);
+  assert.match(source, /\$\('username-input'\)\.value = '';/);
   // swing resumes with continuous direction (no pendulum reversal after a cast)
   assert.match(source, /dragonHookDescending = Math\.cos\(/);
   assert.match(source, /dragonboatHook\.swingPhaseForAngle\(fromAngle, DRAGON_SWING, descending\)/);

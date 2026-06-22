@@ -130,13 +130,14 @@ test('deploy workflows use the canonical docker GitHub environment', async () =>
   }
 });
 
-test('unified deploy workflow verify job runs uncached backend and frontend checks before packaging', async () => {
+test('unified deploy workflow verify job runs centralized checks before packaging', async () => {
   const source = await readRepoFile('.github/workflows/deploy-fufu-tool-site.yml');
   assert.doesNotMatch(source, /^\s*-\s*run:\s*go test \.\/\.\.\.\s*$/m, 'workflow must not use cache-prone go test ./...');
-  assert.match(source, /^\s*-\s*run:\s*go test -count=1 \.\s*$/m, 'workflow should run the workspace Go guard test uncached');
   assert.match(source, /actions\/setup-node@v4/, 'workflow should install Node in deploy verification');
-  assert.match(source, /^\s*-\s*run:\s*npm run test:scripts\s*$/m, 'workflow should run root script discipline tests');
-  assert.match(source, /^\s*-\s*run:\s*npm --prefix apps\/fufu-tool-site run test:frontend\s*$/m, 'workflow should run unified frontend/module tests');
+  assert.match(source, /^\s*-\s*run:\s*npm --prefix apps\/fufu-tool-site ci\s*$/m, 'workflow should install unified frontend dependencies before root tests');
+  assert.match(source, /^\s*-\s*run:\s*npm test\s*$/m, 'workflow should run the centralized root test entry');
+  assert.doesNotMatch(source, /^\s*-\s*run:\s*npm run test:[\w-]+\s*$/m, 'workflow must not call split root test scripts');
+  assert.doesNotMatch(source, /^\s*-\s*run:\s*npm --prefix apps\/[^ ]+ test\s*$/m, 'workflow must not call app test scripts directly');
 });
 
 test('docker context excludes non-production static assets from unified runtime app roots', async () => {
@@ -174,7 +175,9 @@ test('repo docs and agent instructions do not recommend cache-prone Go tests', a
   ]) {
     const source = await readRepoFile(path);
     assert.doesNotMatch(source, /(^|`|\s)go test \.\/\.\.\.(`|\s|$)/, `${path} must not recommend cache-prone go test ./...`);
-    assert.match(source, /go test -count=1 \.\/\.\.\.|go test -count=1 \./, `${path} should recommend uncached Go tests when showing direct Go commands`);
+    if (source.includes('go test')) {
+      assert.match(source, /go test -count=1 \.\/\.\.\.|go test -count=1 \./, `${path} should recommend uncached Go tests when showing direct Go commands`);
+    }
   }
 });
 

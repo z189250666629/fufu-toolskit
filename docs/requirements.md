@@ -48,7 +48,7 @@
 
 运维怎么用：
 
-- 本地使用 `npm run start:tool-site` 或 `npm run start:all` 启动统一服务。
+- 本地只使用根级 `npm start` 启动统一服务；启动目标集中在 `scripts/start-config.mjs`，不要再分开拉起历史模块或模块专用入口。
 - 发布时使用 tag + deploy directive 触发 `deploy-fufu-tool-site`。
 - GitHub Environment 固定使用 `toolskit`。
 - 通过 `ADMIN_TOKEN`、NewAPI、MCY 等既有变量完成首次启动种子配置。
@@ -66,16 +66,17 @@
 开发者怎么用：
 
 - 在 `apps/fufu-tool-site` 维护统一生产服务和业务入口。
-- 在 `apps/fufu-act` 维护 activity 模块能力与独立测试边界。
-- 在 `apps/y2k-nav` 维护导航模块的历史资源与测试边界。
+- 在 `apps/fufu-act` 维护 activity 模块能力与嵌入资源。
+- 在 `apps/y2k-nav` 维护导航模块的历史资源与交互资源。
 - 在 `apps/network-detect` 保留历史状态面板源码，生产不再单独部署。
 - 在 `packages/go/fufu/*` 维护共享能力。
+- 本地验证只使用根级 `npm test`；它只启动 `node --test scripts/test-suite.mjs` 这一条根级测试进程。子 package 不再提供 `test` / `test:*` 脚本，root 也不再分开调用各 app 测试或 Go 测试二进制，避免 Windows 反复弹出临时 `*.test.exe` 确认。
 
 要达成的效果：
 
 - 生产入口统一，但代码仍按业务能力和共享能力分层。
 - 公共逻辑优先进入 `packages/go/fufu/*`，避免在 app 间复制。
-- 每次整理都能通过根级测试和模块级测试验证。
+- 每次整理都能通过唯一根级测试入口验证。
 
 ## 需求边界
 
@@ -190,8 +191,8 @@
 | 模块 | 职责 | 不负责 |
 | --- | --- | --- |
 | `apps/fufu-tool-site` | 统一生产服务、路由整合、统一后台、首页 UI、状态页、合卡入口、activity 嵌入 | 承担所有底层业务算法 |
-| `apps/fufu-act` | 活动后端、抽奖/刮刮卡/补卡接口、activity 前台静态资源和测试边界 | 独立生产部署、原始管理后台 |
-| `apps/y2k-nav` | 导航模块历史资源、视觉/交互测试边界 | 独立生产部署 |
+| `apps/fufu-act` | 活动后端、抽奖/刮刮卡/补卡接口、activity 前台静态资源 | 独立生产部署、原始管理后台 |
+| `apps/y2k-nav` | 导航模块历史资源、视觉/交互资源 | 独立生产部署 |
 | `apps/network-detect` | 历史状态面板源码与迁移参考 | 独立生产部署 |
 | `packages/go/fufu/config` | 配置加载、站点配置归一化 | UI 表现 |
 | `packages/go/fufu/newapi` | NewAPI 客户端与响应处理 | 业务页面路由 |

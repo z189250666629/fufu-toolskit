@@ -57,6 +57,28 @@ func TestGetModelStatusInvalidatesWhenManagedSitesConfigChanges(t *testing.T) {
 	}
 }
 
+func TestModelStatusCacheKeyIncludesConnectivityOverrides(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	clearConnectivityEnv(t)
+
+	baseKey := modelStatusCacheKey(rootDir)
+	t.Setenv("CONNECTIVITY_TARGETS", `[{"id":"api","name":"API","urls":["https://api-a.example.test"]}]`)
+	inlineKey := modelStatusCacheKey(rootDir)
+	if inlineKey == baseKey {
+		t.Fatal("CONNECTIVITY_TARGETS should participate in the model-status cache key")
+	}
+
+	t.Setenv("CONNECTIVITY_TARGETS", "")
+	t.Setenv("CONNECTIVITY_TOKEN_URLS", "https://token-a.example.test")
+	tokenKey := modelStatusCacheKey(rootDir)
+	if tokenKey == baseKey {
+		t.Fatal("CONNECTIVITY_TOKEN_URLS should participate in the model-status cache key")
+	}
+}
+
 func TestGetModelStatusCoalescesConcurrentColdLoads(t *testing.T) {
 	oldRootDir := rootDir
 	oldValue := modelCache.Value

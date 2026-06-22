@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
+import { START_COMMANDS } from './start-config.mjs';
 import { DEFAULT_COMMANDS, createStartAllSupervisor, installSignalShutdownHandlers } from './start-all-supervisor.mjs';
 
 class FakeChild extends EventEmitter {
@@ -21,6 +22,7 @@ class FakeChild extends EventEmitter {
 }
 
 test('startAll defaults to the unified fufu tool site only', () => {
+  assert.equal(DEFAULT_COMMANDS, START_COMMANDS);
   assert.deepEqual(DEFAULT_COMMANDS, [
     { name: 'tool-site', command: 'npm', args: ['--prefix', 'apps/fufu-tool-site', 'start'] }
   ]);
@@ -46,7 +48,8 @@ test('startAll reports a tool-site non-zero exit', () => {
 
   supervisor.start();
 
-  assert.deepEqual(spawned.map((entry) => entry.command), ['npm.cmd']);
+  assert.deepEqual(spawned.map((entry) => entry.command), ['cmd.exe']);
+  assert.deepEqual(spawned[0].args, ['/d', '/s', '/c', 'npm.cmd', '--prefix', 'apps/fufu-tool-site', 'start']);
   assert.equal(spawned[0].options.env.NODE_ENV, 'test');
 
   spawned[0].child.emit('exit', 1, null);

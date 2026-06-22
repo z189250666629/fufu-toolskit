@@ -19,3 +19,14 @@ func SetNewAPIRuntimeSite(site newapi.Site) {
 	}
 	setTokenRuntime(tokens.NewService(newapi.NewClient(site)), nil)
 }
+
+// SetSubscriptionRuntimeSite applies the token-site NewAPI runtime used for
+// subscription-based activity authentication and subscription prize crediting.
+func SetSubscriptionRuntimeSite(site newapi.Site) {
+	site = normalizeSubscriptionRuntimeSite(site)
+	if site.URL == "" || site.Token == "" {
+		setSubscriptionRuntime(newapi.Site{}, errors.New("Token 站未配置"))
+		return
+	}
+	setSubscriptionRuntime(site, nil)
+}

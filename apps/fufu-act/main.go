@@ -44,16 +44,19 @@ const scratchMines = activity.ScratchMines
 const scratchMaxReveals = activity.ScratchMaxReveals
 
 type Card struct {
-	CardKey      string
-	CardName     string
-	Dollars      float64
-	TotalSpins   int
-	UsedSpins    int
-	WonJackpot   int
-	TotalWon     int
-	Source       string
-	PurchaseTime sql.NullString
-	Rigged       sql.NullString
+	CardKey        string
+	CardName       string
+	Dollars        float64
+	TotalSpins     int
+	UsedSpins      int
+	WonJackpot     int
+	TotalWon       int
+	Source         string
+	SubscriptionID sql.NullInt64
+	UserID         sql.NullInt64
+	Username       sql.NullString
+	PurchaseTime   sql.NullString
+	Rigged         sql.NullString
 }
 type ScratchGame struct {
 	ID           int
@@ -126,6 +129,7 @@ func newHTTPServer(port string, handler http.Handler) *http.Server {
 }
 func initAll() error {
 	setTokenRuntime(nil, nil)
+	setSubscriptionRuntime(newapi.Site{}, nil)
 	var err error
 	db, err = initDB(filepath.Join(rootDir, "data", "slot.db"))
 	if err != nil {
@@ -136,6 +140,14 @@ func initAll() error {
 		setTokenRuntime(nil, err)
 	} else {
 		setTokenRuntime(tokens.NewService(newapi.NewClient(site)), nil)
+	}
+	managedSites, managedMsg := config.LoadManagedSites(rootDir)
+	if tokenSite, ok := activitySubscriptionSite(managedSites); ok {
+		setSubscriptionRuntime(tokenSite, nil)
+	} else if managedMsg != "" {
+		setSubscriptionRuntime(newapi.Site{}, fmt.Errorf("%s", managedMsg))
+	} else {
+		setSubscriptionRuntime(newapi.Site{}, nil)
 	}
 	setMCYCookie(config.Env("MCY_COOKIE"))
 	return nil

@@ -24,28 +24,51 @@ func connectivityGroupsWithError() ([]map[string]any, string) {
 		}
 		return defaultConnectivityGroups(), ""
 	}
-	groups := []map[string]any{}
-	if urls := connectivityTargetURLs("CONNECTIVITY_API_URLS", "FUFU_API_URLS", "NEWAPI_API_SITE_URL"); len(urls) > 0 {
-		groups = append(groups, map[string]any{"id": "api", "name": firstNonEmpty(env("CONNECTIVITY_API_NAME"), "API 次数站"), "urls": urls})
+
+	inputs := defaultConnectivityGroupInputs()
+	managed := managedConnectivityTargetsByKind()
+	out := make([]connectivitycore.GroupInput, 0, len(inputs))
+	for _, input := range inputs {
+		urls := connectivityGroupURLs(
+			input.ID,
+			input.URLs,
+			managed[input.ID],
+		)
+		if len(urls) == 0 {
+			continue
+		}
+		out = append(out, connectivitycore.GroupInput{
+			ID:   input.ID,
+			Name: input.Name,
+			URLs: urls,
+		})
 	}
-	if urls := connectivityTargetURLs("CONNECTIVITY_TOKEN_URLS", "FUFU_TOKEN_URLS", "NEWAPI_TOKEN_SITE_URL"); len(urls) > 0 {
-		groups = append(groups, map[string]any{"id": "token", "name": firstNonEmpty(env("CONNECTIVITY_TOKEN_NAME"), "Token 站"), "urls": urls})
-	}
-	if len(groups) > 0 {
-		return groups, ""
+	if len(out) > 0 {
+		return connectivitycore.BuildGroups(out), ""
 	}
 	return defaultConnectivityGroups(), ""
 }
 
 func defaultConnectivityGroups() []map[string]any {
-	return connectivitycore.BuildGroups([]connectivitycore.GroupInput{
-		{ID: "api", Name: "API 次数站", URLs: []string{"https://api.fufuapi.top", "https://api.fufuapi.online", "https://api.fufuflower.top"}},
-		{ID: "token", Name: "Token 站", URLs: []string{"https://token.fufuapi.top", "https://token.fufuapi.online", "https://token.fufuflower.top"}},
-	})
+	return connectivitycore.BuildGroups(defaultConnectivityGroupInputs())
 }
 
-func connectivityTargetURLs(explicitName, legacyName, fallbackName string) []string {
-	return connectivitycore.TargetURLs(env(explicitName), env(legacyName), env(fallbackName))
+func connectivityGroupURLs(kind string, defaults []string, managed []string) []string {
+	if urls := explicitConnectivityURLs(kind); len(urls) > 0 {
+		return urls
+	}
+	return connectivitycore.PublicBrowserTargets(append(append([]string{}, defaults...), managed...))
+}
+
+func explicitConnectivityURLs(kind string) []string {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "api":
+		return connectivitycore.SplitPublicTargetList(firstNonEmpty(env("CONNECTIVITY_API_URLS"), env("FUFU_API_URLS")))
+	case "token":
+		return connectivitycore.SplitPublicTargetList(firstNonEmpty(env("CONNECTIVITY_TOKEN_URLS"), env("FUFU_TOKEN_URLS")))
+	default:
+		return nil
+	}
 }
 
 func firstNonEmpty(values ...string) string {

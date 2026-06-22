@@ -5,9 +5,6 @@
   "scripts": {
     "dev": "go run ./cmd/fufu-act",
     "start": "go run ./cmd/fufu-act",
-    "build": "go build -o fufu-act ./cmd/fufu-act",
-    "test:go": "go test -count=1 ./...",
-    "test:frontend": "node --test public/*.test.mjs",
-    "test": "npm run test:go && npm run test:frontend"
+    "build": "go build -o fufu-act ./cmd/fufu-act"
   }
 }

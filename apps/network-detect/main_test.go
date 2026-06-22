@@ -477,6 +477,30 @@ func TestConnectivityTargetsFallsBackWhenInlineJSONUnset(t *testing.T) {
 	}
 }
 
+func TestConnectivityTargetsDoNotCollapseToSinglePublicNewAPISiteURL(t *testing.T) {
+	oldRootDir := rootDir
+	t.Cleanup(func() { rootDir = oldRootDir })
+	rootDir = t.TempDir()
+	clearManagedSiteEnv(t)
+	clearConnectivityEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_CONFIG", filepath.Join(rootDir, "missing-managed-sites.json"))
+	t.Setenv("NEWAPI_API_SITE_URL", "https://api.fufuflower.top")
+	req := httptest.NewRequest(http.MethodGet, "/api/connectivity/targets", nil)
+	w := httptest.NewRecorder()
+
+	handleAPI(w, req)
+
+	body := w.Body.String()
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, body)
+	}
+	for _, want := range []string{"api.fufuapi.top", "api.fufuapi.online", "api.fufuflower.top"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("connectivity targets should keep public API defaults including %q, got %s", want, body)
+		}
+	}
+}
+
 func TestNewAPISitesMasksManagedSiteConfigParseErrors(t *testing.T) {
 	oldRootDir := rootDir
 	t.Cleanup(func() { rootDir = oldRootDir })

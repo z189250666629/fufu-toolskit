@@ -7,15 +7,34 @@ import (
 )
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
-	key, ok, err := readLoginCardKey(r)
+	ident, err := readLoginIdentity(r)
 	if err != nil {
-		writeCardKeyRequestError(w, err)
+		writeLoginRequestError(w, err)
 		return
 	}
-	if !ok {
+
+	if ident.CardKey != "" {
+		handleCardKeyLogin(w, r, ident.CardKey)
+		return
+	}
+	if ident.CardKeyProvided && !ident.UserIDProvided && !ident.UsernameProvided {
 		writeMissingCardKey(w)
 		return
 	}
+	if !ident.UserIDProvided || ident.Username == "" {
+		writeMissingLoginIdentity(w)
+		return
+	}
+
+	card, err := loginWithSubscriptionIdentity(r, ident.UserID, ident.Username)
+	if err != nil {
+		writeLoginError(w, err)
+		return
+	}
+	respondCard(w, card)
+}
+
+func handleCardKeyLogin(w http.ResponseWriter, r *http.Request, key string) {
 	card, ok, lookupErr := lookupCard(key)
 	if lookupErr != nil {
 		writeJSONError(w, http.StatusInternalServerError, "服务器错误")
@@ -27,6 +46,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		var err error
 		card, err = createLoginCard(r.Context(), key, loginClientIP(r), time.Now())
 		if err != nil {
 			writeLoginError(w, err)

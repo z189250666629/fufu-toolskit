@@ -20,6 +20,7 @@ func applyToolConfigSnapshot(cfg ToolConfig) {
 		UploadEndpoint: cfg.MCY.UploadEndpoint,
 	})
 	activityapp.SetNewAPIRuntimeSite(newAPIRuntimeSiteForActivity(cfg))
+	activityapp.SetSubscriptionRuntimeSite(subscriptionRuntimeSiteForActivity(cfg))
 	resetModelStatusCache()
 }
 
@@ -45,6 +46,22 @@ func newAPISitesForActivity(cfg ToolConfig) []newapi.Site {
 		}
 	}
 	return sites
+}
+
+func subscriptionRuntimeSiteForActivity(cfg ToolConfig) newapi.Site {
+	var fallback newapi.Site
+	for _, site := range newAPISitesForActivity(cfg) {
+		if !strings.EqualFold(site.Category, "token") {
+			continue
+		}
+		if fallback == (newapi.Site{}) {
+			fallback = site
+		}
+		if strings.EqualFold(site.Name, "token-fufu") {
+			return site
+		}
+	}
+	return fallback
 }
 
 func managedSitesForRuntime() ([]newapi.Site, string) {

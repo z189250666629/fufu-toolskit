@@ -1,9 +1,13 @@
 package activityapp
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"fufu/activity"
+	"fufu/newapi"
 	"fufu/poolfundcore"
 	"fufu/tokens"
 )
@@ -16,6 +20,25 @@ type loginCardPlan struct {
 	Source           string
 	PurchaseTime     string
 	PoolContribution poolfundcore.ContributionResult
+	SubscriptionID   int64
+	UserID           int64
+	Username         string
+}
+
+type subscriptionUpstreamUser struct {
+	ID       int64
+	Username string
+}
+
+type subscriptionSummary struct {
+	ID          int64
+	UserID      int64
+	PlanID      int64
+	AmountTotal int64
+	AmountUsed  int64
+	StartTime   int64
+	EndTime     int64
+	Status      string
 }
 
 func planLoginCardForToken(key string, t *tokens.Token, shop ShopPurchaseLookup, cfg activity.Config, quotaUnit int64) (loginCardPlan, error) {
@@ -52,6 +75,58 @@ func planLoginCardForToken(key string, t *tokens.Token, shop ShopPurchaseLookup,
 		PurchaseTime:     plan.PurchaseTime,
 		PoolContribution: plan.PoolContribution,
 	}, nil
+}
+
+func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptionSummary, cfg activity.Config, quotaUnit int64) (loginCardPlan, error) {
+	result := activity.PlanLoginCard(activity.LoginCardPlanInput{
+		CardKey:       fmt.Sprintf("subscription-%d", sub.ID),
+		Name:          user.Username,
+		Status:        subscriptionStatusForPlan(sub.Status),
+		IntervalQuota: sub.AmountTotal,
+		CreatedTime:   sub.StartTime,
+		Config:        cfg,
+		QuotaUnit:     quotaUnit,
+	})
+	switch result.Rejection {
+	case "":
+	case activity.LoginCardDisabled, activity.LoginCardOutsideWindow:
+		return loginCardPlan{}, httpErr{http.StatusForbidden, "该用户没有活动期内生效的有效订阅"}
+	default:
+		return loginCardPlan{}, httpErr{http.StatusForbidden, "该用户没有可参与活动的订阅额度"}
+	}
+	plan := result.Plan
+	return loginCardPlan{
+		CardName:         firstNonEmpty(user.Username, fmt.Sprintf("user-%d", user.ID)),
+		Dollars:          plan.Dollars,
+		TotalSpins:       plan.TotalDraws,
+		Source:           "subscription",
+		PurchaseTime:     formatUnixText(sub.StartTime),
+		PoolContribution: plan.PoolContribution,
+		SubscriptionID:   sub.ID,
+		UserID:           user.ID,
+		Username:         user.Username,
+	}, nil
+}
+
+func subscriptionStatusForPlan(status string) int {
+	if strings.EqualFold(strings.TrimSpace(status), "active") {
+		return 1
+	}
+	return 0
+}
+
+func formatUnixText(ts int64) string {
+	if ts <= 0 {
+		return ""
+	}
+	return time.Unix(ts, 0).Local().Format("2006-01-02 15:04:05")
+}
+
+func quotaUnitOrDefault(value int64) int64 {
+	if value > 0 {
+		return value
+	}
+	return newapi.DefaultQuotaUnit
 }
 
 // isScratchDollarTier reports whether a card of the given dollar tier plays the

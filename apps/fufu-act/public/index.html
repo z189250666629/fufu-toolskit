@@ -238,6 +238,92 @@
       to   { transform: translateY(-576px); } /* 9 cells * 64px */
     }
 
+    .login-question {
+      margin: 0 4px 12px;
+      font-family: var(--cn-font);
+      font-size: 13px;
+      color: var(--c-white);
+      letter-spacing: 1px;
+    }
+
+    .login-switch {
+      display: grid;
+      gap: 12px;
+      margin: 0 4px 18px;
+    }
+
+    .login-switch-option {
+      display: block;
+      cursor: pointer;
+    }
+
+    .login-switch-option input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .login-switch-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 14px 16px;
+      background: var(--c-black);
+      color: var(--c-white);
+      box-shadow:
+        inset 4px 4px 0 0 #000,
+        inset -4px -4px 0 0 var(--c-purple),
+        0 0 0 4px var(--c-purple);
+      transition: transform .05s, box-shadow .05s, background .05s, color .05s;
+    }
+
+    .login-switch-option:hover .login-switch-copy {
+      transform: translateY(-2px);
+    }
+
+    .login-switch-option input:checked + .login-switch-copy {
+      background: var(--c-cyan);
+      color: var(--c-black);
+      box-shadow:
+        inset 4px 4px 0 0 #d8ffff,
+        inset -4px -4px 0 0 #0097a0,
+        0 0 0 4px var(--c-yellow);
+    }
+
+    .login-option-title {
+      font-family: var(--pixel-font);
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+
+    .login-option-desc {
+      font-family: var(--cn-font);
+      font-size: 12px;
+      color: var(--c-cyan);
+      letter-spacing: 1px;
+    }
+
+    .login-switch-option input:checked + .login-switch-copy .login-option-desc {
+      color: #06424a;
+    }
+
+    .login-mode-note {
+      margin: 0 4px 18px;
+      padding: 10px 12px;
+      font-family: var(--cn-font);
+      font-size: 12px;
+      color: var(--c-yellow);
+      background: rgba(10, 10, 20, 0.8);
+      box-shadow:
+        inset 4px 4px 0 0 #201035,
+        inset -4px -4px 0 0 #070710,
+        0 0 0 4px var(--c-black);
+    }
+
+    .login-form[hidden] {
+      display: none;
+    }
+
     .login-input {
       display: block;
       width: 100%;
@@ -1745,8 +1831,32 @@
           <div class="mini-reel"><div class="mini-strip" id="mini-strip-3"></div></div>
         </div>
       </div>
-      <input type="text" class="login-input" id="card-input" placeholder="SK-XXXX..." autocomplete="off" spellcheck="false">
-      <button class="px-btn btn-cyan" id="btn-login">VERIFY KEY</button>
+      <div class="login-question">请问购买卡的站点是？</div>
+      <div class="login-switch" role="radiogroup" aria-label="选择活动鉴权方式">
+        <label class="login-switch-option" for="login-mode-card">
+          <input type="radio" name="login-mode" id="login-mode-card" value="card" checked>
+          <span class="login-switch-copy">
+            <span class="login-option-title">1) 次数站</span>
+            <span class="login-option-desc">透过shop站点购买</span>
+          </span>
+        </label>
+        <label class="login-switch-option" for="login-mode-subscription">
+          <input type="radio" name="login-mode" id="login-mode-subscription" value="subscription">
+          <span class="login-switch-copy">
+            <span class="login-option-title">2) token站</span>
+            <span class="login-option-desc">透过订阅购买</span>
+          </span>
+        </label>
+      </div>
+      <div class="login-mode-note" id="login-mode-note">次数站：请输入在 shop 站点购买的卡密。</div>
+      <div class="login-form" id="card-login-fields">
+        <input type="text" class="login-input" id="card-key-input" placeholder="CARD KEY" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="login-form" id="subscription-login-fields" hidden>
+        <input type="text" class="login-input" id="user-id-input" placeholder="USER ID" inputmode="numeric" autocomplete="off" spellcheck="false">
+        <input type="text" class="login-input" id="username-input" placeholder="USERNAME" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="px-btn btn-cyan" id="btn-login">VERIFY CARD</button>
       <div id="login-error" class="error"></div>
     </div>
 
@@ -1976,6 +2086,56 @@
     let spinning = false;
 
     const $ = id => document.getElementById(id);
+    const LOGIN_MODE_CARD = 'card';
+    const LOGIN_MODE_SUBSCRIPTION = 'subscription';
+
+    function getSelectedLoginMode() {
+      return document.querySelector('input[name="login-mode"]:checked')?.value || LOGIN_MODE_CARD;
+    }
+
+    function loginButtonLabel(mode = getSelectedLoginMode()) {
+      return mode === LOGIN_MODE_CARD ? 'VERIFY CARD' : 'VERIFY USER';
+    }
+
+    function loginModeNote(mode = getSelectedLoginMode()) {
+      return mode === LOGIN_MODE_CARD
+        ? '次数站：请输入在 shop 站点购买的卡密。'
+        : 'token站：请输入订阅对应的 USER ID 和 USERNAME。';
+    }
+
+    function setLoginModeUI(mode = getSelectedLoginMode()) {
+      const isCardMode = mode === LOGIN_MODE_CARD;
+      $('card-login-fields').hidden = !isCardMode;
+      $('subscription-login-fields').hidden = isCardMode;
+      $('login-mode-note').textContent = loginModeNote(mode);
+      $('login-error').textContent = '';
+      $('btn-login').textContent = loginButtonLabel(mode);
+    }
+
+    function setLoginBusy(busy) {
+      $('btn-login').disabled = busy;
+      $('card-key-input').disabled = busy;
+      $('user-id-input').disabled = busy;
+      $('username-input').disabled = busy;
+      document.querySelectorAll('input[name="login-mode"]').forEach(el => { el.disabled = busy; });
+    }
+
+    function currentLoginPayload(mode = getSelectedLoginMode()) {
+      if (mode === LOGIN_MODE_CARD) {
+        const cardKey = $('card-key-input').value.trim();
+        if (!cardKey) return null;
+        return { cardKey };
+      }
+      const userIdText = $('user-id-input').value.trim();
+      const username = $('username-input').value.trim();
+      if (!userIdText || !username) return null;
+      return { userId: Number(userIdText), username };
+    }
+
+    document.querySelectorAll('input[name="login-mode"]').forEach(el => {
+      el.addEventListener('change', () => setLoginModeUI());
+    });
+    setLoginModeUI();
 
     /* ============================================================
        Background — drifting pixel squares
@@ -2168,23 +2328,24 @@
        Login flow
        ============================================================ */
     $('btn-login').onclick = async () => {
-      const key = $('card-input').value.trim();
-      if (!key) return;
+      const loginMode = getSelectedLoginMode();
+      const loginPayload = currentLoginPayload(loginMode);
+      if (!loginPayload) return;
       $('login-error').textContent = '';
       const btn = $('btn-login');
-      btn.disabled = true;
+      setLoginBusy(true);
       btn.textContent = 'CHECKING...';
       try {
         const res = await fetch(API + '/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cardKey: key }),
+          body: JSON.stringify(loginPayload),
         });
         const data = await activityApi.readApiJson(res, {
           serverErrorMessage: '登录失败，请稍后重试',
-          clientErrorMessage: 'INVALID KEY',
+          clientErrorMessage: loginMode === LOGIN_MODE_CARD ? '卡密校验失败' : '账号校验失败',
         });
-        currentCardKey = key;
+        currentCardKey = data.cardKey;
         if (data.game === 'dragonboat') {
           showDragonBoat(data);
         } else if (data.isScratch) {
@@ -2196,11 +2357,13 @@
       } catch (e) {
         $('login-error').textContent = activityApi.safeErrorMessage(e, '登录失败，请稍后重试');
       } finally {
-        btn.disabled = false;
-        btn.textContent = 'VERIFY KEY';
+        setLoginBusy(false);
+        btn.textContent = loginButtonLabel();
       }
     };
-    $('card-input').onkeydown = e => { if (e.key === 'Enter') $('btn-login').click(); };
+    $('card-key-input').onkeydown = e => { if (e.key === 'Enter') $('btn-login').click(); };
+    $('user-id-input').onkeydown = e => { if (e.key === 'Enter') $('btn-login').click(); };
+    $('username-input').onkeydown = e => { if (e.key === 'Enter') $('btn-login').click(); };
 
     function showGame(data) {
       $('login-panel').style.display = 'none';
@@ -2449,7 +2612,10 @@
       $('scratch-panel').style.display = 'none';
       $('dragonboat-panel').style.display = 'none';
       document.body.classList.remove('dragonboat-fullscreen');
-      $('card-input').value = '';
+      $('card-key-input').value = '';
+      $('user-id-input').value = '';
+      $('username-input').value = '';
+      setLoginModeUI();
       $('result').className = 'result muted';
       $('result').textContent = 'PRESS LEVER TO START';
       reels.forEach(r => r.reset());

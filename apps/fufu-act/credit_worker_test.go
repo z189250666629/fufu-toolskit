@@ -48,6 +48,23 @@ func TestProcessCreditsWithMarksScannedRowIDFailedOnScanError(t *testing.T) {
 	}
 }
 
+func TestProcessCreditsWithMarksPermanentQuotaErrorsFailedImmediately(t *testing.T) {
+	store := &fakeCreditProcessorStore{rows: &fakeCreditRows{results: []fakeCreditRowResult{
+		{item: creditQueueItem{ID: 9, CardKey: "perm-card", PrizeDollars: 30, Retries: 0}},
+	}}}
+	quota := &fakeCreditQuota{failures: map[string]error{"perm-card": newPermanentCreditError(errors.New("subscription total quota endpoint is unavailable"))}}
+
+	processCreditsWith(store, quota, 5)
+
+	if len(store.quotaFailures) != 1 {
+		t.Fatalf("quota failures=%#v", store.quotaFailures)
+	}
+	failure := store.quotaFailures[0]
+	if failure.id != 9 || failure.update.Retries != 1 || failure.update.Status != creditStatusFailed || failure.update.Error != "派奖失败，请人工处理" {
+		t.Fatalf("failure=%#v", failure)
+	}
+}
+
 type fakeCreditProcessorStore struct {
 	rows              creditPendingRows
 	pendingMaxRetries int
@@ -121,7 +138,7 @@ type fakeCreditQuota struct {
 	calls    []string
 }
 
-func (q *fakeCreditQuota) AddQuota(key string, prizeDollars int) error {
-	q.calls = append(q.calls, key+":"+strconv.Itoa(prizeDollars))
-	return q.failures[key]
+func (q *fakeCreditQuota) AddQuota(card Card, prizeDollars int) error {
+	q.calls = append(q.calls, card.CardKey+":"+strconv.Itoa(prizeDollars))
+	return q.failures[card.CardKey]
 }

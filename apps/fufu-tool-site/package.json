@@ -9,10 +9,7 @@
     "start": "go run .",
     "build": "npm run build:ui && go build -o fufu-tool-site .",
     "build:ui": "vite build --config ui/vite.config.ts",
-    "typecheck:ui": "tsc -p ui/tsconfig.json --noEmit",
-    "test": "npm run test:go && npm run test:frontend",
-    "test:go": "go test -count=1 ./...",
-    "test:frontend": "node --test *.test.mjs frontend/*.test.mjs ../y2k-nav/*.test.mjs ../fufu-act/public/*.test.mjs"
+    "typecheck:ui": "tsc -p ui/tsconfig.json --noEmit"
   },
   "dependencies": {
     "@heroui/react": "^3.1.0",

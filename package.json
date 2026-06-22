@@ -6,18 +6,10 @@
   "scripts": {
     "deps": "npm run deps:go",
     "deps:go": "go work sync",
-    "start:all": "node scripts/start-all.mjs",
-    "start:tool-site": "npm --prefix apps/fufu-tool-site start",
-    "dev:tool-site": "npm --prefix apps/fufu-tool-site run dev",
+    "start": "node scripts/start-all.mjs",
     "build:tool-site": "npm --prefix apps/fufu-tool-site run build",
     "build:all": "npm run build:tool-site",
-    "test:tool-site": "npm --prefix apps/fufu-tool-site test",
-    "test:act": "npm --prefix apps/fufu-act test",
-    "test:y2k": "npm --prefix apps/y2k-nav test",
-    "test:scripts": "node --test scripts/*.test.mjs",
-    "test:workspace": "go test -count=1 .",
-    "test:shared": "go test -count=1 ./packages/go/fufu/...",
-    "test": "npm run test:workspace && npm run test:shared && npm run test:tool-site && npm run test:act && npm run test:y2k && npm run test:scripts"
+    "test": "node --test scripts/test-suite.mjs"
   },
   "engines": {
     "node": ">=20"

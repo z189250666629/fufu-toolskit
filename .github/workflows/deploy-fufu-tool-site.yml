@@ -47,11 +47,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/fufu-tool-site/package-lock.json
-      - run: go test -count=1 .
-      - run: npm run test:scripts
-      # 前端结构测试会 import typescript 转译 .ts 核心模块，必须先装依赖。
       - run: npm --prefix apps/fufu-tool-site ci
-      - run: npm --prefix apps/fufu-tool-site run test:frontend
+      - run: npm test
   docker:
     needs: verify
     runs-on: ubuntu-latest

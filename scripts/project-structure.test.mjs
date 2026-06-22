@@ -271,7 +271,8 @@ test('login module separates handler, request, token, purchase, store and respon
   assert.doesNotMatch(handler, /func insertLoginCard/);
   assert.doesNotMatch(handler, /func buildLoginCardResponse/);
 
-  assert.match(request, /func readLoginCardKey/);
+  assert.match(request, /func readLoginIdentity/);
+  assert.match(request, /func parseLoginUserID/);
   assert.match(token, /func lookupLoginToken/);
   assert.match(token, /func dollarsTier/);
   assert.match(purchase, /func createLoginCard/);

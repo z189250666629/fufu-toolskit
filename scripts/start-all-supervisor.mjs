@@ -1,13 +1,18 @@
-import { fileURLToPath } from 'node:url';
+import { START_COMMANDS, START_CWD } from './start-config.mjs';
 
-export const DEFAULT_COMMANDS = [
-  { name: 'tool-site', command: 'npm', args: ['--prefix', 'apps/fufu-tool-site', 'start'] }
-];
-
-const DEFAULT_CWD = fileURLToPath(new URL('../', import.meta.url));
+export const DEFAULT_COMMANDS = START_COMMANDS;
+const DEFAULT_CWD = START_CWD;
 
 export function npmCommand(command, platform) {
-  return platform === 'win32' && command === 'npm' ? 'npm.cmd' : command;
+  return platform === 'win32' && command === 'npm' ? 'cmd.exe' : command;
+}
+
+export function npmArgs(command, args, platform) {
+  const normalizedArgs = [...args];
+  if (platform === 'win32' && command === 'npm') {
+    return ['/d', '/s', '/c', 'npm.cmd', ...normalizedArgs];
+  }
+  return normalizedArgs;
 }
 
 export function createStartAllSupervisor({
@@ -100,7 +105,7 @@ export function createStartAllSupervisor({
 
   function start() {
     for (const item of commands) {
-      const child = spawn(npmCommand(item.command, platform), item.args, {
+      const child = spawn(npmCommand(item.command, platform), npmArgs(item.command, item.args, platform), {
         stdio: 'pipe',
         shell: false,
         env,

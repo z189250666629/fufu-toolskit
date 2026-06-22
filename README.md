@@ -6,7 +6,7 @@
 | --- | --- | ---: | ---: | --- |
 | fufu 工具站 | `apps/fufu-tool-site` | `8080` | `38473` | 首页导航 + API/模型状态 + 合卡 + 活动前台 + 统一管理后台 |
 
-旧的独立生产入口 `y2k-nav:33148`、`fufu-act:18820` 已下线；`apps/y2k-nav` 与 `apps/fufu-act` 仍保留为嵌入式模块和测试边界。`fufu-combine` 已并入合卡模块，入口为 `/combine`。
+旧的独立生产入口 `y2k-nav:33148`、`fufu-act:18820` 已下线；`apps/y2k-nav` 与 `apps/fufu-act` 仍保留为嵌入式资源模块。`fufu-combine` 已并入合卡模块，入口为 `/combine`。
 
 ## 路由
 
@@ -36,7 +36,10 @@ apps/
   network-detect/     # 历史模块源码保留，生产不再单独部署
 packages/go/fufu/     # 共享 Go 包：config/newapi/tokens/combine/activity/auth
 scripts/
-  start-all.mjs       # 只启动 fufu-tool-site
+  start-config.mjs    # 唯一启动目标配置
+  start-all.mjs       # 读取集中配置，只启动 fufu-tool-site
+  test-config.mjs     # 唯一测试套件配置
+  test-suite.mjs      # 唯一测试入口文件
 ```
 
 ## 安装/检查
@@ -49,15 +52,14 @@ scripts/
 ```powershell
 npm run deps
 npm test
-go test -count=1 .
 ```
+
+整个项目只保留根目录 `npm test` 一个测试入口；它只启动 `node --test scripts/test-suite.mjs` 这一条根级测试进程。子 package 不再提供 `test` / `test:*` 脚本，root 也不再分开调用各 app 测试或 Go 测试二进制，避免 Windows 反复弹出临时 `*.test.exe` 确认。
 
 ## 本地启动
 
 ```powershell
-npm run start:tool-site
-# 或
-npm run start:all
+npm start
 ```
 
 默认访问：`http://127.0.0.1:8080/`。

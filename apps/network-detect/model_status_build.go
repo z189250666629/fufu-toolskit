@@ -17,7 +17,7 @@ func newModelStatusBuildPlan() modelStatusBuildPlan {
 	now := time.Now().Unix()
 	pruneManualTestCache(now)
 	return modelStatusBuildPlan{
-		Sites:         sites,
+		Sites:         expandSitesForModelStatus(sites),
 		ConfigError:   publicManagedSiteConfigError(msg),
 		Now:           now,
 		WindowSeconds: modelStatusWindowSeconds,

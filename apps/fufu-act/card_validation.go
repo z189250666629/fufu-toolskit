@@ -3,9 +3,16 @@ package activityapp
 import (
 	"context"
 	"net/http"
+	"strings"
 )
 
 func requireCurrentTokenActive(ctx context.Context, key string) error {
+	if card, ok, err := lookupCard(key); err == nil && ok && isSubscriptionCard(card) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
 	service, _ := snapshotTokenRuntime()
 	if service == nil {
 		return httpErr{http.StatusServiceUnavailable, "NewAPI 未配置"}
@@ -55,4 +62,8 @@ func requireDragonBoatEligibleCard(ctx context.Context, key string) (Card, error
 		return Card{}, httpErr{http.StatusForbidden, "此卡密不参与端午捕粽活动"}
 	}
 	return card, nil
+}
+
+func isSubscriptionCard(card Card) bool {
+	return card.SubscriptionID.Valid || strings.EqualFold(strings.TrimSpace(card.Source), "subscription")
 }

@@ -45,6 +45,24 @@ function defaultCssEscape(value) {
   return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+export function preferredModelTestGroupId(state, siteName) {
+  const normalizedSiteName = String(siteName || '').trim().toLowerCase();
+  const site = state?.modelStatus?.sites?.find((item) => item?.site?.name === siteName);
+  const category = String(site?.site?.category || '').trim().toLowerCase();
+  if (category === 'api' || category === 'token') return category;
+  if (normalizedSiteName === 'token-fufu' || normalizedSiteName.includes('token')) return 'token';
+  return 'api';
+}
+
+export function preferredModelTestUrl(state, siteName) {
+  const groupId = preferredModelTestGroupId(state, siteName);
+  const results = Array.isArray(state?.connectivity?.results) ? state.connectivity.results : [];
+  const best = results
+    .filter((item) => item?.groupId === groupId && item?.reachable && Number.isFinite(item?.averageMs))
+    .sort((left, right) => left.averageMs - right.averageMs)[0];
+  return best?.url || '';
+}
+
 export function createDashboardApp(deps = {}) {
   const {
     documentRef = globalThis.document,
@@ -156,6 +174,7 @@ export function createDashboardApp(deps = {}) {
       siteName,
       model,
       group,
+      preferredUrl: preferredModelTestUrl(state, siteName),
       postJsonImpl,
       render
     });
