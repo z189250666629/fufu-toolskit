@@ -429,6 +429,23 @@ func TestDefaultConfigReturnsIndependentCopies(t *testing.T) {
 	}
 }
 
+func TestNormalizeConfigClampsScratchMaxReveals(t *testing.T) {
+	def := NormalizeConfig(Config{})
+	if def.ScratchMaxReveals != ScratchMaxReveals {
+		t.Fatalf("default scratch max reveals = %d, want %d", def.ScratchMaxReveals, ScratchMaxReveals)
+	}
+
+	custom := NormalizeConfig(Config{ScratchMaxReveals: 4})
+	if custom.ScratchMaxReveals != 4 {
+		t.Fatalf("custom scratch max reveals = %d, want 4", custom.ScratchMaxReveals)
+	}
+
+	clamped := NormalizeConfig(Config{ScratchMaxReveals: 99})
+	if clamped.ScratchMaxReveals != ScratchCells-ScratchMines {
+		t.Fatalf("clamped scratch max reveals = %d, want %d", clamped.ScratchMaxReveals, ScratchCells-ScratchMines)
+	}
+}
+
 func TestSpinWithConfigUsesRuntimePrizeWeights(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.GameConfigs = []GameConfig{{Game: GameSlot, TargetExpectedValue: 4.5, ActualExpectedValue: 4.5}}

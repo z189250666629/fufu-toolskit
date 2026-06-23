@@ -60,7 +60,7 @@ func handleScratchStart(w http.ResponseWriter, r *http.Request) {
 			}
 			return nil, err
 		}
-		return map[string]any{"cells": scratchCellCount, "revealed": []int{}, "prize": 0, "status": "playing"}, nil
+		return map[string]any{"cells": scratchCellCount, "maxReveals": currentScratchMaxReveals(), "revealed": []int{}, "prize": 0, "status": "playing"}, nil
 	})
 	if err != nil {
 		writeHTTPError(w, err)
@@ -125,7 +125,9 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, err
 		}
-		rewards, err := scratchRewardsForCurrentPool()
+		cfg := SnapshotRuntimeConfig()
+		maxReveals := cfg.ScratchMaxReveals
+		rewards, err := scratchRewardsForConfig(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +136,7 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 			Revealed:  revealed,
 			Prize:     g.PrizeDollars,
 			Status:    g.Status,
-		}, cellIndex, rewards, scratchMaxReveals, scratchMines, scratchCellCount)
+		}, cellIndex, rewards, maxReveals, scratchMines, scratchCellCount)
 		if err != nil {
 			return nil, scratchAppError(err)
 		}
@@ -142,7 +144,7 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 			if err := updateScratchLost(key, result.Revealed); err != nil {
 				return nil, err
 			}
-			return map[string]any{"hit": true, "mines": result.Mines, "prize": result.Prize, "status": result.Status, "revealed": result.Revealed}, nil
+			return map[string]any{"hit": true, "mines": result.Mines, "maxReveals": maxReveals, "prize": result.Prize, "status": result.Status, "revealed": result.Revealed}, nil
 		}
 		if result.Status == "won" {
 			if err := updateScratchWonWithCredit(key, result.Revealed, result.Prize, result.Status); err != nil {
@@ -153,7 +155,7 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 				return nil, err
 			}
 		}
-		response := map[string]any{"hit": false, "prize": result.Prize, "status": result.Status, "revealed": result.Revealed}
+		response := map[string]any{"hit": false, "maxReveals": maxReveals, "prize": result.Prize, "status": result.Status, "revealed": result.Revealed}
 		if isScratchGameOver(result.Status) {
 			response["mines"] = result.Mines
 		}
@@ -201,7 +203,9 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, err
 		}
-		rewards, err := scratchRewardsForCurrentPool()
+		cfg := SnapshotRuntimeConfig()
+		maxReveals := cfg.ScratchMaxReveals
+		rewards, err := scratchRewardsForConfig(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +214,7 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 			Revealed:  revealed,
 			Prize:     g.PrizeDollars,
 			Status:    g.Status,
-		}, rewards, scratchMaxReveals, scratchMines, scratchCellCount)
+		}, rewards, maxReveals, scratchMines, scratchCellCount)
 		if err != nil {
 			return nil, scratchAppError(err)
 		}
@@ -223,7 +227,7 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 				return nil, err
 			}
 		}
-		return map[string]any{"prize": result.Prize, "status": result.Status, "revealed": result.Revealed, "mines": result.Mines}, nil
+		return map[string]any{"maxReveals": maxReveals, "prize": result.Prize, "status": result.Status, "revealed": result.Revealed, "mines": result.Mines}, nil
 	})
 	if err != nil {
 		writeHTTPError(w, err)

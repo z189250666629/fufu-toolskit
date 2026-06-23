@@ -13,17 +13,18 @@ import (
 const scratchDynamicPoolRate = 0.10
 
 func scratchGameResponse(g ScratchGame) (map[string]any, error) {
-	return scratchAppResponse(scratchcore.GameResponse(g.MinePos, g.Revealed, g.PrizeDollars, g.Status, scratchMaxReveals, scratchMines, scratchCellCount))
+	return scratchAppResponse(scratchcore.GameResponse(g.MinePos, g.Revealed, g.PrizeDollars, g.Status, currentScratchMaxReveals(), scratchMines, scratchCellCount))
 }
 
 func scratchStartResponse(g ScratchGame) (map[string]any, error) {
-	return scratchAppResponse(scratchcore.StartResponse(g.MinePos, g.Revealed, g.PrizeDollars, g.Status, scratchMaxReveals, scratchMines, scratchCellCount))
+	return scratchAppResponse(scratchcore.StartResponse(g.MinePos, g.Revealed, g.PrizeDollars, g.Status, currentScratchMaxReveals(), scratchMines, scratchCellCount))
 }
 
 func scratchAppResponse(response map[string]any, err error) (map[string]any, error) {
 	if err != nil {
 		return nil, scratchAppError(err)
 	}
+	response["maxReveals"] = currentScratchMaxReveals()
 	return response, nil
 }
 
@@ -32,13 +33,19 @@ func isScratchGameOver(status string) bool {
 }
 
 func scratchPrizeForSafeCount(safe int) (int, bool) {
-	return scratchcore.PrizeForSafeCount(SnapshotRuntimeConfig().ScratchRewards, safe)
+	cfg := SnapshotRuntimeConfig()
+	return scratchcore.PrizeForSafeCount(fixedLengthScratchRewardProfile(cfg.ScratchRewards, cfg.ScratchMaxReveals), safe)
 }
 
 func scratchRewardsForCurrentPool() ([]int, error) {
 	cfg := SnapshotRuntimeConfig()
+	return scratchRewardsForConfig(cfg)
+}
+
+func scratchRewardsForConfig(cfg activity.Config) ([]int, error) {
+	cfg = activity.NormalizeConfig(cfg)
 	if !cfg.DynamicPrizePool.Enabled {
-		return fixedLengthScratchRewardProfile(cfg.ScratchRewards, scratchMaxReveals), nil
+		return fixedLengthScratchRewardProfile(cfg.ScratchRewards, cfg.ScratchMaxReveals), nil
 	}
 	balance, err := currentScratchPrizePoolBalance()
 	if err != nil {
@@ -49,15 +56,16 @@ func scratchRewardsForCurrentPool() ([]int, error) {
 
 func scratchRewardsForPoolBalance(cfg activity.Config, poolBalance float64) []int {
 	cfg = activity.NormalizeConfig(cfg)
-	rewards := fixedLengthScratchRewardProfile(cfg.ScratchRewards, scratchMaxReveals)
+	steps := cfg.ScratchMaxReveals
+	rewards := fixedLengthScratchRewardProfile(cfg.ScratchRewards, steps)
 	if !cfg.DynamicPrizePool.Enabled {
 		return rewards
 	}
 	fullPrize := int(math.Round(math.Max(0, poolBalance) * scratchDynamicPoolRate))
 	if fullPrize <= 0 {
-		return make([]int, scratchMaxReveals)
+		return make([]int, steps)
 	}
-	out := make([]int, scratchMaxReveals)
+	out := make([]int, steps)
 	last := 0
 	for i := range out {
 		prize := int(math.Round(float64(fullPrize) * float64(i+1) / float64(len(out))))
@@ -75,6 +83,10 @@ func scratchRewardsForPoolBalance(cfg activity.Config, poolBalance float64) []in
 	}
 	out[len(out)-1] = fullPrize
 	return out
+}
+
+func currentScratchMaxReveals() int {
+	return SnapshotRuntimeConfig().ScratchMaxReveals
 }
 
 func fixedLengthScratchRewardProfile(rewards []int, steps int) []int {
@@ -127,7 +139,7 @@ func parseScratchIntArray(s string) ([]int, error) {
 }
 
 func parseScratchRevealedCells(s string) ([]int, error) {
-	cells, err := scratchcore.ParseRevealedCells(s, scratchMaxReveals, scratchCellCount)
+	cells, err := scratchcore.ParseRevealedCells(s, currentScratchMaxReveals(), scratchCellCount)
 	if err != nil {
 		return nil, scratchAppError(err)
 	}

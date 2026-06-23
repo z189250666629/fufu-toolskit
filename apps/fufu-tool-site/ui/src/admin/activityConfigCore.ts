@@ -2,6 +2,9 @@ import type { ActivityConfig, ActivityGameConfig, ActivityGameRoute, DynamicPriz
 
 export type GameMode = 'slot' | 'scratch' | 'dragonboat';
 
+export const DEFAULT_SCRATCH_MAX_REVEALS = 6;
+export const SCRATCH_SAFE_CELLS = 7;
+
 export type SaleCardTierOption = {
   quota: number;
   label: string;
@@ -29,6 +32,12 @@ export function rateToPercentInput(value: unknown): string {
 export function percentInputToRate(value: string): number {
   const percent = Number(value);
   return Number.isFinite(percent) ? Math.max(0, percent) / 100 : 0;
+}
+
+export function normalizeScratchMaxReveals(value: unknown): number {
+  const count = Math.floor(numberValue(value));
+  if (count <= 0) return DEFAULT_SCRATCH_MAX_REVEALS;
+  return Math.max(1, Math.min(SCRATCH_SAFE_CELLS, count));
 }
 
 export function formatQuota(value: number): string {
@@ -162,6 +171,7 @@ export function stripComputedExpectedValues(activity: ActivityConfig): ActivityC
 
 export function materializeActivityGameRoutes(activity: ActivityConfig, salePlans: SaleCardPlan[] = []): ActivityConfig {
   const sanitized = stripComputedExpectedValues(activity);
+  sanitized.scratchMaxReveals = normalizeScratchMaxReveals(sanitized.scratchMaxReveals);
   const saleTierOptions = buildSaleCardTierOptions(salePlans);
   if (saleTierOptions.length === 0) {
     return sanitized;

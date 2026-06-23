@@ -1137,6 +1137,10 @@ tr:last-child td {
   gap: 8px;
 }
 
+.scratch-step-field {
+  min-width: 150px;
+}
+
 .scratch-chip {
   display: flex;
   align-items: center;

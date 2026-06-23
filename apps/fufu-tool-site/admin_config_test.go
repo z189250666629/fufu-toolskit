@@ -999,7 +999,7 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 					{"type": "win", "dollars": 7, "weight": 3},
 				},
 			},
-			"scratchRewards": []int{2, 4, 6, 8, 10, 12},
+			"scratchMaxReveals": 4,
 		},
 	})
 
@@ -1009,6 +1009,9 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 	}
 	if cfg.DrawCountForTier(42) != 3 || len(cfg.PrizePool) != 2 || cfg.PrizePool[0].Weight != 100 || cfg.PrizePool[1].Dollars != 9 || cfg.PrizePool[1].Weight != 1 {
 		t.Fatalf("activity odds not applied: %#v", cfg)
+	}
+	if cfg.ScratchMaxReveals != 4 {
+		t.Fatalf("scratch max reveals = %d, want 4", cfg.ScratchMaxReveals)
 	}
 
 	req := authorizedJSONRequest(t, http.MethodGet, "/api/admin/config", nil)

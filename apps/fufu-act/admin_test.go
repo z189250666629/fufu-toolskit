@@ -101,6 +101,7 @@ func TestHandlePrizesReturnsDisplayAwardsAndMinimumGuarantee(t *testing.T) {
 	}
 	var extra struct {
 		MinimumGuaranteedPrize int   `json:"minimumGuaranteedPrize"`
+		ScratchMaxReveals      int   `json:"scratchMaxReveals"`
 		ScratchRewards         []int `json:"scratchRewards"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &extra); err != nil {
@@ -108,6 +109,9 @@ func TestHandlePrizesReturnsDisplayAwardsAndMinimumGuarantee(t *testing.T) {
 	}
 	if extra.MinimumGuaranteedPrize != 2 {
 		t.Fatalf("minimumGuaranteedPrize=%d, want 2", extra.MinimumGuaranteedPrize)
+	}
+	if extra.ScratchMaxReveals != scratchMaxReveals {
+		t.Fatalf("scratchMaxReveals=%d, want %d", extra.ScratchMaxReveals, scratchMaxReveals)
 	}
 	if len(extra.ScratchRewards) != scratchMaxReveals || extra.ScratchRewards[0] != 2 {
 		t.Fatalf("scratchRewards=%+v", extra.ScratchRewards)

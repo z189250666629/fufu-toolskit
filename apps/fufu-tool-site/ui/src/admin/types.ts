@@ -72,6 +72,7 @@ export type ActivityConfig = {
   prizePool?: PrizeRow[];
   dynamicPrizePool?: DynamicPrizePoolConfig;
   scratchRewards?: number[];
+  scratchMaxReveals?: number;
   gameRoutes?: ActivityGameRoute[];
   scratchTiers?: number[];
   [key: string]: unknown;

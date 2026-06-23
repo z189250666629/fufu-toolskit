@@ -66,6 +66,7 @@ func handlePrizes(w http.ResponseWriter, r *http.Request) {
 		"spinMap":                spinMapOut,
 		"poolBalance":            poolBalance,
 		"scratchPoolBalance":     scratchPoolBalance,
+		"scratchMaxReveals":      cfg.ScratchMaxReveals,
 		"scratchRewards":         scratchRewards,
 		"minimumGuaranteedPrize": minimumGuaranteedPrize(cfg, scratchRewards),
 	})

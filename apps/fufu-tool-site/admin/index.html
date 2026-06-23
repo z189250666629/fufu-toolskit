@@ -265,7 +265,7 @@ tr:last-child td { border-bottom: 0; }
             </div>
             <div class="json-grid">
               <div class="field"><label for="game-config-json">玩法参数</label><textarea id="game-config-json" data-slot="input" spellcheck="false"></textarea></div>
-              <div class="field"><label for="scratch-rewards-json">刮刮卡奖励</label><textarea id="scratch-rewards-json" data-slot="input" spellcheck="false"></textarea></div>
+              <div class="field"><label for="scratch-max-reveals">刮刮乐通关安全步数</label><input id="scratch-max-reveals" data-slot="input" type="number" min="1" max="7" placeholder="6"></div>
             </div>
           </section>
         </section>
@@ -435,7 +435,7 @@ function renderConfig(data) {
   $('target-ev').textContent = formatNumber(act.targetExpectedValue);
   $('actual-ev').textContent = formatNumber(act.actualExpectedValue);
   $('game-config-json').value = pretty(act.gameConfigs || []);
-  $('scratch-rewards-json').value = pretty(act.scratchRewards || []);
+  $('scratch-max-reveals').value = act.scratchMaxReveals || 6;
 }
 function formatNumber(value) {
   const n = Number(value);
@@ -519,7 +519,7 @@ function collectConfig() {
       targetExpectedValue: Number($('activity-target-ev').value || 0),
       prizePool: state.config?.activity?.prizePool || [],
       gameConfigs: parseJSONField('game-config-json', []),
-      scratchRewards: parseJSONField('scratch-rewards-json', [])
+      scratchMaxReveals: numberValue('scratch-max-reveals') || 6
     }
   };
 }

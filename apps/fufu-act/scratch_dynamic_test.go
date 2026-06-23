@@ -9,11 +9,12 @@ import (
 	"fufu/poolfundcore"
 )
 
-func TestScratchDynamicRewardsUseSeparatePoolAndFixedSteps(t *testing.T) {
+func TestScratchDynamicRewardsUseSeparatePoolAndConfiguredSteps(t *testing.T) {
 	setupScratchLockTestDB(t)
 	restoreRuntimeConfig(t)
 	cfg := activity.DefaultConfig()
 	cfg.DynamicPrizePool = poolfundcore.Config{Enabled: true}
+	cfg.ScratchMaxReveals = 4
 	SetRuntimeConfig(cfg)
 	insertPrizePoolLedgerForTest(t, "sk-main-pool-seed", "deposit", 1000, "", "")
 	insertScratchPrizePoolLedgerForTest(t, "sk-scratch-pool-seed", "deposit", 1000, "", "")
@@ -22,7 +23,7 @@ func TestScratchDynamicRewardsUseSeparatePoolAndFixedSteps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantRewards := []int{17, 33, 50, 67, 83, 100}
+	wantRewards := []int{25, 50, 75, 100}
 	if !sameScratchRewardInts(rewards, wantRewards) {
 		t.Fatalf("dynamic scratch rewards=%+v, want %+v", rewards, wantRewards)
 	}
@@ -36,13 +37,17 @@ func TestScratchDynamicRewardsUseSeparatePoolAndFixedSteps(t *testing.T) {
 		t.Fatalf("reveal code=%d body=%s", reveal.Code, reveal.Body.String())
 	}
 	var revealBody struct {
-		Prize int `json:"prize"`
+		MaxReveals int `json:"maxReveals"`
+		Prize      int `json:"prize"`
 	}
 	if err := json.Unmarshal(reveal.Body.Bytes(), &revealBody); err != nil {
 		t.Fatal(err)
 	}
-	if revealBody.Prize != 17 {
-		t.Fatalf("first safe prize=%d, want 17", revealBody.Prize)
+	if revealBody.MaxReveals != 4 {
+		t.Fatalf("maxReveals=%d, want 4", revealBody.MaxReveals)
+	}
+	if revealBody.Prize != 25 {
+		t.Fatalf("first safe prize=%d, want 25", revealBody.Prize)
 	}
 
 	cashout := postScratch(t, "/api/scratch/cashout", `{"cardKey":"scratch-dynamic-card"}`)
@@ -54,8 +59,8 @@ func TestScratchDynamicRewardsUseSeparatePoolAndFixedSteps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if balance != 983 {
-		t.Fatalf("scratch pool balance=%v, want 983 after $17 scratch payout", balance)
+	if balance != 975 {
+		t.Fatalf("scratch pool balance=%v, want 975 after $25 scratch payout", balance)
 	}
 	mainBalance, err := currentPrizePoolBalance()
 	if err != nil {

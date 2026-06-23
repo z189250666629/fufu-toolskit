@@ -52,18 +52,19 @@ func buildLoginCardResponse(card Card, history []map[string]any, scratchGame any
 	cfg = activity.CloneConfig(cfg)
 	game := cfg.GameForTier(card.Dollars)
 	return map[string]any{
-		"cardKey":        card.CardKey,
-		"cardName":       card.CardName,
-		"dollars":        card.Dollars,
-		"totalSpins":     card.TotalSpins,
-		"usedSpins":      card.UsedSpins,
-		"remainingSpins": card.TotalSpins - card.UsedSpins,
-		"totalWon":       card.TotalWon,
-		"wonJackpot":     card.WonJackpot != 0,
-		"history":        history,
-		"isScratch":      cfg.IsScratchTier(card.Dollars),
-		"game":           game,
-		"scratchGame":    scratchGame,
-		"dragonBoatGame": dragonBoatGame,
+		"cardKey":           card.CardKey,
+		"cardName":          card.CardName,
+		"dollars":           card.Dollars,
+		"totalSpins":        card.TotalSpins,
+		"usedSpins":         card.UsedSpins,
+		"remainingSpins":    card.TotalSpins - card.UsedSpins,
+		"totalWon":          card.TotalWon,
+		"wonJackpot":        card.WonJackpot != 0,
+		"history":           history,
+		"isScratch":         cfg.IsScratchTier(card.Dollars),
+		"game":              game,
+		"scratchMaxReveals": cfg.ScratchMaxReveals,
+		"scratchGame":       scratchGame,
+		"dragonBoatGame":    dragonBoatGame,
 	}
 }

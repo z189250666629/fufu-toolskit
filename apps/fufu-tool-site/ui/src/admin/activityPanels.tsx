@@ -15,6 +15,7 @@ import {
   normalizeGameConfigs,
   normalizeGameMode,
   normalizeGameRoutes,
+  normalizeScratchMaxReveals,
   numberValue,
   patchGameConfig,
   percentInputToRate,
@@ -32,8 +33,6 @@ type LocalMessage = {
   text: string;
   tone?: 'ok' | 'error';
 };
-
-const SCRATCH_FIXED_STEPS = 6;
 
 export function ActivityStatsPanel({ stats }: { stats?: ActivityStats }) {
   const prizeSummary = Array.isArray(stats?.prizeRows) ? stats.prizeRows as Array<Record<string, unknown>> : [];
@@ -64,6 +63,7 @@ export function CurrentPrizePanel({ prizes }: { prizes?: PrizeConfigResponse }) 
   const pool = prizes?.prizePool ?? prizes?.prizes ?? [];
   const totalWeight = pool.reduce((sum, item) => sum + Number(item.weight || 0), 0);
   const scratchRewards = (prizes?.scratchRewards ?? []).map(Number);
+  const scratchMaxReveals = normalizeScratchMaxReveals(prizes?.scratchMaxReveals ?? scratchRewards.length);
   const rows = pool.map((row) => [
     row.label || (row.rank === 'jackpot' ? '大奖' : row.rank === 'second' ? '二等奖' : row.rank === 'third' ? '三等奖' : row.type === 'miss' ? '未中奖' : `$${row.dollars ?? 0}`),
     row.weight ?? 0,
@@ -75,6 +75,7 @@ export function CurrentPrizePanel({ prizes }: { prizes?: PrizeConfigResponse }) 
       <div className="metrics">
         <Metric label="老虎机奖池" value={prizes?.poolBalance ?? 0} />
         <Metric label="刮刮乐奖池" value={prizes?.scratchPoolBalance ?? 0} />
+        <Metric label="刮刮乐通关步数" value={prizes ? scratchMaxReveals : undefined} />
       </div>
       <DataTable columns={['统一奖项', '权重', '总权重', '理论概率']} rows={rows} empty={prizes ? '暂无普通奖项。' : '正在加载当前奖池。'} />
       <DataTable
@@ -176,6 +177,7 @@ export function ActivityConfigEditor({
   const updateWindow = (patch: ActivityConfig) => emit({ ...activity, ...patch });
   const startDateValue = activityDateTimeValue(activity.startText, activity.startTS);
   const endDateValue = activityDateTimeValue(activity.endText, activity.endTS);
+  const scratchMaxReveals = normalizeScratchMaxReveals(activity.scratchMaxReveals);
   const metricConfig = gameConfigs.find((item) => normalizeGameMode(item.game) === 'slot') ?? gameConfigs[0];
   const actualExpectedValue = stats?.expectedValue;
   const awardRateTotal = numberValue(dynamicPool.jackpotRate) + numberValue(dynamicPool.secondRate) + numberValue(dynamicPool.thirdRate);
@@ -274,15 +276,22 @@ export function ActivityConfigEditor({
       </div>
 
       <div className="config-subhead">刮刮乐动态奖励</div>
-      <div className="scratch-editor scratch-editor--readonly">
+      <div className="scratch-editor">
+        <label className="field scratch-step-field">
+          通关安全步数
+          <Input
+            className="mini-input blueprint-input"
+            type="number"
+            min={1}
+            max={7}
+            value={String(scratchMaxReveals)}
+            aria-label="刮刮乐通关安全步数"
+            onChange={(event) => emit({ ...activity, scratchMaxReveals: normalizeScratchMaxReveals(event.target.value) })}
+          />
+        </label>
         <p className="inline-help">
-          刮刮乐使用独立奖池实时计算奖励，后台只固定 {SCRATCH_FIXED_STEPS} 个安全步数；具体金额请在“当前奖池中奖率”里查看。
+          玩家连续刮开 X 个安全格即通关；每一步金额按当前刮刮乐奖池等比例实时计算，具体金额在“当前奖池中奖率”里核对。
         </p>
-        <div className="scratch-step-list" aria-label="刮刮乐固定步数">
-          {Array.from({ length: SCRATCH_FIXED_STEPS }, (_, index) => (
-            <span className="scratch-chip scratch-chip--static" key={index}>第 {index + 1} 步</span>
-          ))}
-        </div>
       </div>
     </div>
   );

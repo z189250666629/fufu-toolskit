@@ -65,6 +65,7 @@ type Config struct {
 	JackpotEligibleDollars []float64           `json:"jackpotEligibleDollars"`
 	DynamicPrizePool       poolfundcore.Config `json:"dynamicPrizePool,omitempty"`
 	ScratchRewards         []int               `json:"scratchRewards"`
+	ScratchMaxReveals      int                 `json:"scratchMaxReveals,omitempty"`
 	// GameRoutes is the source of truth for card-tier gameplay routing.
 	// ScratchTiers is kept as a compatibility projection for older admin payloads.
 	GameRoutes   []GameRoute `json:"gameRoutes"`
@@ -128,6 +129,7 @@ type configJSON struct {
 	JackpotEligibleDollars []float64           `json:"jackpotEligibleDollars"`
 	DynamicPrizePool       poolfundcore.Config `json:"dynamicPrizePool,omitempty"`
 	ScratchRewards         []int               `json:"scratchRewards"`
+	ScratchMaxReveals      int                 `json:"scratchMaxReveals,omitempty"`
 	GameRoutes             []GameRoute         `json:"gameRoutes"`
 	ScratchTiers           []int               `json:"scratchTiers"`
 }
@@ -362,6 +364,7 @@ func DefaultConfig() Config {
 		JackpotEligibleDollars: DefaultJackpotEligibleDollars(),
 		DynamicPrizePool:       poolfundcore.NormalizeConfig(defaultDynamicPrizePool),
 		ScratchRewards:         DefaultScratchRewards(),
+		ScratchMaxReveals:      ScratchMaxReveals,
 		GameRoutes:             DefaultGameRoutes(),
 		ScratchTiers:           DefaultScratchTiers(),
 	}
@@ -377,6 +380,7 @@ func CloneConfig(cfg Config) Config {
 	out.JackpotEligibleDollars = append([]float64(nil), cfg.JackpotEligibleDollars...)
 	out.DynamicPrizePool = cloneDynamicPrizePoolConfig(cfg.DynamicPrizePool)
 	out.ScratchRewards = append([]int(nil), cfg.ScratchRewards...)
+	out.ScratchMaxReveals = cfg.ScratchMaxReveals
 	out.GameRoutes = append([]GameRoute(nil), cfg.GameRoutes...)
 	out.ScratchTiers = append(make([]int, 0, len(cfg.ScratchTiers)), cfg.ScratchTiers...)
 	return out
@@ -435,6 +439,7 @@ func NormalizeConfig(cfg Config) Config {
 		JackpotEligibleDollars: DefaultJackpotEligibleDollars(),
 		DynamicPrizePool:       poolfundcore.NormalizeConfig(defaultDynamicPrizePool),
 		ScratchRewards:         DefaultScratchRewards(),
+		ScratchMaxReveals:      ScratchMaxReveals,
 		GameRoutes:             DefaultGameRoutes(),
 		ScratchTiers:           DefaultScratchTiers(),
 	}
@@ -494,6 +499,7 @@ func NormalizeConfig(cfg Config) Config {
 	} else {
 		cfg.ScratchRewards = normalizeScratchRewards(cfg.ScratchRewards)
 	}
+	cfg.ScratchMaxReveals = normalizeScratchMaxReveals(cfg.ScratchMaxReveals)
 	if cfg.GameRoutes == nil {
 		if cfg.ScratchTiers == nil {
 			cfg.GameRoutes = defaults.GameRoutes
@@ -524,6 +530,7 @@ func (cfg Config) MarshalJSON() ([]byte, error) {
 		JackpotEligibleDollars: cfg.JackpotEligibleDollars,
 		DynamicPrizePool:       cfg.DynamicPrizePool,
 		ScratchRewards:         cfg.ScratchRewards,
+		ScratchMaxReveals:      cfg.ScratchMaxReveals,
 		GameRoutes:             cfg.GameRoutes,
 		ScratchTiers:           cfg.ScratchTiers,
 	})
@@ -550,6 +557,7 @@ func (cfg *Config) UnmarshalJSON(data []byte) error {
 		JackpotEligibleDollars: raw.JackpotEligibleDollars,
 		DynamicPrizePool:       raw.DynamicPrizePool,
 		ScratchRewards:         raw.ScratchRewards,
+		ScratchMaxReveals:      raw.ScratchMaxReveals,
 		GameRoutes:             raw.GameRoutes,
 		ScratchTiers:           raw.ScratchTiers,
 	})
@@ -871,6 +879,20 @@ func normalizeScratchRewards(in []int) []int {
 		}
 	}
 	return out
+}
+
+func normalizeScratchMaxReveals(value int) int {
+	maxSafeCells := ScratchCells - ScratchMines
+	if maxSafeCells < 1 {
+		maxSafeCells = 1
+	}
+	if value <= 0 {
+		return ScratchMaxReveals
+	}
+	if value > maxSafeCells {
+		return maxSafeCells
+	}
+	return value
 }
 
 func spinMapToJSON(in map[float64]int) map[string]int {

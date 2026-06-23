@@ -340,6 +340,23 @@ test('scratch API calls do not expose server 5xx error fields', async () => {
   }
 });
 
+test('scratch UI uses backend max reveals and current prize instead of hardcoded reward steps', async () => {
+  const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
+  const scratchSource = source.slice(
+    source.indexOf('const SCRATCH_MINES_COUNT'),
+    source.indexOf('/* ============================================================\n       Login icon mini reels'),
+  );
+
+  assert.match(scratchSource, /let scratchMaxReveals = 6/);
+  assert.match(scratchSource, /scratchMaxReveals = Math\.max\(1, Number\(data\.scratchMaxReveals\) \|\| scratchMaxReveals\)/);
+  assert.match(scratchSource, /scratchMaxReveals = Math\.max\(1, Number\(state\.maxReveals\) \|\| scratchMaxReveals\)/);
+  assert.match(scratchSource, /Math\.min\(safeCount, scratchMaxReveals\) \+ '\/' \+ scratchMaxReveals/);
+  assert.match(scratchSource, /const remaining = scratchMaxReveals - safeCount/);
+  assert.match(scratchSource, /cashoutBtn\.textContent = 'CASH OUT \$' \+ \(safeCount > 0 \? state\.prize : 0\)/);
+  assert.doesNotMatch(scratchSource, /SCRATCH_REWARDS_CLIENT/);
+  assert.doesNotMatch(scratchSource, /SCRATCH_MAX_REVEALS_CLIENT/);
+});
+
 test('dragon boat API calls use safe parsing and keep card progress in dragon state', async () => {
   const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const dragonStart = source.indexOf('async function startDragonBoatGame()');

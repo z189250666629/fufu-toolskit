@@ -3187,9 +3187,8 @@
     /* ============================================================
        Scratch Card
        ============================================================ */
-    const SCRATCH_REWARDS_CLIENT = [2, 4, 6, 8, 12, 15];
     const SCRATCH_MINES_COUNT = 2;
-    const SCRATCH_MAX_REVEALS_CLIENT = 6;
+    let scratchMaxReveals = 6;
     let scratchBusy = false;
     let scratchPosMap = [0,1,2,3,4,5,6,7,8];
     let scratchRevealed = [];
@@ -3205,6 +3204,7 @@
       scratchRevealed = [];
       scratchMines = [];
       scratchIsTest = scratchCard.isTestCardName(data.cardName);
+      scratchMaxReveals = Math.max(1, Number(data.scratchMaxReveals) || scratchMaxReveals);
 
       if (data.scratchGame) {
         renderScratchState(data.scratchGame);
@@ -3256,6 +3256,7 @@
       const mines = state.mines || [];
       scratchRevealed = revealed;
       scratchMines = mines;
+      scratchMaxReveals = Math.max(1, Number(state.maxReveals) || scratchMaxReveals);
 
       const mineHits = revealed.filter(i => mines.includes(i)).length;
       const safeCount = revealed.length - mineHits;
@@ -3288,7 +3289,7 @@
         grid.appendChild(cell);
       }
 
-      $('scratch-opened').textContent = Math.min(safeCount, SCRATCH_MAX_REVEALS_CLIENT) + '/' + SCRATCH_MAX_REVEALS_CLIENT;
+      $('scratch-opened').textContent = Math.min(safeCount, scratchMaxReveals) + '/' + scratchMaxReveals;
       $('scratch-current-prize').textContent = '$' + state.prize;
       $('scratch-prize-value').textContent = '$' + state.prize;
       if (state.status === 'lost') {
@@ -3324,10 +3325,10 @@
         if (scratchIsTest) resetBtn.style.display = 'block';
       } else {
         statusBar.style.display = 'none';
-        const remaining = SCRATCH_MAX_REVEALS_CLIENT - safeCount;
+        const remaining = scratchMaxReveals - safeCount;
         $('scratch-progress').textContent = '还可刮开 ' + remaining + ' 个格子';
         cashoutBtn.style.display = safeCount > 0 ? 'block' : 'none';
-        cashoutBtn.textContent = 'CASH OUT $' + (safeCount > 0 ? SCRATCH_REWARDS_CLIENT[safeCount - 1] : 0);
+        cashoutBtn.textContent = 'CASH OUT $' + (safeCount > 0 ? state.prize : 0);
       }
     }
 

@@ -298,6 +298,7 @@ test('tool-site activity gameplay routes use MCY sale-card tiers instead of manu
   assert.match(activityCore, /function buildSaleCardTierOptions/);
   assert.match(activityCore, /function materializeActivityGameRoutes/);
   assert.match(activityCore, /function stripComputedExpectedValues/);
+  assert.match(activityCore, /function normalizeScratchMaxReveals/);
   assert.match(activityCore, /function materializeGameRoutesForSaleTiers/);
   assert.match(activityCore, /function gameRoutesFromActivity/);
   assert.match(activity, /drawCountForTier/);
@@ -330,7 +331,13 @@ test('tool-site activity gameplay routes use MCY sale-card tiers instead of manu
   assert.match(activity, /一键生成 key/);
   assert.match(activity, /sale-test-key-result/);
   assert.match(activity, /测试 key 只创建 NewAPI token，不上传 MCY/);
+  assert.match(activity, /刮刮乐通关安全步数/);
+  assert.match(activity, /玩家连续刮开 X 个安全格即通关/);
+  assert.match(types, /scratchMaxReveals\?: number/);
   assert.doesNotMatch(activity, /aria-label=\{`\$\{gameModeLabel\(game\)\}抽奖次数`\}/);
+  assert.doesNotMatch(activity, /刮刮乐固定步数/);
+  assert.doesNotMatch(activity, /SCRATCH_FIXED_STEPS/);
+  assert.doesNotMatch(activity, /scratch-chip--static/);
   assert.doesNotMatch(activity, /spinCountForTier/);
   assert.doesNotMatch(activity, /updateSpinCountForTier/);
   assert.doesNotMatch(activity, /emitSpinCount/);
