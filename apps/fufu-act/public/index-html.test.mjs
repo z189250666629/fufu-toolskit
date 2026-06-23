@@ -275,6 +275,9 @@ test('prize drawer hides odds and refreshes backend prize amounts live', async (
   assert.match(logoutSource, /stopPrizeRefresh\(\);/);
   assert.match(fetchPrizesSource, /rank: p\.rank/);
   assert.match(fetchPrizesSource, /label: p\.label/);
+  assert.match(fetchPrizesSource, /minimumGuaranteedPrize/);
+  assert.match(fetchPrizesSource, /label: '最小保底奖'/);
+  assert.match(fetchPrizesSource, /rank: 'minimum'/);
   assert.doesNotMatch(source, /class="odds"/);
   assert.doesNotMatch(source, /\.prize-row \.odds/);
   assert.doesNotMatch(fetchPrizesSource, /p\.weight/);

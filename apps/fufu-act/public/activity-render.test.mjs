@@ -17,6 +17,7 @@ test('activity render escapes history timestamp and coerces prize rows', async (
   const prizeHtml = render.buildPrizeTableHtml([
     { dollars: '500', rank: 'jackpot', label: '<b>大奖</b>', pct: '0.40<script>' },
     { dollars: '300', rank: 'second', label: '二等奖', pct: '1.20' },
+    { dollars: '13', rank: 'minimum', label: '最小保底奖' },
     { dollars: 'not-a-number' }
   ], symbols);
 
@@ -24,6 +25,8 @@ test('activity render escapes history timestamp and coerces prize rows', async (
   assert.match(prizeHtml, /&lt;b&gt;大奖&lt;\/b&gt; \$500 JP/);
   assert.match(prizeHtml, /class="prize-row second"/);
   assert.match(prizeHtml, /二等奖 \$300/);
+  assert.match(prizeHtml, /🛡️/);
+  assert.match(prizeHtml, /最小保底奖 \$13/);
   assert.doesNotMatch(prizeHtml, /class="odds"/);
   assert.doesNotMatch(prizeHtml, /0\.40&lt;script&gt;%/);
   assert.doesNotMatch(prizeHtml, /0\.40<script>%/);

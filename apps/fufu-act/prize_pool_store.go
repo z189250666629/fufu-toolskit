@@ -54,6 +54,21 @@ func recordPrizePoolPayoutWith(tx *sql.Tx, key string, sr spinResult) error {
 	return err
 }
 
+func recordScratchPrizePoolPayoutWith(tx *sql.Tx, key string, prize int) error {
+	if !SnapshotRuntimeConfig().DynamicPrizePool.Enabled || prize <= 0 {
+		return nil
+	}
+	_, err := tx.Exec(
+		`INSERT INTO prize_pool_ledger (card_key,kind,amount,prize_rank,prize_label) VALUES (?,?,?,?,?)`,
+		key,
+		prizePoolLedgerPayout,
+		-float64(prize),
+		"scratch",
+		"刮刮乐",
+	)
+	return err
+}
+
 func isDynamicPoolPayoutPrize(sr spinResult) bool {
 	return poolfundcore.IsPayoutPrize(poolfundcore.PayoutPrize{
 		Type:       sr.Type,

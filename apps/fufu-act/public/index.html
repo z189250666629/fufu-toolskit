@@ -2394,6 +2394,15 @@
           label: p.label,
           advertised: p.advertised,
         }));
+        const minimumGuaranteedPrize = Number(data.minimumGuaranteedPrize) || 0;
+        if (minimumGuaranteedPrize > 0) {
+          rows.push({
+            dollars: minimumGuaranteedPrize,
+            rank: 'minimum',
+            label: '最小保底奖',
+            advertised: true,
+          });
+        }
         renderPrizeTable(rows);
       } catch (e) {
         renderPrizeLoadError();

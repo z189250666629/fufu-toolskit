@@ -125,12 +125,16 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, err
 		}
+		rewards, err := scratchRewardsForCurrentPool()
+		if err != nil {
+			return nil, err
+		}
 		result, err := scratchcore.Reveal(scratchcore.Game{
 			MineCells: mines,
 			Revealed:  revealed,
 			Prize:     g.PrizeDollars,
 			Status:    g.Status,
-		}, cellIndex, SnapshotRuntimeConfig().ScratchRewards, scratchMaxReveals, scratchMines, scratchCellCount)
+		}, cellIndex, rewards, scratchMaxReveals, scratchMines, scratchCellCount)
 		if err != nil {
 			return nil, scratchAppError(err)
 		}
@@ -140,7 +144,7 @@ func handleScratchReveal(w http.ResponseWriter, r *http.Request) {
 			}
 			return map[string]any{"hit": true, "mines": result.Mines, "prize": result.Prize, "status": result.Status, "revealed": result.Revealed}, nil
 		}
-		if result.Status == "won" && result.Prize > 0 {
+		if result.Status == "won" {
 			if err := updateScratchWonWithCredit(key, result.Revealed, result.Prize, result.Status); err != nil {
 				return nil, err
 			}
@@ -197,12 +201,16 @@ func handleScratchCashout(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return nil, err
 		}
+		rewards, err := scratchRewardsForCurrentPool()
+		if err != nil {
+			return nil, err
+		}
 		result, err := scratchcore.Cashout(scratchcore.Game{
 			MineCells: mines,
 			Revealed:  revealed,
 			Prize:     g.PrizeDollars,
 			Status:    g.Status,
-		}, SnapshotRuntimeConfig().ScratchRewards, scratchMaxReveals, scratchMines, scratchCellCount)
+		}, rewards, scratchMaxReveals, scratchMines, scratchCellCount)
 		if err != nil {
 			return nil, scratchAppError(err)
 		}

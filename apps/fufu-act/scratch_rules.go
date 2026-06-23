@@ -2,9 +2,15 @@ package activityapp
 
 import (
 	"errors"
+	"math"
+	"sort"
+
+	"fufu/activity"
 	"fufu/scratchcore"
 	"net/http"
 )
+
+const scratchDynamicPoolRate = 0.10
 
 func scratchGameResponse(g ScratchGame) (map[string]any, error) {
 	return scratchAppResponse(scratchcore.GameResponse(g.MinePos, g.Revealed, g.PrizeDollars, g.Status, scratchMaxReveals, scratchMines, scratchCellCount))
@@ -27,6 +33,98 @@ func isScratchGameOver(status string) bool {
 
 func scratchPrizeForSafeCount(safe int) (int, bool) {
 	return scratchcore.PrizeForSafeCount(SnapshotRuntimeConfig().ScratchRewards, safe)
+}
+
+func scratchRewardsForCurrentPool() ([]int, error) {
+	cfg := SnapshotRuntimeConfig()
+	if !cfg.DynamicPrizePool.Enabled {
+		return fixedLengthScratchRewardProfile(cfg.ScratchRewards, scratchMaxReveals), nil
+	}
+	balance, err := currentPrizePoolBalance()
+	if err != nil {
+		return nil, err
+	}
+	return scratchRewardsForPoolBalance(cfg, balance), nil
+}
+
+func scratchRewardsForPoolBalance(cfg activity.Config, poolBalance float64) []int {
+	cfg = activity.NormalizeConfig(cfg)
+	rewards := fixedLengthScratchRewardProfile(cfg.ScratchRewards, scratchMaxReveals)
+	if !cfg.DynamicPrizePool.Enabled {
+		return rewards
+	}
+	fullPrize := int(math.Round(math.Max(0, poolBalance) * scratchDynamicPoolRate))
+	if fullPrize <= 0 {
+		return make([]int, scratchMaxReveals)
+	}
+	fullWeight := rewards[len(rewards)-1]
+	if fullWeight <= 0 {
+		rewards = fixedLengthScratchRewardProfile(activity.DefaultScratchRewards(), scratchMaxReveals)
+		fullWeight = rewards[len(rewards)-1]
+	}
+	out := make([]int, len(rewards))
+	last := 0
+	for i, weight := range rewards {
+		prize := int(math.Round(float64(fullPrize) * float64(weight) / float64(fullWeight)))
+		if prize < last {
+			prize = last
+		}
+		if prize == 0 && fullPrize > 0 && weight > 0 {
+			prize = 1
+		}
+		if prize > fullPrize {
+			prize = fullPrize
+		}
+		out[i] = prize
+		last = prize
+	}
+	out[len(out)-1] = fullPrize
+	return out
+}
+
+func fixedLengthScratchRewardProfile(rewards []int, steps int) []int {
+	if steps <= 0 {
+		return nil
+	}
+	clean := make([]int, 0, len(rewards))
+	for _, reward := range rewards {
+		if reward > 0 {
+			clean = append(clean, reward)
+		}
+	}
+	if len(clean) == steps {
+		return clean
+	}
+	defaults := activity.DefaultScratchRewards()
+	if len(defaults) >= steps {
+		return append([]int(nil), defaults[:steps]...)
+	}
+	out := make([]int, steps)
+	for i := range out {
+		out[i] = i + 1
+	}
+	return out
+}
+
+func minimumGuaranteedPrize(cfg activity.Config, scratchRewards []int) int {
+	values := []int{}
+	for _, reward := range scratchRewards {
+		if reward > 0 {
+			values = append(values, reward)
+			break
+		}
+	}
+	cfg = activity.NormalizeConfig(cfg)
+	for _, guarantee := range cfg.SpinGuarantees {
+		if guarantee.PrizeDollars > 0 {
+			values = append(values, guarantee.PrizeDollars)
+		}
+	}
+	if len(values) == 0 {
+		return 0
+	}
+	sort.Ints(values)
+	return values[0]
 }
 
 func parseScratchIntArray(s string) ([]int, error) {

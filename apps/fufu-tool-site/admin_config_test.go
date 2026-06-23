@@ -991,7 +991,7 @@ func TestAdminConfigSavesActivityOddsAndDates(t *testing.T) {
 			},
 			"prizePool": []map[string]any{
 				{"type": "miss", "weight": 100},
-				{"type": "win", "dollars": 9, "weight": 1},
+				{"type": "win", "dollars": 9, "weight": 1, "rank": "jackpot", "label": "大奖", "advertised": true},
 			},
 			"tierPools": map[string][]map[string]any{
 				"42": {

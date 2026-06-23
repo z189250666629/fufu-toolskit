@@ -96,6 +96,9 @@ func finishScratchRound(key, revealed string, prize int, status string) error {
 		if _, err := tx.Exec(`INSERT INTO spin_log (card_key,prize_dollars,is_retry) VALUES (?,?,0)`, key, prize); err != nil {
 			return err
 		}
+		if err := recordScratchPrizePoolPayoutWith(tx, key, prize); err != nil {
+			return err
+		}
 		var totalSpins, usedSpins, totalWon int
 		if err := tx.QueryRow(`SELECT total_spins,used_spins,total_won FROM cards WHERE card_key=?`, key).Scan(&totalSpins, &usedSpins, &totalWon); err != nil {
 			return err

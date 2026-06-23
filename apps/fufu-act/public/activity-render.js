@@ -22,6 +22,7 @@
       jackpot: '🏆',
       second: '👑',
       third: '⭐',
+      minimum: '🛡️',
     };
     return escapeHtml(symbols?.[dollars] || rankSymbols[rank] || '🎁');
   }

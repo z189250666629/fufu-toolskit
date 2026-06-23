@@ -6,6 +6,7 @@ import (
 	"fufu/auth"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -53,11 +54,14 @@ func handlePrizes(w http.ResponseWriter, r *http.Request) {
 	poolCfg := cfg
 	poolCfg.PrizePool = pool
 	balanced := activity.BalancedPrizePoolForGame(poolCfg, activity.GameSlot)
+	scratchRewards := scratchRewardsForPoolBalance(cfg, poolBalance)
 	writeJSON(w, 200, map[string]any{
-		"prizes":      buildPrizeWeightRows(balanced.Pool),
-		"gameConfigs": cfg.GameConfigs,
-		"spinMap":     spinMapOut,
-		"poolBalance": poolBalance,
+		"prizes":                 buildPrizeWeightRows(balanced.Pool),
+		"gameConfigs":            cfg.GameConfigs,
+		"spinMap":                spinMapOut,
+		"poolBalance":            poolBalance,
+		"scratchRewards":         scratchRewards,
+		"minimumGuaranteedPrize": minimumGuaranteedPrize(cfg, scratchRewards),
 	})
 }
 
@@ -75,7 +79,7 @@ func buildPrizeWeightRows(pool []activity.Prize) []prizeWeightResponse {
 	total := sumPoolWeights(pool)
 	prizes := []prizeWeightResponse{}
 	for _, p := range pool {
-		if p.Type == "win" {
+		if p.Type == "win" && isDisplayPrize(p) {
 			prizes = append(prizes, prizeWeightResponse{
 				Type:        p.Type,
 				Dollars:     p.Dollars,
@@ -87,7 +91,27 @@ func buildPrizeWeightRows(pool []activity.Prize) []prizeWeightResponse {
 			})
 		}
 	}
+	sort.SliceStable(prizes, func(i, j int) bool {
+		return displayPrizeRankOrder(prizes[i].Rank) < displayPrizeRankOrder(prizes[j].Rank)
+	})
 	return prizes
+}
+
+func isDisplayPrize(p activity.Prize) bool {
+	return p.Advertised || displayPrizeRankOrder(p.Rank) < 100
+}
+
+func displayPrizeRankOrder(rank string) int {
+	switch strings.ToLower(strings.TrimSpace(rank)) {
+	case "jackpot":
+		return 1
+	case "second":
+		return 2
+	case "third":
+		return 3
+	default:
+		return 100
+	}
 }
 
 func sumPoolWeights(pool []activity.Prize) int {

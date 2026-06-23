@@ -55,7 +55,7 @@ func TestHandleAdminStatsRejectsDefaultTokenWhenAdminTokenUnset(t *testing.T) {
 	}
 }
 
-func TestHandlePrizesReturnsActivityPoolWeights(t *testing.T) {
+func TestHandlePrizesReturnsDisplayAwardsAndMinimumGuarantee(t *testing.T) {
 	original := SnapshotRuntimeConfig()
 	t.Cleanup(func() { SetRuntimeConfig(original) })
 
@@ -84,14 +84,33 @@ func TestHandlePrizesReturnsActivityPoolWeights(t *testing.T) {
 		t.Fatalf("/api/prizes should not expose a second post-jackpot pool, got %s", w.Body.String())
 	}
 
-	defaultPrizePool := activity.DefaultPrizePool()
-	defaultDollar := findPrizeRow(t, body.Prizes, 1)
-	if defaultDollar.Weight != defaultPrizePool[2].Weight || defaultDollar.TotalWeight != sumPrizeWeights(defaultPrizePool) {
-		t.Fatalf("default $1 row=%+v", defaultDollar)
+	if findPrizeRowOK(body.Prizes, 1) {
+		t.Fatalf("/api/prizes should not expose small fixed prizes, got %+v", body.Prizes)
+	}
+	if findPrizeRowOK(body.Prizes, 500) {
+		t.Fatalf("/api/prizes should not expose the fixed $500 prize, got %+v", body.Prizes)
 	}
 	jackpot := findPrizeRow(t, body.Prizes, 1000)
 	if jackpot.Rank != "jackpot" || jackpot.Label != "大奖" || !jackpot.Advertised {
 		t.Fatalf("jackpot row should expose prompt metadata, got %+v", jackpot)
+	}
+	second := findPrizeRow(t, body.Prizes, 200)
+	third := findPrizeRow(t, body.Prizes, 100)
+	if second.Rank != "second" || third.Rank != "third" || len(body.Prizes) != 3 {
+		t.Fatalf("/api/prizes should expose only jackpot/second/third display awards, got %+v", body.Prizes)
+	}
+	var extra struct {
+		MinimumGuaranteedPrize int   `json:"minimumGuaranteedPrize"`
+		ScratchRewards         []int `json:"scratchRewards"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &extra); err != nil {
+		t.Fatal(err)
+	}
+	if extra.MinimumGuaranteedPrize != 2 {
+		t.Fatalf("minimumGuaranteedPrize=%d, want 2", extra.MinimumGuaranteedPrize)
+	}
+	if len(extra.ScratchRewards) != scratchMaxReveals || extra.ScratchRewards[0] != 2 {
+		t.Fatalf("scratchRewards=%+v", extra.ScratchRewards)
 	}
 }
 
@@ -103,7 +122,7 @@ func TestHandlePrizesReturnsBalancedActivityPoolWeights(t *testing.T) {
 	cfg.GameConfigs = []activity.GameConfig{{Game: activity.GameSlot, TargetExpectedValue: 4.5, ActualExpectedValue: 4.5}}
 	cfg.PrizePool = []activity.Prize{
 		{Type: "miss", Weight: 100},
-		{Type: "win", Dollars: 9, Weight: 1},
+		{Type: "win", Dollars: 9, Weight: 1, Rank: "jackpot", Label: "大奖", Advertised: true},
 	}
 	SetRuntimeConfig(cfg)
 
@@ -144,6 +163,15 @@ func findPrizeRow(t *testing.T, rows []prizeWeightRow, dollars int) prizeWeightR
 	}
 	t.Fatalf("missing prize row for $%d in %+v", dollars, rows)
 	return prizeWeightRow{}
+}
+
+func findPrizeRowOK(rows []prizeWeightRow, dollars int) bool {
+	for _, row := range rows {
+		if row.Dollars == dollars {
+			return true
+		}
+	}
+	return false
 }
 
 func sumPrizeWeights(pool []activity.Prize) int {
