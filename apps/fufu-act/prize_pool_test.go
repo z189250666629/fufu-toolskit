@@ -80,6 +80,81 @@ func TestHandleLoginFundsDynamicPrizePoolOnce(t *testing.T) {
 	if deposits != 1 {
 		t.Fatalf("deposit rows = %d, want 1", deposits)
 	}
+	scratchBalance, err := currentScratchPrizePoolBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scratchBalance != 0 {
+		t.Fatalf("scratch pool balance = %v, want untouched by slot login", scratchBalance)
+	}
+}
+
+func TestHandleLoginFundsScratchPrizePoolSeparately(t *testing.T) {
+	setupScratchLockTestDB(t)
+	t.Setenv("MCY_BASE_URL", "")
+	t.Setenv("SHOP_BASE_URL", "")
+	restoreRuntimeConfig(t)
+
+	cfg := activity.DefaultConfig()
+	cfg.DynamicPrizePool = poolfundcore.Config{
+		Enabled:          true,
+		ContributionRate: 0.3,
+		TierEconomics: []poolfundcore.TierEconomics{
+			{Dollars: 55, Revenue: 38.5, Cost: 3.5},
+		},
+	}
+	SetRuntimeConfig(cfg)
+
+	key := "sk-scratch-pool-login"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/token/search" {
+			t.Fatalf("unexpected token request %s %s", r.Method, r.URL.String())
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data": []any{map[string]any{
+				"id":             78,
+				"key":            key,
+				"name":           "55-act-test",
+				"interval_quota": newapi.DefaultQuotaUnit * 55,
+				"status":         1,
+				"created_time":   actStartTS + 1,
+			}},
+		})
+	}))
+	t.Cleanup(server.Close)
+	oldTokenSvc := tokenSvc
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: server.URL, Token: "token", UserID: "1"}))
+	t.Cleanup(func() { tokenSvc = oldTokenSvc })
+
+	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"cardKey":"`+key+`"}`))
+	w := httptest.NewRecorder()
+	handleLogin(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("login code=%d body=%s", w.Code, w.Body.String())
+	}
+
+	mainBalance, err := currentPrizePoolBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mainBalance != 0 {
+		t.Fatalf("main pool balance = %v, want untouched by scratch login", mainBalance)
+	}
+	scratchBalance, err := currentScratchPrizePoolBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scratchBalance != 10.5 {
+		t.Fatalf("scratch pool balance = %v, want scratch contribution 10.5", scratchBalance)
+	}
+	var deposits int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM scratch_prize_pool_ledger WHERE card_key=? AND kind='deposit'`, key).Scan(&deposits); err != nil {
+		t.Fatal(err)
+	}
+	if deposits != 1 {
+		t.Fatalf("scratch deposit rows = %d, want 1", deposits)
+	}
 }
 
 func TestHandlePrizesReflectsDynamicPrizePoolBalance(t *testing.T) {
@@ -181,6 +256,13 @@ func restoreRuntimeConfig(t *testing.T) {
 func insertPrizePoolLedgerForTest(t *testing.T, key, kind string, amount float64, rank, label string) {
 	t.Helper()
 	if _, err := db.Exec(`INSERT INTO prize_pool_ledger (card_key,kind,amount,prize_rank,prize_label) VALUES (?,?,?,?,?)`, key, kind, amount, rank, label); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func insertScratchPrizePoolLedgerForTest(t *testing.T, key, kind string, amount float64, rank, label string) {
+	t.Helper()
+	if _, err := db.Exec(`INSERT INTO scratch_prize_pool_ledger (card_key,kind,amount,prize_rank,prize_label) VALUES (?,?,?,?,?)`, key, kind, amount, rank, label); err != nil {
 		t.Fatal(err)
 	}
 }

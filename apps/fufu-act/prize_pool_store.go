@@ -3,6 +3,7 @@ package activityapp
 import (
 	"database/sql"
 
+	"fufu/activity"
 	"fufu/poolfundcore"
 )
 
@@ -12,11 +13,28 @@ const (
 )
 
 func currentPrizePoolBalance() (float64, error) {
+	return currentLedgerBalance("prize_pool_ledger")
+}
+
+func currentScratchPrizePoolBalance() (float64, error) {
+	return currentLedgerBalance("scratch_prize_pool_ledger")
+}
+
+func currentLedgerBalance(table string) (float64, error) {
 	if db == nil {
 		return 0, nil
 	}
+	query := ""
+	switch table {
+	case "prize_pool_ledger":
+		query = `SELECT COALESCE(SUM(amount),0) FROM prize_pool_ledger`
+	case "scratch_prize_pool_ledger":
+		query = `SELECT COALESCE(SUM(amount),0) FROM scratch_prize_pool_ledger`
+	default:
+		return 0, nil
+	}
 	var balance float64
-	if err := db.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM prize_pool_ledger`).Scan(&balance); err != nil {
+	if err := db.QueryRow(query).Scan(&balance); err != nil {
 		return 0, err
 	}
 	return balance, nil
@@ -26,8 +44,12 @@ func recordPrizePoolDepositWith(tx *sql.Tx, plan loginCardPlan) error {
 	if plan.PoolContribution.Contribution <= 0 {
 		return nil
 	}
+	query := `INSERT OR IGNORE INTO prize_pool_ledger (card_key,kind,dollars,revenue,cost,net_profit,amount) VALUES (?,?,?,?,?,?,?)`
+	if planPrizePoolGame(plan) == activity.GameScratch {
+		query = `INSERT OR IGNORE INTO scratch_prize_pool_ledger (card_key,kind,dollars,revenue,cost,net_profit,amount) VALUES (?,?,?,?,?,?,?)`
+	}
 	_, err := tx.Exec(
-		`INSERT OR IGNORE INTO prize_pool_ledger (card_key,kind,dollars,revenue,cost,net_profit,amount) VALUES (?,?,?,?,?,?,?)`,
+		query,
 		plan.CardKey,
 		prizePoolLedgerDeposit,
 		plan.Dollars,
@@ -37,6 +59,13 @@ func recordPrizePoolDepositWith(tx *sql.Tx, plan loginCardPlan) error {
 		plan.PoolContribution.Contribution,
 	)
 	return err
+}
+
+func planPrizePoolGame(plan loginCardPlan) string {
+	if plan.Game != "" {
+		return plan.Game
+	}
+	return SnapshotRuntimeConfig().GameForTier(plan.Dollars)
 }
 
 func recordPrizePoolPayoutWith(tx *sql.Tx, key string, sr spinResult) error {
@@ -59,7 +88,7 @@ func recordScratchPrizePoolPayoutWith(tx *sql.Tx, key string, prize int) error {
 		return nil
 	}
 	_, err := tx.Exec(
-		`INSERT INTO prize_pool_ledger (card_key,kind,amount,prize_rank,prize_label) VALUES (?,?,?,?,?)`,
+		`INSERT INTO scratch_prize_pool_ledger (card_key,kind,amount,prize_rank,prize_label) VALUES (?,?,?,?,?)`,
 		key,
 		prizePoolLedgerPayout,
 		-float64(prize),

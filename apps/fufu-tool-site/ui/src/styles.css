@@ -1147,6 +1147,25 @@ tr:last-child td {
   width: 80px;
 }
 
+.scratch-editor--readonly {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.scratch-step-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scratch-chip--static {
+  border: 1px solid var(--blueprint-line);
+  border-radius: var(--blueprint-radius-control);
+  background: color-mix(in srgb, var(--blueprint-accent) 10%, transparent);
+  padding: 8px 12px;
+  color: var(--blueprint-ink);
+}
+
 .game-route-editor {
   display: grid;
   gap: 6px;

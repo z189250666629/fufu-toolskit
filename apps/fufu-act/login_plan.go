@@ -20,6 +20,7 @@ type loginCardPlan struct {
 	CardName         string
 	Dollars          float64
 	TotalSpins       int
+	Game             string
 	Source           string
 	PurchaseTime     string
 	PoolContribution poolfundcore.ContributionResult
@@ -74,6 +75,7 @@ func planLoginCardForToken(key string, t *tokens.Token, shop ShopPurchaseLookup,
 		CardName:         plan.CardName,
 		Dollars:          plan.Dollars,
 		TotalSpins:       plan.TotalDraws,
+		Game:             plan.Game,
 		Source:           plan.Source,
 		PurchaseTime:     plan.PurchaseTime,
 		PoolContribution: plan.PoolContribution,
@@ -107,6 +109,7 @@ func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptio
 		CardName:         firstNonEmpty(user.Username, fmt.Sprintf("user-%d", user.ID)),
 		Dollars:          plan.Dollars,
 		TotalSpins:       plan.TotalDraws,
+		Game:             plan.Game,
 		Source:           "subscription",
 		PurchaseTime:     formatUnixText(sub.StartTime),
 		PoolContribution: plan.PoolContribution,

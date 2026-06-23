@@ -47,6 +47,11 @@ func handlePrizes(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "服务器错误")
 		return
 	}
+	scratchPoolBalance, err := currentScratchPrizePoolBalance()
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "服务器错误")
+		return
+	}
 	pool := cfg.PrizePool
 	if cfg.DynamicPrizePool.Enabled {
 		pool = activity.PrizePoolWithDynamicAwards(cfg, poolBalance)
@@ -54,12 +59,13 @@ func handlePrizes(w http.ResponseWriter, r *http.Request) {
 	poolCfg := cfg
 	poolCfg.PrizePool = pool
 	balanced := activity.BalancedPrizePoolForGame(poolCfg, activity.GameSlot)
-	scratchRewards := scratchRewardsForPoolBalance(cfg, poolBalance)
+	scratchRewards := scratchRewardsForPoolBalance(cfg, scratchPoolBalance)
 	writeJSON(w, 200, map[string]any{
 		"prizes":                 buildPrizeWeightRows(balanced.Pool),
 		"gameConfigs":            cfg.GameConfigs,
 		"spinMap":                spinMapOut,
 		"poolBalance":            poolBalance,
+		"scratchPoolBalance":     scratchPoolBalance,
 		"scratchRewards":         scratchRewards,
 		"minimumGuaranteedPrize": minimumGuaranteedPrize(cfg, scratchRewards),
 	})
@@ -155,7 +161,11 @@ func buildAdminStats() (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"prizeRows": prizeRows, "totalSpins": totalSpins, "totalWon": totalWon, "ev": ev, "tierRows": tierRows, "queueRows": queueRows, "scratchRows": scratchRows, "poolBalance": poolBalance}, nil
+	scratchPoolBalance, err := currentScratchPrizePoolBalance()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"prizeRows": prizeRows, "totalSpins": totalSpins, "totalWon": totalWon, "ev": ev, "tierRows": tierRows, "queueRows": queueRows, "scratchRows": scratchRows, "poolBalance": poolBalance, "scratchPoolBalance": scratchPoolBalance}, nil
 }
 
 func queryRows(q string) ([]map[string]any, error) {

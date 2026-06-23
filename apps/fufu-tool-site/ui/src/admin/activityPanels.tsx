@@ -33,6 +33,8 @@ type LocalMessage = {
   tone?: 'ok' | 'error';
 };
 
+const SCRATCH_FIXED_STEPS = 6;
+
 export function ActivityStatsPanel({ stats }: { stats?: ActivityStats }) {
   const prizeSummary = Array.isArray(stats?.prizeRows) ? stats.prizeRows as Array<Record<string, unknown>> : [];
   const tierRows = Array.isArray(stats?.tierRows) ? stats.tierRows as Array<Record<string, unknown>> : [];
@@ -61,6 +63,7 @@ export function ActivityStatsPanel({ stats }: { stats?: ActivityStats }) {
 export function CurrentPrizePanel({ prizes }: { prizes?: PrizeConfigResponse }) {
   const pool = prizes?.prizePool ?? prizes?.prizes ?? [];
   const totalWeight = pool.reduce((sum, item) => sum + Number(item.weight || 0), 0);
+  const scratchRewards = (prizes?.scratchRewards ?? []).map(Number);
   const rows = pool.map((row) => [
     row.label || (row.rank === 'jackpot' ? '大奖' : row.rank === 'second' ? '二等奖' : row.rank === 'third' ? '三等奖' : row.type === 'miss' ? '未中奖' : `$${row.dollars ?? 0}`),
     row.weight ?? 0,
@@ -70,9 +73,15 @@ export function CurrentPrizePanel({ prizes }: { prizes?: PrizeConfigResponse }) 
   return (
     <div className="business-stack">
       <div className="metrics">
-        <Metric label="当前奖池" value={prizes?.poolBalance ?? 0} />
+        <Metric label="老虎机奖池" value={prizes?.poolBalance ?? 0} />
+        <Metric label="刮刮乐奖池" value={prizes?.scratchPoolBalance ?? 0} />
       </div>
       <DataTable columns={['统一奖项', '权重', '总权重', '理论概率']} rows={rows} empty={prizes ? '暂无普通奖项。' : '正在加载当前奖池。'} />
+      <DataTable
+        columns={['刮开步数', '动态奖励']}
+        rows={scratchRewards.map((value, index) => [`第 ${index + 1} 步`, `$${value}`])}
+        empty={prizes ? '暂无刮刮乐动态奖励。' : '正在加载刮刮乐奖池。'}
+      />
     </div>
   );
 }
@@ -91,7 +100,6 @@ export function ActivityConfigEditor({
   onChange: (activity: ActivityConfig) => void;
 }) {
   const [gameConfigs, setGameConfigs] = useState<ActivityGameConfig[]>(() => normalizeGameConfigs(activity.gameConfigs, activity));
-  const [scratch, setScratch] = useState<number[]>(() => (activity.scratchRewards ?? []).map(Number));
   const [gameRoutes, setGameRoutes] = useState<ActivityGameRoute[]>(() => gameRoutesFromActivity(activity));
   const [dynamicPool, setDynamicPool] = useState<DynamicPrizePoolConfig>(() => normalizeDynamicPrizePool(activity.dynamicPrizePool));
   const [testKeyCount, setTestKeyCount] = useState(1);
@@ -104,7 +112,6 @@ export function ActivityConfigEditor({
   useEffect(() => {
     if (activity === pushedRef.current) return;
     setGameConfigs(normalizeGameConfigs(activity.gameConfigs, activity));
-    setScratch((activity.scratchRewards ?? []).map(Number));
     setGameRoutes(gameRoutesFromActivity(activity));
     setDynamicPool(normalizeDynamicPrizePool(activity.dynamicPrizePool));
   }, [activity]);
@@ -113,7 +120,6 @@ export function ActivityConfigEditor({
     pushedRef.current = next;
     onChange(next);
   }
-  const emitScratch = (values: number[]) => { setScratch(values); emit({ ...activity, scratchRewards: values }); };
   const emitGameConfigs = (values: ActivityGameConfig[]) => {
     const normalized = normalizeGameConfigs(values, activity);
     const slot = normalized.find((item) => normalizeGameMode(item.game) === 'slot');
@@ -267,15 +273,16 @@ export function ActivityConfigEditor({
         <div className="dynamic-pool-note">奖项分配合计 {rateToPercentInput(awardRateTotal)}%；入池比例用于计算每张卡贡献多少利润。</div>
       </div>
 
-      <div className="config-subhead">刮刮卡奖励（$）</div>
-      <div className="scratch-editor">
-        {scratch.map((value, index) => (
-          <div className="scratch-chip" key={index}>
-            <Input className="mini-input blueprint-input" type="number" min={0} value={String(value)} onChange={(event) => emitScratch(scratch.map((v, i) => (i === index ? Number(event.target.value) : v)))} />
-            <Button className="blueprint-danger-button" onPress={() => emitScratch(scratch.filter((_, i) => i !== index))}>×</Button>
-          </div>
-        ))}
-        <Button className="blueprint-button" onPress={() => emitScratch([...scratch, 0])}>新增奖励</Button>
+      <div className="config-subhead">刮刮乐动态奖励</div>
+      <div className="scratch-editor scratch-editor--readonly">
+        <p className="inline-help">
+          刮刮乐使用独立奖池实时计算奖励，后台只固定 {SCRATCH_FIXED_STEPS} 个安全步数；具体金额请在“当前奖池中奖率”里查看。
+        </p>
+        <div className="scratch-step-list" aria-label="刮刮乐固定步数">
+          {Array.from({ length: SCRATCH_FIXED_STEPS }, (_, index) => (
+            <span className="scratch-chip scratch-chip--static" key={index}>第 {index + 1} 步</span>
+          ))}
+        </div>
       </div>
     </div>
   );

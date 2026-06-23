@@ -9,19 +9,20 @@ import (
 	"fufu/poolfundcore"
 )
 
-func TestScratchDynamicRewardsUsePoolPercentageAndDebitPayout(t *testing.T) {
+func TestScratchDynamicRewardsUseSeparatePoolAndFixedSteps(t *testing.T) {
 	setupScratchLockTestDB(t)
 	restoreRuntimeConfig(t)
 	cfg := activity.DefaultConfig()
 	cfg.DynamicPrizePool = poolfundcore.Config{Enabled: true}
 	SetRuntimeConfig(cfg)
-	insertPrizePoolLedgerForTest(t, "sk-pool-seed", "deposit", 1000, "", "")
+	insertPrizePoolLedgerForTest(t, "sk-main-pool-seed", "deposit", 1000, "", "")
+	insertScratchPrizePoolLedgerForTest(t, "sk-scratch-pool-seed", "deposit", 1000, "", "")
 
 	rewards, err := scratchRewardsForCurrentPool()
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantRewards := []int{13, 27, 40, 53, 80, 100}
+	wantRewards := []int{17, 33, 50, 67, 83, 100}
 	if !sameScratchRewardInts(rewards, wantRewards) {
 		t.Fatalf("dynamic scratch rewards=%+v, want %+v", rewards, wantRewards)
 	}
@@ -40,8 +41,8 @@ func TestScratchDynamicRewardsUsePoolPercentageAndDebitPayout(t *testing.T) {
 	if err := json.Unmarshal(reveal.Body.Bytes(), &revealBody); err != nil {
 		t.Fatal(err)
 	}
-	if revealBody.Prize != 13 {
-		t.Fatalf("first safe prize=%d, want 13", revealBody.Prize)
+	if revealBody.Prize != 17 {
+		t.Fatalf("first safe prize=%d, want 17", revealBody.Prize)
 	}
 
 	cashout := postScratch(t, "/api/scratch/cashout", `{"cardKey":"scratch-dynamic-card"}`)
@@ -49,15 +50,22 @@ func TestScratchDynamicRewardsUsePoolPercentageAndDebitPayout(t *testing.T) {
 		t.Fatalf("cashout code=%d body=%s", cashout.Code, cashout.Body.String())
 	}
 
-	balance, err := currentPrizePoolBalance()
+	balance, err := currentScratchPrizePoolBalance()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if balance != 987 {
-		t.Fatalf("pool balance=%v, want 987 after $13 scratch payout", balance)
+	if balance != 983 {
+		t.Fatalf("scratch pool balance=%v, want 983 after $17 scratch payout", balance)
+	}
+	mainBalance, err := currentPrizePoolBalance()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mainBalance != 1000 {
+		t.Fatalf("main pool balance=%v, want unchanged 1000 after scratch payout", mainBalance)
 	}
 	var rank, label string
-	if err := db.QueryRow(`SELECT prize_rank,prize_label FROM prize_pool_ledger WHERE card_key=? AND kind=?`, key, prizePoolLedgerPayout).Scan(&rank, &label); err != nil {
+	if err := db.QueryRow(`SELECT prize_rank,prize_label FROM scratch_prize_pool_ledger WHERE card_key=? AND kind=?`, key, prizePoolLedgerPayout).Scan(&rank, &label); err != nil {
 		t.Fatal(err)
 	}
 	if rank != "scratch" || label != "刮刮乐" {

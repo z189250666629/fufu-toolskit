@@ -220,4 +220,5 @@ export type SaleCardTestKeyResult = {
 export type PrizeConfigResponse = ActivityConfig & {
   prizes?: PrizeRow[];
   poolBalance?: number;
+  scratchPoolBalance?: number;
 };

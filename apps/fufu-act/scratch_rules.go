@@ -3,11 +3,11 @@ package activityapp
 import (
 	"errors"
 	"math"
+	"net/http"
 	"sort"
 
 	"fufu/activity"
 	"fufu/scratchcore"
-	"net/http"
 )
 
 const scratchDynamicPoolRate = 0.10
@@ -40,7 +40,7 @@ func scratchRewardsForCurrentPool() ([]int, error) {
 	if !cfg.DynamicPrizePool.Enabled {
 		return fixedLengthScratchRewardProfile(cfg.ScratchRewards, scratchMaxReveals), nil
 	}
-	balance, err := currentPrizePoolBalance()
+	balance, err := currentScratchPrizePoolBalance()
 	if err != nil {
 		return nil, err
 	}
@@ -57,19 +57,14 @@ func scratchRewardsForPoolBalance(cfg activity.Config, poolBalance float64) []in
 	if fullPrize <= 0 {
 		return make([]int, scratchMaxReveals)
 	}
-	fullWeight := rewards[len(rewards)-1]
-	if fullWeight <= 0 {
-		rewards = fixedLengthScratchRewardProfile(activity.DefaultScratchRewards(), scratchMaxReveals)
-		fullWeight = rewards[len(rewards)-1]
-	}
-	out := make([]int, len(rewards))
+	out := make([]int, scratchMaxReveals)
 	last := 0
-	for i, weight := range rewards {
-		prize := int(math.Round(float64(fullPrize) * float64(weight) / float64(fullWeight)))
+	for i := range out {
+		prize := int(math.Round(float64(fullPrize) * float64(i+1) / float64(len(out))))
 		if prize < last {
 			prize = last
 		}
-		if prize == 0 && fullPrize > 0 && weight > 0 {
+		if prize == 0 && fullPrize > 0 {
 			prize = 1
 		}
 		if prize > fullPrize {

@@ -95,6 +95,7 @@ type LoginCardPlan struct {
 	CardName         string
 	Dollars          float64
 	TotalDraws       int
+	Game             string
 	Source           string
 	PurchaseTime     string
 	PoolContribution poolfundcore.ContributionResult
@@ -942,6 +943,7 @@ func PlanLoginCard(input LoginCardPlanInput) LoginCardPlanResult {
 		CardName:         input.Name,
 		Dollars:          dollars,
 		TotalDraws:       drawCount,
+		Game:             game,
 		Source:           source,
 		PurchaseTime:     purchaseTime,
 		PoolContribution: contribution,
