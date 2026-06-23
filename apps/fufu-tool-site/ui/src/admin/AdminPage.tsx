@@ -290,7 +290,7 @@ export function AdminPage() {
                   stats={activityStats}
                   salePlans={saleCards?.plans ?? []}
                   onGenerateTestKey={generateSaleCardTestKey}
-                  onChange={(activity) => setConfig({ ...config, activity })}
+                  onChange={(activity) => setConfig((current) => ({ ...current, activity }))}
                 />
               </ConfigCard>
             </Tabs.Panel>

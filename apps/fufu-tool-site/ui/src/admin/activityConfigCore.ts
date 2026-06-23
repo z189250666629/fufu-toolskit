@@ -78,6 +78,49 @@ export function buildSaleCardTierOptions(plans: SaleCardPlan[] = []): SaleCardTi
     });
 }
 
+export function buildSubscriptionTierOptions(activity: ActivityConfig): SaleCardTierOption[] {
+  const byQuota = new Map<number, SubscriptionPlanMapping[]>();
+  for (const mapping of normalizeSubscriptionPlanMappings(activity.subscriptionPlanMappings)) {
+    const quota = numberValue(mapping.dollars);
+    if (quota <= 0) continue;
+    byQuota.set(quota, [...(byQuota.get(quota) ?? []), mapping]);
+  }
+  return [...byQuota.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([quota, rows]) => {
+      const names = uniqueText(rows.map((row) => row.title || (row.planId ? `订阅计划 ${row.planId}` : '订阅映射')));
+      const planText = uniqueText(rows.map((row) => row.planId ? `planId:${row.planId}` : row.title)).join(' / ') || 'subscription';
+      return {
+        quota,
+        label: names.join(' / ') || `${formatQuota(quota)} 次订阅档`,
+        planText,
+        planIds: []
+      };
+    });
+}
+
+export function buildActivityTierOptions(plans: SaleCardPlan[] = [], activity: ActivityConfig = {}): SaleCardTierOption[] {
+  const byQuota = new Map<number, SaleCardTierOption>();
+  for (const option of buildSaleCardTierOptions(plans)) {
+    byQuota.set(option.quota, option);
+  }
+  for (const option of buildSubscriptionTierOptions(activity)) {
+    const current = byQuota.get(option.quota);
+    if (!current) {
+      byQuota.set(option.quota, option);
+      continue;
+    }
+    byQuota.set(option.quota, {
+      ...current,
+      label: uniqueText([current.label, option.label]).join(' / '),
+      planText: uniqueText([current.planText, option.planText]).join(' / '),
+      planIds: current.planIds,
+      primaryPlanId: current.primaryPlanId
+    });
+  }
+  return [...byQuota.values()].sort((a, b) => a.quota - b.quota);
+}
+
 export function normalizeGameMode(value: unknown): GameMode {
   const text = String(value ?? '').trim().toLowerCase();
   if (text === 'scratch' || text === '刮刮乐') return 'scratch';
@@ -194,7 +237,7 @@ export function stripComputedExpectedValues(activity: ActivityConfig): ActivityC
 export function materializeActivityGameRoutes(activity: ActivityConfig, salePlans: SaleCardPlan[] = []): ActivityConfig {
   const sanitized = stripComputedExpectedValues(activity);
   sanitized.scratchMaxReveals = normalizeScratchMaxReveals(sanitized.scratchMaxReveals);
-  const saleTierOptions = buildSaleCardTierOptions(salePlans);
+  const saleTierOptions = buildActivityTierOptions(salePlans, sanitized);
   if (saleTierOptions.length === 0) {
     return sanitized;
   }

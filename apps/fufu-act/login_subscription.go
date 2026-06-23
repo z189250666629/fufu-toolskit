@@ -141,6 +141,10 @@ func selectSubscriptionLoginCard(user subscriptionUpstreamUser, subs []subscript
 			return Card{}, err
 		}
 		if ok {
+			card, err = syncUnusedSubscriptionCardPlan(card, plan)
+			if err != nil {
+				return Card{}, err
+			}
 			if card.TotalSpins-card.UsedSpins > 0 {
 				return card, nil
 			}

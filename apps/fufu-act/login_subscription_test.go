@@ -234,6 +234,65 @@ func TestHandleLoginWithSubscriptionIdentityMapsSaleCardPlanTitle(t *testing.T) 
 	}
 }
 
+func TestHandleLoginWithSubscriptionIdentitySyncsUnusedExistingCardToMappedDragonTier(t *testing.T) {
+	setupScratchLockTestDB(t)
+	original := SnapshotRuntimeConfig()
+	t.Cleanup(func() { SetRuntimeConfig(original) })
+	useSubscriptionRuntimeServerWithConfig(t, subscriptionRuntimeTestConfig{
+		UserID:   123,
+		Username: "alice",
+		Subs: []subscriptionSummary{{
+			ID:          904,
+			UserID:      123,
+			PlanID:      42,
+			AmountTotal: newapi.DefaultQuotaUnit * 100,
+			StartTime:   actStartTS + 60,
+			EndTime:     actEndTS + 3600,
+			Status:      "active",
+		}},
+		PlanTitles: map[int64]string{42: "plain subscription"},
+	})
+
+	SetRuntimeConfig(activity.DefaultConfig())
+	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"userId":123,"username":"alice"}`))
+	w := httptest.NewRecorder()
+	handleLogin(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("first login code=%d body=%s", w.Code, w.Body.String())
+	}
+	first := parseLoginResponse(t, w.Body.String())
+	cardKey := first["cardKey"]
+	if first["game"] != activity.GameSlot || first["dollars"] != float64(100) {
+		t.Fatalf("first login should create raw 100 slot card, got %#v", first)
+	}
+
+	cfg := activity.DefaultConfig()
+	cfg.SubscriptionPlanMappings = []activity.SubscriptionPlanMapping{{PlanID: 42, Dollars: 55}}
+	cfg.GameRoutes = []activity.GameRoute{{Dollars: 55, Game: activity.GameDragon, DrawCount: 1}}
+	SetRuntimeConfig(cfg)
+
+	req2 := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"userId":123,"username":"alice"}`))
+	w2 := httptest.NewRecorder()
+	handleLogin(w2, req2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("second login code=%d body=%s", w2.Code, w2.Body.String())
+	}
+	second := parseLoginResponse(t, w2.Body.String())
+	if second["cardKey"] != cardKey {
+		t.Fatalf("second login should reuse existing subscription card key, got %#v want %v", second["cardKey"], cardKey)
+	}
+	if second["game"] != activity.GameDragon || second["dollars"] != float64(55) {
+		t.Fatalf("mapped subscription should sync existing unused card to dragon tier, got %#v", second)
+	}
+	card, ok, err := lookupCardBySubscriptionID(904)
+	if err != nil || !ok {
+		t.Fatalf("lookup synced card ok=%v err=%v", ok, err)
+	}
+	if card.Dollars != 55 || card.TotalSpins != 1 {
+		t.Fatalf("stored card not synced: %#v", card)
+	}
+}
+
 func TestPlanLoginCardForSubscriptionUsesManualPlanIDMapping(t *testing.T) {
 	cfg := activity.DefaultConfig()
 	cfg.SubscriptionPlanMappings = []activity.SubscriptionPlanMapping{{PlanID: 777, Dollars: 100}}

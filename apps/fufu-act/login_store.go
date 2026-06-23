@@ -3,6 +3,7 @@ package activityapp
 import (
 	"database/sql"
 	"errors"
+	"math"
 )
 
 func insertLoginCard(plan loginCardPlan) error {
@@ -60,6 +61,66 @@ func lookupCardBySubscriptionID(subscriptionID int64) (Card, bool, error) {
 		return Card{}, false, nil
 	}
 	return lookupCardWhere(`subscription_id=?`, subscriptionID)
+}
+
+func syncUnusedSubscriptionCardPlan(card Card, plan loginCardPlan) (Card, error) {
+	if !card.SubscriptionID.Valid || card.SubscriptionID.Int64 != plan.SubscriptionID {
+		return card, nil
+	}
+	if card.UsedSpins != 0 || card.TotalWon != 0 || card.WonJackpot != 0 {
+		return card, nil
+	}
+	if math.Abs(card.Dollars-plan.Dollars) < 0.0001 && card.TotalSpins == plan.TotalSpins {
+		return card, nil
+	}
+	plan.CardKey = card.CardKey
+	if plan.CardName == "" {
+		plan.CardName = card.CardName
+	}
+	err := withTx(func(tx *sql.Tx) error {
+		res, err := tx.Exec(
+			`UPDATE cards
+			 SET card_name=?, dollars=?, total_spins=?, source=?, purchase_time=?, subscription_id=?, user_id=?, username=?
+			 WHERE card_key=? AND used_spins=0 AND total_won=0 AND won_jackpot=0`,
+			plan.CardName,
+			plan.Dollars,
+			plan.TotalSpins,
+			plan.Source,
+			nullString(plan.PurchaseTime),
+			nullInt64(plan.SubscriptionID),
+			nullInt64(plan.UserID),
+			nullString(plan.Username),
+			card.CardKey,
+		)
+		if err != nil {
+			return err
+		}
+		affected, _ := res.RowsAffected()
+		if affected == 0 {
+			return nil
+		}
+		if _, err := tx.Exec(`DELETE FROM scratch_games WHERE card_key=?`, card.CardKey); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM dragonboat_games WHERE card_key=?`, card.CardKey); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM prize_pool_ledger WHERE card_key=? AND kind=?`, card.CardKey, prizePoolLedgerDeposit); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM scratch_prize_pool_ledger WHERE card_key=? AND kind=?`, card.CardKey, prizePoolLedgerDeposit); err != nil {
+			return err
+		}
+		return recordPrizePoolDepositWith(tx, plan)
+	})
+	if err != nil {
+		return Card{}, err
+	}
+	updated, ok, err := lookupCard(card.CardKey)
+	if err != nil || !ok {
+		return updated, err
+	}
+	return updated, nil
 }
 
 func lookupCardWhere(where string, arg any) (Card, bool, error) {
