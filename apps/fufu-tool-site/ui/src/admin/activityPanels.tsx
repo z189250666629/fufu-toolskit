@@ -226,7 +226,7 @@ export function ActivityConfigEditor({
         })}
       </div>
 
-      <div className="config-subhead">卡档配置（来自 MCY 上架配置 / 订阅映射）</div>
+      <div className="config-subhead">卡档配置（来自 MCY 上架配置）/ 订阅映射</div>
       <p className="inline-help">卡档读取补卡卡档配置和订阅映射档位；这里维护每个卡档的玩法、抽奖次数、售价和成本。</p>
       <div className="sale-test-key-toolbar">
         <label className="field field--inline">测试数量<Input className="mini-input blueprint-input sale-test-key-count" type="number" min={1} max={20} value={String(testKeyCount)} onChange={(event) => updateTestKeyCount(event.target.value)} /></label>
