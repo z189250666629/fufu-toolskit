@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"fufu/newapi"
@@ -66,6 +67,38 @@ func (s *Service) SearchTokenByName(ctx context.Context, name string) (*Token, e
 		}
 	}
 	return nil, nil
+}
+
+func (s *Service) SearchTokensByNamePrefix(ctx context.Context, prefix string, size int) ([]Token, error) {
+	if s == nil || s.Client == nil {
+		return nil, fmt.Errorf("token service is not configured")
+	}
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		return nil, nil
+	}
+	if size <= 0 {
+		size = 10
+	}
+	endpoint := "/api/token/search?keyword=" + url.QueryEscape(prefix) + "&p=0&size=" + strconv.Itoa(size)
+	res, data, err := s.Client.Request(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !res.OK() {
+		return nil, fmt.Errorf("查询 token 名称前缀 %q 失败", prefix)
+	}
+	if !newapi.IsSuccess(data) {
+		return nil, errors.New(newapi.ErrorMessage(data, res.StatusCode, fmt.Sprintf("查询 token 名称前缀 %q 失败", prefix)))
+	}
+	out := []Token{}
+	for _, item := range DataList(data) {
+		name := getString(item, "name")
+		if name == prefix || strings.HasPrefix(name, prefix+"-") {
+			out = append(out, FromRaw(item))
+		}
+	}
+	return out, nil
 }
 
 type SearchResult struct {

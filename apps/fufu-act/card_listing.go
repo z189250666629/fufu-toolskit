@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"fufu/activity"
+	"fufu/newapi"
 	"fufu/salecore"
 	"fufu/tokens"
+	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,9 +18,15 @@ import (
 var (
 	ErrSaleCardInvalidPlan      = salecore.ErrInvalidPlan
 	ErrSaleCardGenerationFailed = errors.New("sale card generation failed")
+	errSaleCardBatchUnsupported = errors.New("sale card batch create unsupported")
 )
 
 var saleCardNow = time.Now
+
+// saleCardRestockMaxUploadPerJob is a production safety valve for automatic
+// restock. When a SKU is far below target, do not create/upload the entire
+// deficit in one scheduler run; smooth it over subsequent runs instead.
+var saleCardRestockMaxUploadPerJob = 50
 
 type SaleCardPlan = salecore.SaleCardPlan
 
@@ -70,7 +79,7 @@ func generateAndUploadSaleCards(ctx context.Context, svc *tokens.Service, plan S
 		}
 		result.CurrentStock = current
 		result.TargetStock = plan.TargetStock
-		uploadCount = max(0, plan.TargetStock-current)
+		uploadCount = capSaleCardRestockUploadCount(max(0, plan.TargetStock-current))
 	}
 	result.ToUpload = uploadCount
 	if uploadCount <= 0 {
@@ -89,6 +98,17 @@ func generateAndUploadSaleCards(ctx context.Context, svc *tokens.Service, plan S
 	}
 	result.Uploaded = len(keys)
 	return result, nil
+}
+
+func capSaleCardRestockUploadCount(count int) int {
+	if count <= 0 {
+		return 0
+	}
+	limit := saleCardRestockMaxUploadPerJob
+	if limit <= 0 || count <= limit {
+		return count
+	}
+	return limit
 }
 
 func generateSaleCardTestKeys(ctx context.Context, svc *tokens.Service, plan SaleCardPlan, count int, cfg activity.Config) (SaleCardTestKeyResult, error) {
@@ -183,6 +203,19 @@ func sanitizeSaleCardSlug(value string) string {
 }
 
 func createSaleCardTokenKeys(ctx context.Context, svc *tokens.Service, plan SaleCardPlan, count int) ([]string, error) {
+	if count > 1 {
+		keys, err := createSaleCardTokenKeysBatch(ctx, svc, plan, count)
+		if err == nil {
+			return keys, nil
+		}
+		if !errors.Is(err, errSaleCardBatchUnsupported) {
+			return nil, err
+		}
+	}
+	return createSaleCardTokenKeysIndividually(ctx, svc, plan, count)
+}
+
+func createSaleCardTokenKeysIndividually(ctx context.Context, svc *tokens.Service, plan SaleCardPlan, count int) ([]string, error) {
 	batchTime := saleCardNow()
 	keys := make([]string, 0, count)
 	quota := svc.DollarsToQuota(plan.Quota)
@@ -200,6 +233,122 @@ func createSaleCardTokenKeys(ctx context.Context, svc *tokens.Service, plan Sale
 		keys = append(keys, key)
 	}
 	return keys, nil
+}
+
+func createSaleCardTokenKeysBatch(ctx context.Context, svc *tokens.Service, plan SaleCardPlan, count int) ([]string, error) {
+	name := saleCardTokenName(plan)
+	createBody := buildSaleTokenCreateBody(name, svc.DollarsToQuota(plan.Quota), plan.Group, plan.IntervalUnit)
+	res, data, err := svc.CreateTokens(ctx, count, createBody)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrSaleCardGenerationFailed, err)
+	}
+	if !res.OK() {
+		if saleCardBatchUnsupportedResponse(res, data) {
+			return nil, fmt.Errorf("%w: %s", errSaleCardBatchUnsupported, res.BodyOr(http.StatusText(res.StatusCode)))
+		}
+		return nil, fmt.Errorf("%w: %s", ErrSaleCardGenerationFailed, res.BodyOr(http.StatusText(res.StatusCode)))
+	}
+	if !newapi.IsSuccess(data) {
+		message := newapi.ErrorMessage(data, res.StatusCode, "NewAPI 批量创建卡密失败")
+		if saleCardBatchUnsupportedMessage(message) {
+			return nil, fmt.Errorf("%w: %s", errSaleCardBatchUnsupported, message)
+		}
+		return nil, fmt.Errorf("%w: %s", ErrSaleCardGenerationFailed, message)
+	}
+	if keys := extractCreatedSaleCardKeys(data); len(keys) == count {
+		return keys, nil
+	}
+
+	searchSize := count * 2
+	if searchSize < 10 {
+		searchSize = 10
+	}
+	found, err := svc.SearchTokensByNamePrefix(ctx, name, searchSize)
+	if err != nil {
+		return nil, fmt.Errorf("%w: 批量创建后查找 token 失败: %v", ErrSaleCardGenerationFailed, err)
+	}
+	if len(found) < count {
+		return nil, fmt.Errorf("%w: NewAPI 批量创建成功但只查回 %d/%d 个 token", ErrSaleCardGenerationFailed, len(found), count)
+	}
+	sort.Slice(found, func(i, j int) bool {
+		if found[i].ID == found[j].ID {
+			return found[i].Name < found[j].Name
+		}
+		return found[i].ID < found[j].ID
+	})
+	return saleCardTokenKeysFromCreatedTokens(ctx, svc, found[:count])
+}
+
+func extractCreatedSaleCardKeys(data map[string]any) []string {
+	keys := []string{}
+	for _, item := range tokens.DataList(data) {
+		raw := strings.TrimSpace(fmt.Sprint(item["key"]))
+		if raw == "" || raw == "<nil>" || tokens.IsMaskedKey(raw) {
+			continue
+		}
+		keys = append(keys, tokens.EnsureFullKey(raw))
+	}
+	return keys
+}
+
+func saleCardTokenKeysFromCreatedTokens(ctx context.Context, svc *tokens.Service, created []tokens.Token) ([]string, error) {
+	keys := make([]string, len(created))
+	missing := []int{}
+	missingPos := map[int]int{}
+	for i, token := range created {
+		key := strings.TrimSpace(token.Key)
+		if key != "" && !tokens.IsMaskedKey(key) {
+			keys[i] = tokens.EnsureFullKey(key)
+			continue
+		}
+		if token.ID <= 0 {
+			return nil, fmt.Errorf("%w: NewAPI 批量创建成功但第 %d 个 token 缺少 id/key", ErrSaleCardGenerationFailed, i+1)
+		}
+		missing = append(missing, token.ID)
+		missingPos[token.ID] = i
+	}
+	if len(missing) > 0 {
+		if resolved, err := svc.GetTokenKeysBatch(ctx, missing); err == nil {
+			for id, key := range resolved {
+				if pos, ok := missingPos[id]; ok {
+					keys[pos] = strings.TrimSpace(key)
+				}
+			}
+		}
+		for _, id := range missing {
+			pos := missingPos[id]
+			if strings.TrimSpace(keys[pos]) != "" {
+				continue
+			}
+			key, err := svc.ResolveTokenKey(ctx, id)
+			if err != nil {
+				return nil, fmt.Errorf("%w: 批量创建后读取 token %d key 失败: %v", ErrSaleCardGenerationFailed, id, err)
+			}
+			keys[pos] = key
+		}
+	}
+	for i, key := range keys {
+		key = strings.TrimSpace(key)
+		if key == "" || tokens.IsMaskedKey(key) {
+			return nil, fmt.Errorf("%w: NewAPI 批量创建成功但第 %d 个 token key 为空或被隐藏", ErrSaleCardGenerationFailed, i+1)
+		}
+		keys[i] = tokens.EnsureFullKey(key)
+	}
+	return keys, nil
+}
+
+func saleCardBatchUnsupportedResponse(res newapi.Response, data map[string]any) bool {
+	if res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusMethodNotAllowed {
+		return true
+	}
+	return saleCardBatchUnsupportedMessage(newapi.ErrorMessage(data, res.StatusCode, ""))
+}
+
+func saleCardBatchUnsupportedMessage(message string) bool {
+	message = strings.ToLower(strings.TrimSpace(message))
+	return strings.Contains(message, "invalid url") ||
+		strings.Contains(message, "not found") ||
+		strings.Contains(message, "/api/token/tokens")
 }
 
 func createSaleCardTestTokenKeys(ctx context.Context, svc *tokens.Service, plan SaleCardPlan, count int) ([]string, error) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,18 +23,36 @@ func resetSaleCardFiredGuard(t *testing.T) {
 
 // restockBackend wires the real restock dependencies: an MCY stub answering the
 // encrypted card/get (reports stockTotal as data.total) and card/add (upload),
-// plus a NewAPI stub that mints N token keys. The returned counters track stock
-// queries, token creations and MCY uploads.
+// plus a NewAPI stub that mints token keys. The returned counters track stock
+// queries, NewAPI create requests and MCY uploads.
 func restockBackend(t *testing.T, stockTotal int) (*atomic.Int32, *atomic.Int32, *atomic.Int32) {
 	t.Helper()
 	setMCYCookieForTest(t, "manage_token=test")
-	var stockQ, create, upload atomic.Int32
+	var stockQ, create, upload, lastBatchCount atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
-			t.Fatalf("unexpected NewAPI request %s", r.URL.Path)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/tokens":
+			create.Add(1)
+			count, err := strconv.Atoi(r.URL.Query().Get("tokenCount"))
+			if err != nil || count <= 1 {
+				t.Fatalf("bad tokenCount=%q", r.URL.Query().Get("tokenCount"))
+			}
+			lastBatchCount.Store(int32(count))
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "message": fmt.Sprintf("成功添加%d个令牌", count)})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			prefix := r.URL.Query().Get("keyword")
+			count := int(lastBatchCount.Load())
+			items := []any{}
+			for i := 1; i <= count; i++ {
+				items = append(items, map[string]any{"id": i, "name": fmt.Sprintf("%s-%02d", prefix, i), "key": fmt.Sprintf("key-%d", i)})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/":
+			idx := create.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"id": idx, "key": fmt.Sprintf("key-%d", idx)}})
+		default:
+			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
 		}
-		idx := create.Add(1)
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"id": idx, "key": fmt.Sprintf("key-%d", idx)}})
 	}))
 	t.Cleanup(tokenSrv.Close)
 	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -156,7 +175,7 @@ func TestRunDueSaleCardSlotsDoesNotCatchUpEarlierEnabledSpecial55Slot(t *testing
 		t.Fatalf("special55 should not catch up after its configured minute: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
 	}
 	runDueSaleCardSlots(time.Date(2026, 6, 16, 23, 30, 0, 0, time.FixedZone("CST", 8*60*60)))
-	if stockQ.Load() != 1 || create.Load() != 9 || upload.Load() != 1 {
+	if stockQ.Load() != 1 || create.Load() != 1 || upload.Load() != 1 {
 		t.Fatalf("month should fire only at its configured minute: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
 	}
 	runDueSaleCardSlots(time.Date(2026, 6, 16, 23, 31, 0, 0, time.FixedZone("CST", 8*60*60)))
@@ -205,13 +224,27 @@ func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 	resetSaleCardFiredGuard(t)
 	setMCYCookieForTest(t, "manage_token=test")
 
-	var stockHits, createHits, uploadHits atomic.Int32
+	var stockHits, createHits, uploadHits, lastBatchCount atomic.Int32
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/token/" {
-			t.Fatalf("unexpected NewAPI request %s", r.URL.Path)
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/token/tokens":
+			createHits.Add(1)
+			count, err := strconv.Atoi(r.URL.Query().Get("tokenCount"))
+			if err != nil || count <= 1 {
+				t.Fatalf("bad tokenCount=%q", r.URL.Query().Get("tokenCount"))
+			}
+			lastBatchCount.Store(int32(count))
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "message": fmt.Sprintf("成功添加%d个令牌", count)})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/token/search":
+			prefix := r.URL.Query().Get("keyword")
+			items := []any{}
+			for i := 1; i <= int(lastBatchCount.Load()); i++ {
+				items = append(items, map[string]any{"id": i, "name": fmt.Sprintf("%s-%02d", prefix, i), "key": "scheduled-key"})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": items})
+		default:
+			t.Fatalf("unexpected NewAPI request %s %s", r.Method, r.URL.String())
 		}
-		idx := createHits.Add(1)
-		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": map[string]any{"id": idx, "key": "scheduled-key"}})
 	}))
 	t.Cleanup(tokenSrv.Close)
 
@@ -259,7 +292,7 @@ func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 
 	// Matching minute → the 55卡 slot fires once and restocks 20-8=12.
 	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 30, 30, 0, time.UTC))
-	if stockHits.Load() != 1 || createHits.Load() != 12 || uploadHits.Load() != 1 {
+	if stockHits.Load() != 1 || createHits.Load() != 1 || uploadHits.Load() != 1 {
 		t.Fatalf("expected one restock: search=%d create=%d upload=%d", stockHits.Load(), createHits.Load(), uploadHits.Load())
 	}
 
