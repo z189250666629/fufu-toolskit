@@ -9,6 +9,7 @@ export const NODE_TEST_FILES = Object.freeze([
   'scripts/package-scripts.test.mjs',
   'scripts/project-structure.test.mjs',
   'scripts/start-all-supervisor.test.mjs',
+  'apps/mcy-card-upload/upload-core.test.mjs',
   'apps/fufu-tool-site/ui_heroui_architecture.test.mjs',
   'apps/fufu-tool-site/ui_site_navigation_core.test.mjs',
   'apps/fufu-tool-site/frontend/api.test.mjs',

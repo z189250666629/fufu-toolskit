@@ -2,7 +2,7 @@
  * 萌次元商城 - 虚拟卡密批量上传脚本
  *
  * 用法:
- *   node upload.mjs --item <item_id> --sku <sku_id> --file <cards.txt> [--remark <备注>] [--unique]
+ *   node upload.mjs --item <item_id> --sku <sku_id> --file <cards.txt> [--remark <备注>] [--unique] [--batch-size <N>]
  *   node upload.mjs --list   # 实时列出所有商品和SKU
  *
  * 卡密文件格式: 一行一个卡密
@@ -10,6 +10,7 @@
 
 import fs from 'fs';
 import { login, post, fetchItems, fetchSkus } from './mcy-client.mjs';
+import { batchRanges, parsePositiveIntOption } from './upload-core.mjs';
 
 // ============ 命令行 ============
 const args = process.argv.slice(2);
@@ -56,9 +57,16 @@ async function uploadCards() {
   const filePath = getArg('file');
   const remark = getArg('remark') || '';
   const unique = hasFlag('unique') ? 1 : 0;
+  let batchSize;
+  try {
+    batchSize = parsePositiveIntOption(args, 'batch-size');
+  } catch (err) {
+    console.error(`❌ ${err.message}`);
+    process.exit(1);
+  }
 
   if (!itemId || !skuId || !filePath) {
-    console.error('用法: node upload.mjs --item <item_id> --sku <sku_id> --file <cards.txt> [--remark <备注>] [--unique]');
+    console.error('用法: node upload.mjs --item <item_id> --sku <sku_id> --file <cards.txt> [--remark <备注>] [--unique] [--batch-size <N>]');
     console.error('     node upload.mjs --list');
     process.exit(1);
   }
@@ -80,18 +88,26 @@ async function uploadCards() {
   console.log(`   SKU:  ${skuName}`);
   console.log(`   数量: ${cards.length} 张`);
   console.log(`   去重: ${unique ? '是' : '否'}`);
+  console.log(`   上传: ${batchSize ? `每批 ${batchSize} 张` : '一次性提交'}`);
   if (remark) console.log(`   备注: ${remark}`);
   console.log();
 
-  // 每批最多 500 张，避免请求过大
-  const BATCH = 500;
+  // MCY card/add 支持一次性提交多行卡密；默认一次提交，避免大量分批请求占用带宽。
+  // 如遇到网关请求体限制，可手动传 --batch-size <N> 回退到分批。
   let total = 0, success = 0, failed = 0;
+  const batchCount = batchSize ? Math.ceil(cards.length / batchSize) : 1;
 
-  for (let i = 0; i < cards.length; i += BATCH) {
-    const batch = cards.slice(i, i + BATCH);
+  for (const [from, to] of batchRanges(cards.length, batchSize)) {
+    const batch = batchSize ? cards.slice(from, to) : cards;
     const cardText = batch.join('\n');
+    const start = from + 1;
+    const end = to;
 
-    console.log(`⏳ 上传第 ${i + 1}-${i + batch.length} 张...`);
+    if (batchCount === 1) {
+      console.log(`⏳ 一次性上传 ${batch.length} 张...`);
+    } else {
+      console.log(`⏳ 上传第 ${start}-${end} 张...`);
+    }
 
     const res = await post('/plugin/virtual-card-ship/card/add', {
       item_id: parseInt(itemId),

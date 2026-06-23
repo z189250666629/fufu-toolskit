@@ -24,10 +24,10 @@ $env:MCY_PASSWORD = '***'
 ```bash
 node upload.mjs --list                                              # 列出商品和 SKU
 node upload.mjs --item <item_id> --sku <sku_id> --file <cards.txt>  # 上传
-#   [--remark <备注>] [--unique]                                     # 可选
+#   [--remark <备注>] [--unique] [--batch-size <N>]                  # 可选
 ```
 
-卡密文件一行一个，按每批 500 张分批提交。
+卡密文件一行一个，默认把本次文件内的所有卡密一次性提交到 MCY `card/add`。如遇到网关请求体限制，可显式传 `--batch-size <N>` 回退到分批提交。
 
 ## fufu-shop.mjs — 查询商品 / 库存 / 卡密
 
