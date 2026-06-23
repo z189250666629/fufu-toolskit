@@ -52,6 +52,8 @@ func mcyLoginJSON(ctx context.Context, base, login, user, pass string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Connection", "close")
+	req.Close = true
 	resp, err := mcyHTTPClient.Do(req)
 	if err != nil {
 		return err

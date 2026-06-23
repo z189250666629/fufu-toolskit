@@ -184,6 +184,29 @@ export type SaleCardSchedule = {
 export type SaleCardConfig = {
   plans?: SaleCardPlan[];
   schedule?: SaleCardSchedule;
+  restockStatus?: SaleCardRestockStatus;
+};
+
+export type SaleCardRestockJobStatus = {
+  id: number;
+  bizDate?: string;
+  slotGroup?: string;
+  slotTime?: string;
+  planId: string;
+  targetStock?: number;
+  status: 'pending' | 'running' | 'succeeded' | 'failed' | string;
+  attempts?: number;
+  consecutiveTimeouts?: number;
+  currentStock?: number;
+  uploaded?: number;
+  lastError?: string;
+  failureReason?: string;
+  updatedAt?: string;
+  finishedAt?: string;
+};
+
+export type SaleCardRestockStatus = {
+  jobs?: SaleCardRestockJobStatus[];
 };
 
 export type SaleCardStockEntry = {

@@ -183,7 +183,7 @@ func TestRunDoesNotStartCreditWorkerWhenListenFails(t *testing.T) {
 	}
 }
 
-func TestStartWorkersKeepsSaleCardSchedulerPaused(t *testing.T) {
+func TestStartWorkersStartsSaleCardScheduler(t *testing.T) {
 	oldStartCreditWorker := startCreditWorker
 	oldStartSaleCardScheduler := startSaleCardScheduler
 	t.Cleanup(func() {
@@ -201,8 +201,8 @@ func TestStartWorkersKeepsSaleCardSchedulerPaused(t *testing.T) {
 	if !creditStarted {
 		t.Fatal("credit worker should still start")
 	}
-	if schedulerStarted {
-		t.Fatal("sale-card scheduler should stay paused while auto restock is offline")
+	if !schedulerStarted {
+		t.Fatal("sale-card scheduler should start")
 	}
 }
 

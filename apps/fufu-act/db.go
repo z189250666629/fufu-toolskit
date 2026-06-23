@@ -28,6 +28,36 @@ func initDB(path string) (*sql.DB, error) {
 			return nil, err
 		}
 	}
+	restockStmts := []string{
+		`CREATE TABLE IF NOT EXISTS sale_card_restock_jobs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			biz_date TEXT NOT NULL,
+			slot_group TEXT NOT NULL,
+			slot_time TEXT NOT NULL,
+			plan_id TEXT NOT NULL,
+			target_stock INTEGER NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending',
+			attempts INTEGER NOT NULL DEFAULT 0,
+			consecutive_timeouts INTEGER NOT NULL DEFAULT 0,
+			current_stock INTEGER NOT NULL DEFAULT 0,
+			uploaded INTEGER NOT NULL DEFAULT 0,
+			last_error TEXT,
+			failure_reason TEXT,
+			run_token TEXT,
+			locked_until INTEGER NOT NULL DEFAULT 0,
+			started_at TEXT,
+			finished_at TEXT,
+			created_at TEXT NOT NULL DEFAULT (datetime('now')),
+			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS sale_card_restock_jobs_once_idx ON sale_card_restock_jobs(biz_date, slot_group, plan_id)`,
+		`CREATE INDEX IF NOT EXISTS sale_card_restock_jobs_status_idx ON sale_card_restock_jobs(status, locked_until, id)`,
+	}
+	for _, s := range restockStmts {
+		if _, err := d.Exec(s); err != nil {
+			return nil, err
+		}
+	}
 	migrations := []struct {
 		table string
 		col   string

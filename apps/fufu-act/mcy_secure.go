@@ -44,6 +44,8 @@ func mcyEncryptedRequest(ctx context.Context, base, endpoint string, payload map
 	req.Header.Set("Content-Type", "text/plain")
 	req.Header.Set("Secret", secret)
 	req.Header.Set("Signature", mcySignature(payload, secret))
+	req.Header.Set("Connection", "close")
+	req.Close = true
 	if strings.TrimSpace(cookie) != "" {
 		req.Header.Set("Cookie", cookie)
 	}

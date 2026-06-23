@@ -169,7 +169,7 @@ func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 	html := readToolSiteUISource(t)
 	for _, want := range []string{
 		"活动统计",
-		"补卡 / MCY 库存检测（暂时下线）",
+		"自动补卡任务状态",
 		"当前奖池中奖率",
 		"/api/admin/stats",
 		"/api/admin/sale-cards/config",
@@ -236,7 +236,7 @@ func TestProductionAdminShellGroupsOverlappingConfigIntoTwoTabs(t *testing.T) {
 		"状态页 / 合卡 / 活动卡档",
 		"状态页实际站点",
 		"NewAPI 站点配置",
-		"补卡 / MCY 库存检测（暂时下线）",
+		"自动补卡任务状态",
 		`activity`,
 		"活动统计",
 		"当前奖池中奖率",

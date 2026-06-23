@@ -20,10 +20,11 @@ func NewHandler(root string) (http.Handler, error) {
 }
 
 // StartWorkers starts background activity jobs for the production server.
-// 自动补卡/MCY 库存检测暂时下线：这里只保留卡密核销后的补额度 worker，
-// 不再启动 sale-card scheduler。
+// 自动补卡由 DB 任务队列驱动：到点只入队，worker 负责超时取消、库存确认
+// 和失败状态持久化。
 func StartWorkers() {
 	startCreditWorker()
+	startSaleCardScheduler()
 }
 
 // Close releases activity module resources. It is primarily used by embedded

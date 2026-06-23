@@ -41,6 +41,8 @@ func mcyPost(ctx context.Context, endpoint string, payload any) (map[string]any,
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Cookie", getMCYCookie())
+	req.Header.Set("Connection", "close")
+	req.Close = true
 	resp, err := mcyHTTPClient.Do(req)
 	if err != nil {
 		return nil, err

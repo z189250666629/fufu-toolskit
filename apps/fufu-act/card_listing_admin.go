@@ -25,8 +25,9 @@ type saleCardRunRequest struct {
 }
 
 type saleCardAdminConfigResponse struct {
-	Plans    []SaleCardPlan         `json:"plans"`
-	Schedule SaleCardScheduleConfig `json:"schedule"`
+	Plans         []SaleCardPlan         `json:"plans"`
+	Schedule      SaleCardScheduleConfig `json:"schedule"`
+	RestockStatus SaleCardRestockStatus  `json:"restockStatus"`
 }
 
 type saleCardAdminConfigRequest struct {
@@ -91,7 +92,7 @@ func handleAdminSaleCardsConfig(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusInternalServerError, "读取上架配置失败")
 			return
 		}
-		writeJSON(w, http.StatusOK, saleCardAdminConfigResponse{Plans: saleCardPlanList(), Schedule: schedule})
+		writeJSON(w, http.StatusOK, saleCardAdminConfigResponse{Plans: saleCardPlanList(), Schedule: schedule, RestockStatus: loadSaleCardRestockStatus()})
 	case http.MethodPost:
 		var req saleCardAdminConfigRequest
 		if err := readBody(r, &req); err != nil {
@@ -111,7 +112,7 @@ func handleAdminSaleCardsConfig(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, http.StatusInternalServerError, "保存上架配置失败")
 			return
 		}
-		writeJSON(w, http.StatusOK, saleCardAdminConfigResponse{Plans: saleCardPlanList(), Schedule: schedule})
+		writeJSON(w, http.StatusOK, saleCardAdminConfigResponse{Plans: saleCardPlanList(), Schedule: schedule, RestockStatus: loadSaleCardRestockStatus()})
 	default:
 		w.Header().Set("Allow", "GET, POST")
 		writeJSONError(w, http.StatusMethodNotAllowed, "Only GET, POST")

@@ -390,18 +390,20 @@ test('tool-site activity prize editor exposes calculated unified prize pool only
   assert.doesNotMatch(activity, /postJackpot/);
 });
 
-test('tool-site sale card panel makes paused MCY integration explicit', async () => {
+test('tool-site sale card panel shows automatic restock task status', async () => {
   const saleCard = await readText('ui/src/admin/saleCardPanel.tsx');
   const adminPage = await readText('ui/src/admin/AdminPage.tsx');
 
-  assert.match(saleCard, /PAUSED_MESSAGE/);
-  assert.match(saleCard, /自动补卡和 MCY 库存检测已暂时下线/);
-  assert.match(saleCard, /当前不查询库存，也不对接商城上架/);
-  assert.match(saleCard, /卡档参考（不查询 MCY 库存）/);
-  assert.match(saleCard, /状态 <b>未对接<\/b>/);
+  assert.match(saleCard, /STATUS_LABELS/);
+  assert.match(saleCard, /自动补卡按已保存计划执行/);
+  assert.match(saleCard, /任务超时会取消请求、复查 MCY 库存并按 DB 任务单独重试/);
+  assert.match(saleCard, /补卡任务状态/);
+  assert.match(saleCard, /失败任务/);
+  assert.match(saleCard, /原因：\{reason\}/);
+  assert.match(saleCard, /restockStatus/);
   assert.match(saleCard, /from '\.\/saleCardConfigCore'/);
   assert.match(adminPage, /<SaleCardManager config=\{saleCards\} \/>/);
-  assert.match(adminPage, /补卡 \/ MCY 库存检测（暂时下线）/);
+  assert.match(adminPage, /自动补卡任务状态/);
 
   assert.doesNotMatch(saleCard, /STOCK_REFRESH_INTERVAL_MS/);
   assert.doesNotMatch(saleCard, /refreshStock/);
@@ -412,12 +414,12 @@ test('tool-site sale card panel makes paused MCY integration explicit', async ()
   assert.doesNotMatch(adminPage, /onRun=\{runSalePlan\}/);
 });
 
-test('tool-site sale card paused panel does not keep save or run handlers wired', async () => {
+test('tool-site sale card status panel does not keep manual stock or run handlers wired', async () => {
   const saleCard = await readText('ui/src/admin/saleCardPanel.tsx');
   const adminPage = await readText('ui/src/admin/AdminPage.tsx');
 
-  assert.match(saleCard, /<MessageLine tone="error">\{PAUSED_MESSAGE\}<\/MessageLine>/);
-  assert.match(saleCard, /保留卡档数据用于活动配置与测试 key/);
+  assert.match(saleCard, /<MessageLine tone=\{jobs\.some\(\(job\) => job\.status === 'failed'\) \? 'error' : undefined\}>/);
+  assert.match(saleCard, /后台不做全天库存监控/);
   assert.doesNotMatch(saleCard, /setScheduleMessage/);
   assert.doesNotMatch(saleCard, /async function saveSchedule/);
   assert.doesNotMatch(saleCard, /补卡计划已保存/);

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -59,7 +60,11 @@ func restockBackend(t *testing.T, stockTotal int) (*atomic.Int32, *atomic.Int32,
 		switch r.URL.Path {
 		case "/plugin/virtual-card-ship/card/get":
 			stockQ.Add(1)
-			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": stockTotal, "list": []any{}}})
+			total := stockTotal
+			if upload.Load() > 0 {
+				total = 999
+			}
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": total, "list": []any{}}})
 		case "/plugin/virtual-card-ship/card/add":
 			upload.Add(1)
 			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
@@ -108,6 +113,78 @@ func TestRunSaleCardSlotSkipsWhenTokenSvcNil(t *testing.T) {
 	}})
 }
 
+func TestSaleCardRestockJobCancelsTimedOutMCYRequestAndFailsAfterThreeTimeouts(t *testing.T) {
+	setupScratchLockTestDB(t)
+	setMCYCookieForTest(t, "manage_token=test")
+	oldTimeout := saleCardRestockTimeout
+	oldVerifyTimeout := saleCardRestockVerifyTimeout
+	oldRetryDelay := saleCardRestockRetryDelay
+	oldMaxJobs := saleCardRestockMaxJobsPerPass
+	t.Cleanup(func() {
+		saleCardRestockTimeout = oldTimeout
+		saleCardRestockVerifyTimeout = oldVerifyTimeout
+		saleCardRestockRetryDelay = oldRetryDelay
+		saleCardRestockMaxJobsPerPass = oldMaxJobs
+	})
+	saleCardRestockTimeout = 20 * time.Millisecond
+	saleCardRestockVerifyTimeout = 20 * time.Millisecond
+	saleCardRestockRetryDelay = 0
+	saleCardRestockMaxJobsPerPass = 5
+
+	var hits, missingClose atomic.Int32
+	mcySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+			t.Fatalf("unexpected MCY path %s", r.URL.Path)
+		}
+		hits.Add(1)
+		if !r.Close {
+			missingClose.Add(1)
+		}
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 0, "list": []any{}}})
+		}
+	}))
+	t.Cleanup(mcySrv.Close)
+	t.Setenv("MCY_BASE_URL", mcySrv.URL)
+
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("NewAPI must not be called when MCY stock query times out, got %s %s", r.Method, r.URL.Path)
+	}))
+	t.Cleanup(tokenSrv.Close)
+	oldSvc := tokenSvc
+	tokenSvc = tokens.NewService(newapi.NewClient(newapi.Site{URL: tokenSrv.URL, Token: "test-token", UserID: "1", QuotaUnit: 1000}))
+	t.Cleanup(func() { tokenSvc = oldSvc })
+
+	if _, err := db.Exec(`INSERT INTO sale_card_restock_jobs
+		(biz_date, slot_group, slot_time, plan_id, target_stock, status)
+		VALUES ('2026-06-23', 'special55', '09:00', 'fufu-mix-special-55', 20, ?)`, saleCardRestockStatusPending); err != nil {
+		t.Fatalf("insert restock job: %v", err)
+	}
+
+	processSaleCardRestockJobs(time.Now())
+
+	var status, reason string
+	var attempts, timeouts int
+	if err := db.QueryRow(`SELECT status, attempts, consecutive_timeouts, failure_reason FROM sale_card_restock_jobs WHERE plan_id='fufu-mix-special-55'`).Scan(&status, &attempts, &timeouts, &reason); err != nil {
+		t.Fatalf("query restock job: %v", err)
+	}
+	if status != saleCardRestockStatusFailed || attempts != 3 || timeouts != 3 {
+		t.Fatalf("job status=%s attempts=%d timeouts=%d, want failed/3/3", status, attempts, timeouts)
+	}
+	if !strings.Contains(reason, "连续 3 次超时") {
+		t.Fatalf("failure reason should mention consecutive timeouts, got %q", reason)
+	}
+	if hits.Load() == 0 {
+		t.Fatal("MCY stock endpoint was not hit")
+	}
+	if missingClose.Load() != 0 {
+		t.Fatalf("MCY requests should use Connection: close, missing=%d", missingClose.Load())
+	}
+}
+
 func TestSaleCardScheduleLocationLoadsOrFallsBack(t *testing.T) {
 	if loc := saleCardScheduleLocation("Asia/Shanghai"); loc == time.UTC || loc.String() != "Asia/Shanghai" {
 		t.Fatalf("valid tz should load, got %v", loc)
@@ -118,6 +195,7 @@ func TestSaleCardScheduleLocationLoadsOrFallsBack(t *testing.T) {
 }
 
 func TestRunDueSaleCardSlotsFiresSlotsIndependently(t *testing.T) {
+	setupScratchLockTestDB(t)
 	setupSaleCardConfigTestRoot(t)
 	resetSaleCardFiredGuard(t)
 	stockQ, _, _ := restockBackend(t, 0)
@@ -134,25 +212,26 @@ func TestRunDueSaleCardSlotsFiresSlotsIndependently(t *testing.T) {
 		t.Fatalf("saveSaleCardSchedule: %v", err)
 	}
 
-	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 0, 0, 0, time.UTC)) // only special55
-	if stockQ.Load() != 1 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 13, 8, 0, 0, 0, time.UTC)) // only special55
+	if stockQ.Load() != 2 {
 		t.Fatalf("after 08:00 only special55 should fire, stockQueries=%d", stockQ.Load())
 	}
-	runDueSaleCardSlots(time.Date(2026, 6, 13, 9, 0, 0, 0, time.UTC)) // only month
-	if stockQ.Load() != 2 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 13, 9, 0, 0, 0, time.UTC)) // only month
+	if stockQ.Load() != 3 {
 		t.Fatalf("after 09:00 month should also fire, stockQueries=%d", stockQ.Load())
 	}
-	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 0, 0, 0, time.UTC)) // same-day dedup
-	if stockQ.Load() != 2 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 13, 8, 0, 0, 0, time.UTC)) // same-day dedup
+	if stockQ.Load() != 3 {
 		t.Fatalf("same-day re-run must not refire, stockQueries=%d", stockQ.Load())
 	}
-	runDueSaleCardSlots(time.Date(2026, 6, 14, 8, 0, 0, 0, time.UTC)) // next day special55 again
-	if stockQ.Load() != 3 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 14, 8, 0, 0, 0, time.UTC)) // next day special55 again
+	if stockQ.Load() != 4 {
 		t.Fatalf("next-day special55 should fire again, stockQueries=%d", stockQ.Load())
 	}
 }
 
 func TestRunDueSaleCardSlotsDoesNotCatchUpEarlierEnabledSpecial55Slot(t *testing.T) {
+	setupScratchLockTestDB(t)
 	setupSaleCardConfigTestRoot(t)
 	resetSaleCardFiredGuard(t)
 	stockQ, create, upload := restockBackend(t, 1)
@@ -169,22 +248,23 @@ func TestRunDueSaleCardSlotsDoesNotCatchUpEarlierEnabledSpecial55Slot(t *testing
 		t.Fatalf("saveSaleCardSchedule: %v", err)
 	}
 
-	runDueSaleCardSlots(time.Date(2026, 6, 16, 19, 58, 0, 0, time.FixedZone("CST", 8*60*60)))
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 16, 19, 58, 0, 0, time.FixedZone("CST", 8*60*60)))
 
 	if stockQ.Load() != 0 || create.Load() != 0 || upload.Load() != 0 {
 		t.Fatalf("special55 should not catch up after its configured minute: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
 	}
-	runDueSaleCardSlots(time.Date(2026, 6, 16, 23, 30, 0, 0, time.FixedZone("CST", 8*60*60)))
-	if stockQ.Load() != 1 || create.Load() != 1 || upload.Load() != 1 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 16, 23, 30, 0, 0, time.FixedZone("CST", 8*60*60)))
+	if stockQ.Load() != 2 || create.Load() != 1 || upload.Load() != 1 {
 		t.Fatalf("month should fire only at its configured minute: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
 	}
-	runDueSaleCardSlots(time.Date(2026, 6, 16, 23, 31, 0, 0, time.FixedZone("CST", 8*60*60)))
-	if stockQ.Load() != 1 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 16, 23, 31, 0, 0, time.FixedZone("CST", 8*60*60)))
+	if stockQ.Load() != 2 {
 		t.Fatalf("same-day after-minute run must not refire, stock=%d", stockQ.Load())
 	}
 }
 
-func TestRunDueSaleCardSlotsRefiresWhenSpecial55TimeChangesSameDay(t *testing.T) {
+func TestRunDueSaleCardSlotsDoesNotDuplicateCompletedPlanWhenTimeChangesSameDay(t *testing.T) {
+	setupScratchLockTestDB(t)
 	setupSaleCardConfigTestRoot(t)
 	resetSaleCardFiredGuard(t)
 	stockQ, create, upload := restockBackend(t, 1)
@@ -200,8 +280,8 @@ func TestRunDueSaleCardSlotsRefiresWhenSpecial55TimeChangesSameDay(t *testing.T)
 		t.Fatalf("saveSaleCardSchedule: %v", err)
 	}
 
-	runDueSaleCardSlots(time.Date(2026, 6, 16, 19, 54, 0, 0, time.FixedZone("CST", 8*60*60)))
-	if stockQ.Load() != 1 || create.Load() != 1 || upload.Load() != 1 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 16, 19, 54, 0, 0, time.FixedZone("CST", 8*60*60)))
+	if stockQ.Load() != 2 || create.Load() != 1 || upload.Load() != 1 {
 		t.Fatalf("initial special55 fire failed: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
 	}
 
@@ -209,9 +289,9 @@ func TestRunDueSaleCardSlotsRefiresWhenSpecial55TimeChangesSameDay(t *testing.T)
 	if err := saveSaleCardSchedule(schedule); err != nil {
 		t.Fatalf("saveSaleCardSchedule updated time: %v", err)
 	}
-	runDueSaleCardSlots(time.Date(2026, 6, 16, 20, 4, 0, 0, time.FixedZone("CST", 8*60*60)))
-	if stockQ.Load() != 2 || create.Load() != 2 || upload.Load() != 2 {
-		t.Fatalf("special55 should re-evaluate after same-day time change: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 16, 20, 4, 0, 0, time.FixedZone("CST", 8*60*60)))
+	if stockQ.Load() != 2 || create.Load() != 1 || upload.Load() != 1 {
+		t.Fatalf("completed special55 should not duplicate after same-day time change: stock=%d create=%d upload=%d", stockQ.Load(), create.Load(), upload.Load())
 	}
 }
 
@@ -220,6 +300,7 @@ func TestRunDueSaleCardSlotsRefiresWhenSpecial55TimeChangesSameDay(t *testing.T)
 // (MCY reports 8 in stock, target 20 → create 12), and refuses to re-run the
 // same day.
 func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
+	setupScratchLockTestDB(t)
 	setupSaleCardConfigTestRoot(t)
 	resetSaleCardFiredGuard(t)
 	setMCYCookieForTest(t, "manage_token=test")
@@ -253,7 +334,11 @@ func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 		case "/plugin/virtual-card-ship/card/get":
 			stockHits.Add(1)
 			// Shop reports 8 unsold 55卡 (equal-* → data.total); target 20 → create 12.
-			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": 8, "list": []any{}}})
+			total := 8
+			if uploadHits.Load() > 0 {
+				total = 20
+			}
+			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"total": total, "list": []any{}}})
 		case "/plugin/virtual-card-ship/card/add":
 			uploadHits.Add(1)
 			testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "msg": "ok"})
@@ -285,25 +370,26 @@ func TestRunDueSaleCardSlotsFiresEnabledSlotAtItsTime(t *testing.T) {
 	}
 
 	// Wrong minute → nothing fires.
-	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 29, 0, 0, time.UTC))
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 13, 8, 29, 0, 0, time.UTC))
 	if stockHits.Load() != 0 || uploadHits.Load() != 0 {
 		t.Fatalf("slot fired off-schedule: search=%d upload=%d", stockHits.Load(), uploadHits.Load())
 	}
 
 	// Matching minute → the 55卡 slot fires once and restocks 20-8=12.
-	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 30, 30, 0, time.UTC))
-	if stockHits.Load() != 1 || createHits.Load() != 1 || uploadHits.Load() != 1 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 13, 8, 30, 30, 0, time.UTC))
+	if stockHits.Load() != 2 || createHits.Load() != 1 || uploadHits.Load() != 1 {
 		t.Fatalf("expected one restock: search=%d create=%d upload=%d", stockHits.Load(), createHits.Load(), uploadHits.Load())
 	}
 
 	// Same day, same minute → dedup guard blocks a second run.
-	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 30, 45, 0, time.UTC))
-	if stockHits.Load() != 1 {
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 13, 8, 30, 45, 0, time.UTC))
+	if stockHits.Load() != 2 {
 		t.Fatalf("slot should fire at most once per day, search=%d", stockHits.Load())
 	}
 }
 
 func TestRunDueSaleCardSlotsSkipsWhenDisabled(t *testing.T) {
+	setupScratchLockTestDB(t)
 	setupSaleCardConfigTestRoot(t)
 	resetSaleCardFiredGuard(t)
 	oldSvc := tokenSvc
@@ -324,7 +410,7 @@ func TestRunDueSaleCardSlotsSkipsWhenDisabled(t *testing.T) {
 	}
 	// Schedule disabled at the top level → no panic, no fire (would error on the
 	// unreachable NewAPI host if it tried).
-	runDueSaleCardSlots(time.Date(2026, 6, 13, 8, 30, 0, 0, time.UTC))
+	runSaleCardSchedulerOnce(time.Date(2026, 6, 13, 8, 30, 0, 0, time.UTC))
 }
 
 func TestSaleCardSchedulerStartIsOverridable(t *testing.T) {

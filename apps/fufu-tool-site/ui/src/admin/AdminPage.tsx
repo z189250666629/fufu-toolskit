@@ -272,7 +272,7 @@ export function AdminPage() {
               <ConfigCard title="MCY 商城登录" description="商城账号仍用于活动核销等既有流程；自动补卡与库存检测暂时下线，不从后台触发对接。">
                 <MCYConfigEditor mcy={config.mcy ?? {}} onChange={(mcy) => setConfig({ ...config, mcy })} onSave={saveMCY} />
               </ConfigCard>
-              <ConfigCard title="补卡 / MCY 库存检测（暂时下线）" description="暂不启动自动补卡，也不查询 MCY 商城库存；仅保留卡档给活动配置和测试 key 使用。">
+              <ConfigCard title="自动补卡任务状态" description="按配置时段补卡；后台记录任务、超时重试和失败原因，不做全天库存监控。">
                 <SaleCardManager config={saleCards} />
               </ConfigCard>
             </Tabs.Panel>

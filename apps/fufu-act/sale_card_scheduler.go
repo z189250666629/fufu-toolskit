@@ -40,15 +40,20 @@ func saleCardScheduler() {
 	ticker := time.NewTicker(saleCardSchedulerTick)
 	defer ticker.Stop()
 	for {
-		runDueSaleCardSlots(saleCardNowFunc())
+		runSaleCardSchedulerOnce(saleCardNowFunc())
 		<-ticker.C
 	}
 }
 
-// runDueSaleCardSlots fires every enabled slot whose configured HH:MM matches
-// the current minute in the schedule's timezone and that has not yet fired
-// today. It intentionally does not catch up missed slots: MCY stock is queried
-// only at the configured补卡 minute (or by the logged-in admin stock panel).
+func runSaleCardSchedulerOnce(now time.Time) {
+	runDueSaleCardSlots(now)
+	processSaleCardRestockJobs(now)
+}
+
+// runDueSaleCardSlots enqueues every enabled slot whose configured HH:MM
+// matches the current minute in the schedule's timezone. The DB unique key
+// guarantees a plan is only queued once per business day; the worker then
+// retries only incomplete per-plan jobs.
 func runDueSaleCardSlots(now time.Time) {
 	schedule, err := loadSaleCardSchedule()
 	if err != nil || !schedule.Enabled {
@@ -62,10 +67,9 @@ func runDueSaleCardSlots(now time.Time) {
 		if !slot.Enabled || !saleCardSlotDue(slot.Time, hhmm) {
 			continue
 		}
-		if !markSaleCardSlotFired(saleCardSlotFireKey(slot), day) {
-			continue
+		if err := enqueueSaleCardRestockJobs(day, slot); err != nil {
+			fmt.Printf("[sale-card] enqueue slot %s failed: %v\n", slot.Group, err)
 		}
-		runSaleCardSlot(slot)
 	}
 }
 
