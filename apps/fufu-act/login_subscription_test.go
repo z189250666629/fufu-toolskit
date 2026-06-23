@@ -179,7 +179,7 @@ func TestHandleLoginWithSubscriptionIdentityCreatesAndReusesOpaqueCard(t *testin
 	}
 }
 
-func TestHandleLoginWithSubscriptionIdentityAllowsUnconfiguredSubscriptionAmount(t *testing.T) {
+func TestHandleLoginWithSubscriptionIdentityRejectsUnconfiguredSubscriptionAmount(t *testing.T) {
 	setupScratchLockTestDB(t)
 	useSubscriptionRuntimeServer(t, 123, "alice", []subscriptionSummary{{
 		ID:          902,
@@ -194,16 +194,49 @@ func TestHandleLoginWithSubscriptionIdentityAllowsUnconfiguredSubscriptionAmount
 	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"userId":123,"username":"alice"}`))
 	w := httptest.NewRecorder()
 	handleLogin(w, req)
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "未匹配活动次数卡档位") {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleLoginWithSubscriptionIdentityMapsSaleCardPlanTitle(t *testing.T) {
+	setupScratchLockTestDB(t)
+	useSubscriptionRuntimeServerWithConfig(t, subscriptionRuntimeTestConfig{
+		UserID:   123,
+		Username: "alice",
+		Subs: []subscriptionSummary{{
+			ID:          903,
+			UserID:      123,
+			PlanID:      100,
+			AmountTotal: newapi.DefaultQuotaUnit * 10,
+			StartTime:   actStartTS + 60,
+			EndTime:     actEndTS + 3600,
+			Status:      "active",
+		}},
+		PlanTitles: map[int64]string{
+			100: "混合卡 月一百次卡",
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"userId":123,"username":"alice"}`))
+	w := httptest.NewRecorder()
+	handleLogin(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
 	}
-
-	card, ok, err := lookupCardBySubscriptionID(902)
+	card, ok, err := lookupCardBySubscriptionID(903)
 	if err != nil || !ok {
 		t.Fatalf("lookup subscription card ok=%v err=%v", ok, err)
 	}
-	if card.Dollars != 10 || card.TotalSpins != 1 {
-		t.Fatalf("fallback subscription card dollars/spins = %v/%d, want 10/1", card.Dollars, card.TotalSpins)
+	if card.Dollars != 100 || card.TotalSpins != 1 {
+		t.Fatalf("card tier/draws = (%v,%d), want (100,1); card=%#v", card.Dollars, card.TotalSpins, card)
+	}
+}
+
+func TestSubscriptionSaleCardDollarsFromPlanTitlePrefersLongerTier(t *testing.T) {
+	dollars, ok := subscriptionSaleCardDollarsFromPlanTitle("混合卡 月一千次卡")
+	if !ok || dollars != 1000 {
+		t.Fatalf("mapped dollars=(%v,%v), want (1000,true)", dollars, ok)
 	}
 }
 

@@ -2,9 +2,12 @@ package activityapp
 
 import (
 	"fmt"
+	"math"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"fufu/activity"
 	"fufu/newapi"
@@ -77,13 +80,17 @@ func planLoginCardForToken(key string, t *tokens.Token, shop ShopPurchaseLookup,
 	}, nil
 }
 
-func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptionSummary, cfg activity.Config, quotaUnit int64) (loginCardPlan, error) {
+func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptionSummary, planTitle string, cfg activity.Config, quotaUnit int64) (loginCardPlan, error) {
 	quotaUnit = quotaUnitOrDefault(quotaUnit)
+	intervalQuota := sub.AmountTotal
+	if dollars, ok := subscriptionSaleCardDollarsFromPlanTitle(planTitle); ok {
+		intervalQuota = int64(math.Round(dollars * float64(quotaUnit)))
+	}
 	result := activity.PlanLoginCard(activity.LoginCardPlanInput{
 		CardKey:       fmt.Sprintf("subscription-%d", sub.ID),
 		Name:          user.Username,
 		Status:        subscriptionStatusForPlan(sub.Status),
-		IntervalQuota: sub.AmountTotal,
+		IntervalQuota: intervalQuota,
 		CreatedTime:   sub.StartTime,
 		Config:        cfg,
 		QuotaUnit:     quotaUnit,
@@ -93,7 +100,7 @@ func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptio
 	case activity.LoginCardDisabled, activity.LoginCardOutsideWindow:
 		return loginCardPlan{}, httpErr{http.StatusForbidden, "该用户没有活动期内生效的有效订阅"}
 	default:
-		return fallbackSubscriptionLoginCardPlan(user, sub, cfg, quotaUnit)
+		return loginCardPlan{}, httpErr{http.StatusForbidden, "该订阅额度未匹配活动次数卡档位"}
 	}
 	plan := result.Plan
 	return loginCardPlan{
@@ -103,29 +110,6 @@ func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptio
 		Source:           "subscription",
 		PurchaseTime:     formatUnixText(sub.StartTime),
 		PoolContribution: plan.PoolContribution,
-		SubscriptionID:   sub.ID,
-		UserID:           user.ID,
-		Username:         user.Username,
-	}, nil
-}
-
-func fallbackSubscriptionLoginCardPlan(user subscriptionUpstreamUser, sub subscriptionSummary, cfg activity.Config, quotaUnit int64) (loginCardPlan, error) {
-	dollars := activity.DollarsTier(sub.AmountTotal, quotaUnit)
-	if dollars <= 0 {
-		return loginCardPlan{}, httpErr{http.StatusForbidden, "该用户没有可参与活动的订阅额度"}
-	}
-	totalDraws := cfg.DrawCountForTier(dollars)
-	if totalDraws <= 0 {
-		totalDraws = 1
-	}
-	contribution, _ := activity.DynamicPoolContributionForTier(cfg, dollars)
-	return loginCardPlan{
-		CardName:         firstNonEmpty(user.Username, fmt.Sprintf("user-%d", user.ID)),
-		Dollars:          dollars,
-		TotalSpins:       totalDraws,
-		Source:           "subscription",
-		PurchaseTime:     formatUnixText(sub.StartTime),
-		PoolContribution: contribution,
 		SubscriptionID:   sub.ID,
 		UserID:           user.ID,
 		Username:         user.Username,
@@ -151,6 +135,86 @@ func quotaUnitOrDefault(value int64) int64 {
 		return value
 	}
 	return newapi.DefaultQuotaUnit
+}
+
+type subscriptionPlanTitleCandidate struct {
+	Token   string
+	Dollars float64
+}
+
+func subscriptionSaleCardDollarsFromPlanTitle(planTitle string) (float64, bool) {
+	title := normalizeSubscriptionPlanTitleToken(planTitle)
+	if title == "" {
+		return 0, false
+	}
+	candidates := []subscriptionPlanTitleCandidate{}
+	for _, plan := range saleCardPlanTemplates() {
+		for _, token := range []string{plan.Name, plan.Remark, plan.ID, plan.TokenNameSlug} {
+			token = normalizeSubscriptionPlanTitleToken(token)
+			if token != "" {
+				candidates = append(candidates, subscriptionPlanTitleCandidate{Token: token, Dollars: plan.Quota})
+			}
+		}
+		for _, token := range subscriptionQuotaTitleAliases(plan.Quota) {
+			token = normalizeSubscriptionPlanTitleToken(token)
+			if token != "" {
+				candidates = append(candidates, subscriptionPlanTitleCandidate{Token: token, Dollars: plan.Quota})
+			}
+		}
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if len(candidates[i].Token) != len(candidates[j].Token) {
+			return len(candidates[i].Token) > len(candidates[j].Token)
+		}
+		return candidates[i].Dollars > candidates[j].Dollars
+	})
+	for _, candidate := range candidates {
+		if title == candidate.Token || strings.Contains(title, candidate.Token) {
+			return candidate.Dollars, true
+		}
+	}
+	return 0, false
+}
+
+func subscriptionQuotaTitleAliases(dollars float64) []string {
+	quota := int(math.Round(dollars))
+	if quota <= 0 || math.Abs(float64(quota)-dollars) > 0.001 {
+		return nil
+	}
+	aliases := []string{
+		fmt.Sprintf("%d次卡", quota),
+		fmt.Sprintf("%d次", quota),
+	}
+	switch quota {
+	case 55:
+		aliases = append(aliases, "五十五次卡", "五十五次")
+	case 100:
+		aliases = append(aliases, "一百次卡", "一百次", "百次卡", "百次")
+	case 150:
+		aliases = append(aliases, "一百五十次卡", "一百五十次")
+	case 300:
+		aliases = append(aliases, "三百次卡", "三百次")
+	case 500:
+		aliases = append(aliases, "五百次卡", "五百次")
+	case 1000:
+		aliases = append(aliases, "一千次卡", "一千次", "千次卡", "千次")
+	}
+	return aliases
+}
+
+func normalizeSubscriptionPlanTitleToken(value string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= '０' && r <= '９' {
+			return r - '０' + '0'
+		}
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return unicode.ToLower(r)
+		}
+		return -1
+	}, strings.TrimSpace(value))
 }
 
 // isScratchDollarTier reports whether a card of the given dollar tier plays the

@@ -47,7 +47,6 @@
           <div class="symbol">${prizeSymbol(symbols, dollars, rank)}</div>
           <div class="prize-main">
             <div class="amount">${prizeLabel(row, jackpot)}</div>
-            <div class="odds">${escapeHtml(row?.pct)}%</div>
           </div>
         </div>
       `;

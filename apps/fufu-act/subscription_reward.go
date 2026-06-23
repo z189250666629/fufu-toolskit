@@ -574,7 +574,7 @@ func rewardPlanPoolTitle(slot int) string {
 
 func isRewardSubscriptionPlanTitle(title string) bool {
 	title = strings.ToLower(strings.TrimSpace(title))
-	return strings.HasPrefix(title, rewardPlanTitlePrefix)
+	return strings.HasPrefix(title, rewardPlanTitlePrefix) || strings.Contains(title, "reward")
 }
 
 func subscriptionIDSet(ids []int64) map[int64]struct{} {

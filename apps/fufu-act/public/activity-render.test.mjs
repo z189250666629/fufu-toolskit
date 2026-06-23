@@ -24,7 +24,8 @@ test('activity render escapes history timestamp and coerces prize rows', async (
   assert.match(prizeHtml, /&lt;b&gt;大奖&lt;\/b&gt; \$500 JP/);
   assert.match(prizeHtml, /class="prize-row second"/);
   assert.match(prizeHtml, /二等奖 \$300/);
-  assert.match(prizeHtml, /0\.40&lt;script&gt;%/);
+  assert.doesNotMatch(prizeHtml, /class="odds"/);
+  assert.doesNotMatch(prizeHtml, /0\.40&lt;script&gt;%/);
   assert.doesNotMatch(prizeHtml, /0\.40<script>%/);
   assert.doesNotMatch(prizeHtml, /<b>大奖<\/b>/);
 

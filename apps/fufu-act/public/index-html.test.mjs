@@ -251,16 +251,35 @@ test('prize drawer reports load failures instead of silently swallowing them', a
   assert.doesNotMatch(fetchPrizesSource, /catch \(e\) \{ \/\* silent \*\/ \}/);
 });
 
-test('prize drawer uses backend weight metadata instead of hardcoded weights', async () => {
+test('prize drawer hides odds and refreshes backend prize amounts live', async () => {
   const source = await readFile(new URL('./index.html', import.meta.url), 'utf8');
   const fetchPrizesStart = source.indexOf('async function fetchPrizes()');
   const fetchPrizesEnd = source.indexOf('function renderPrizeTable(rows)');
   const fetchPrizesSource = source.slice(fetchPrizesStart, fetchPrizesEnd);
+  const spinStart = source.indexOf('async function doSpin()');
+  const spinEnd = source.indexOf('function triggerJackpot');
+  const spinSource = source.slice(spinStart, spinEnd);
+  const logoutStart = source.indexOf("$('btn-logout').onclick = () =>");
+  const logoutEnd = source.indexOf("$('btn-scratch-logout').onclick");
+  const logoutSource = source.slice(logoutStart, logoutEnd);
 
-  assert.match(fetchPrizesSource, /p\.weight/);
-  assert.match(fetchPrizesSource, /p\.totalWeight/);
+  assert.match(source, /const PRIZE_REFRESH_MS = 10000/);
+  assert.match(source, /let prizeRefreshTimer = 0/);
+  assert.match(source, /function startPrizeRefresh\(\)/);
+  assert.match(source, /window\.setInterval\(fetchPrizes,\s*PRIZE_REFRESH_MS\)/);
+  assert.match(source, /function stopPrizeRefresh\(\)/);
+  assert.match(source, /window\.clearInterval\(prizeRefreshTimer\)/);
+  assert.match(source, /fetch\(API \+ '\/prizes', \{ cache: 'no-store' \}\)/);
+  assert.match(source, /startPrizeRefresh\(\)/);
+  assert.match(spinSource, /fetchPrizes\(\);/);
+  assert.match(logoutSource, /stopPrizeRefresh\(\);/);
   assert.match(fetchPrizesSource, /rank: p\.rank/);
   assert.match(fetchPrizesSource, /label: p\.label/);
+  assert.doesNotMatch(source, /class="odds"/);
+  assert.doesNotMatch(source, /\.prize-row \.odds/);
+  assert.doesNotMatch(fetchPrizesSource, /p\.weight/);
+  assert.doesNotMatch(fetchPrizesSource, /p\.totalWeight/);
+  assert.doesNotMatch(fetchPrizesSource, /pct:/);
   assert.doesNotMatch(fetchPrizesSource, /const weights = \{/);
   assert.doesNotMatch(fetchPrizesSource, /1:\s*1100/);
 });

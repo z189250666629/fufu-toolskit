@@ -123,13 +123,17 @@ func selectSubscriptionLoginCard(user subscriptionUpstreamUser, subs []subscript
 	hasExhausted := false
 	var createPlan loginCardPlan
 	needsCreate := false
+	var eligiblePlanErr error
 
 	for _, sub := range subs {
 		if !subscriptionQualifiesForActivity(sub, planTitles[sub.PlanID], user.ID, cfg) {
 			continue
 		}
-		plan, err := planLoginCardForSubscription(user, sub, cfg, quotaUnit)
+		plan, err := planLoginCardForSubscription(user, sub, planTitles[sub.PlanID], cfg, quotaUnit)
 		if err != nil {
+			if eligiblePlanErr == nil {
+				eligiblePlanErr = err
+			}
 			continue
 		}
 		card, ok, err := lookupCardBySubscriptionID(sub.ID)
@@ -157,6 +161,9 @@ func selectSubscriptionLoginCard(user subscriptionUpstreamUser, subs []subscript
 	}
 	if hasExhausted {
 		return exhausted, nil
+	}
+	if eligiblePlanErr != nil {
+		return Card{}, eligiblePlanErr
 	}
 	return Card{}, httpErr{http.StatusForbidden, "该用户没有活动期内生效的有效订阅"}
 }
