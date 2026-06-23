@@ -128,12 +128,24 @@ func newHTTPServer(port string, handler http.Handler) *http.Server {
 	return webutil.NewHTTPServer("0.0.0.0:"+port, handler)
 }
 func initAll() error {
+	return initAllWithBootstrap(true)
+}
+
+func initAllEmbedded() error {
+	return initAllWithBootstrap(false)
+}
+
+func initAllWithBootstrap(loadRuntimeFromConfig bool) error {
 	setTokenRuntime(nil, nil)
 	setSubscriptionRuntime(newapi.Site{}, nil)
+	setMCYCookie("")
 	var err error
 	db, err = initDB(filepath.Join(rootDir, "data", "slot.db"))
 	if err != nil {
 		return err
+	}
+	if !loadRuntimeFromConfig {
+		return nil
 	}
 	site, err := config.LoadPrimarySite(rootDir)
 	if err != nil {

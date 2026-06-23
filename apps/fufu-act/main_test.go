@@ -413,6 +413,106 @@ func TestInitAllResetsTokenConfigStateOnPrimarySiteError(t *testing.T) {
 	}
 }
 
+func TestInitAllStandaloneBootstrapsRuntimeFromConfig(t *testing.T) {
+	oldRoot := rootDir
+	oldDB := db
+	oldTokenSvc := tokenSvc
+	oldTokenConfigErr := tokenConfigErr
+	oldSubSite, _, oldSubErr := snapshotSubscriptionRuntime()
+	oldMCYCfg := getMCYRuntimeConfig()
+	oldMCYCookie := getMCYCookie()
+	tempRoot := t.TempDir()
+	t.Cleanup(func() {
+		if db != nil && db != oldDB {
+			_ = db.Close()
+		}
+		rootDir = oldRoot
+		db = oldDB
+		setTokenRuntime(oldTokenSvc, oldTokenConfigErr)
+		setSubscriptionRuntime(oldSubSite, oldSubErr)
+		SetMCYRuntimeConfig(oldMCYCfg)
+		setMCYCookie(oldMCYCookie)
+	})
+
+	clearActPrimaryEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `{"managedApiSites":[
+		{"name":"次数fufu","category":"api","url":"https://api.example.test","token":"api-token","userId":"9"},
+		{"name":"token-fufu","category":"token","url":"https://token.example.test","token":"token-site-token","userId":"1"}
+	]}`)
+	t.Setenv("MCY_COOKIE", "env-mcy-cookie")
+	rootDir = tempRoot
+
+	if err := initAll(); err != nil {
+		t.Fatal(err)
+	}
+
+	service, cfgErr := snapshotTokenRuntime()
+	if cfgErr != nil || service == nil || service.Client == nil {
+		t.Fatalf("standalone init should bootstrap token runtime, service=%#v err=%v", service, cfgErr)
+	}
+	if service.Client.Site.URL != "https://api.example.test" || service.Client.Site.Token != "api-token" {
+		t.Fatalf("token runtime site = %#v", service.Client.Site)
+	}
+
+	subSite, subClient, subErr := snapshotSubscriptionRuntime()
+	if subErr != nil || subClient == nil {
+		t.Fatalf("standalone init should bootstrap subscription runtime, site=%#v err=%v", subSite, subErr)
+	}
+	if subSite.Name != "token-fufu" || subSite.URL != "https://token.example.test" || subSite.Token != "token-site-token" {
+		t.Fatalf("subscription runtime site = %#v", subSite)
+	}
+	if got := getMCYCookie(); got != "env-mcy-cookie" {
+		t.Fatalf("MCY cookie = %q, want env bootstrap", got)
+	}
+}
+
+func TestNewHandlerEmbeddedSkipsEnvRuntimeBootstrap(t *testing.T) {
+	oldRoot := rootDir
+	oldDB := db
+	oldTokenSvc := tokenSvc
+	oldTokenConfigErr := tokenConfigErr
+	oldSubSite, _, oldSubErr := snapshotSubscriptionRuntime()
+	oldMCYCfg := getMCYRuntimeConfig()
+	oldMCYCookie := getMCYCookie()
+	tempRoot := t.TempDir()
+	t.Cleanup(func() {
+		if db != nil && db != oldDB {
+			_ = db.Close()
+		}
+		rootDir = oldRoot
+		db = oldDB
+		setTokenRuntime(oldTokenSvc, oldTokenConfigErr)
+		setSubscriptionRuntime(oldSubSite, oldSubErr)
+		SetMCYRuntimeConfig(oldMCYCfg)
+		setMCYCookie(oldMCYCookie)
+	})
+
+	clearActPrimaryEnv(t)
+	t.Setenv("NEWAPI_MANAGED_API_SITES", `{"managedApiSites":[
+		{"name":"次数fufu","category":"api","url":"https://api-env.example.test","token":"api-env-token","userId":"9"},
+		{"name":"token-fufu","category":"token","url":"https://token-env.example.test","token":"token-env-token","userId":"1"}
+	]}`)
+	t.Setenv("MCY_COOKIE", "env-cookie")
+
+	if _, err := NewHandler(tempRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	service, cfgErr := snapshotTokenRuntime()
+	if service != nil || cfgErr != nil {
+		t.Fatalf("embedded handler should not load token runtime from env, service=%#v err=%v", service, cfgErr)
+	}
+
+	subSite, subClient, subErr := snapshotSubscriptionRuntime()
+	if subClient != nil || subErr != nil || subSite.URL != "" || subSite.Token != "" {
+		t.Fatalf("embedded handler should leave subscription runtime empty, site=%#v client=%#v err=%v", subSite, subClient, subErr)
+	}
+
+	if got := getMCYCookie(); got != "" {
+		t.Fatalf("embedded handler should not bootstrap MCY cookie from env, got %q", got)
+	}
+}
+
 func clearActPrimaryEnv(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{

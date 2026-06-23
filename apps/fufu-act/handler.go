@@ -4,10 +4,13 @@ import "net/http"
 
 // NewHandler initializes the activity module and returns its HTTP handler for
 // embedding inside the unified fufu tool site. The root directory should contain
-// the activity public/ and data/ directories.
+// the activity public/ and data/ directories. When embedded, the host is the
+// source of truth for NewAPI/MCY runtime config, so this path intentionally
+// skips environment/bootstrap site loading and waits for the host to apply its
+// persisted config snapshot.
 func NewHandler(root string) (http.Handler, error) {
 	rootDir = root
-	if err := initAll(); err != nil {
+	if err := initAllEmbedded(); err != nil {
 		return nil, err
 	}
 	mux := http.NewServeMux()
