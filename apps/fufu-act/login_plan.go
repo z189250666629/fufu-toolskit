@@ -78,6 +78,7 @@ func planLoginCardForToken(key string, t *tokens.Token, shop ShopPurchaseLookup,
 }
 
 func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptionSummary, cfg activity.Config, quotaUnit int64) (loginCardPlan, error) {
+	quotaUnit = quotaUnitOrDefault(quotaUnit)
 	result := activity.PlanLoginCard(activity.LoginCardPlanInput{
 		CardKey:       fmt.Sprintf("subscription-%d", sub.ID),
 		Name:          user.Username,
@@ -92,7 +93,7 @@ func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptio
 	case activity.LoginCardDisabled, activity.LoginCardOutsideWindow:
 		return loginCardPlan{}, httpErr{http.StatusForbidden, "该用户没有活动期内生效的有效订阅"}
 	default:
-		return loginCardPlan{}, httpErr{http.StatusForbidden, "该用户没有可参与活动的订阅额度"}
+		return fallbackSubscriptionLoginCardPlan(user, sub, cfg, quotaUnit)
 	}
 	plan := result.Plan
 	return loginCardPlan{
@@ -102,6 +103,29 @@ func planLoginCardForSubscription(user subscriptionUpstreamUser, sub subscriptio
 		Source:           "subscription",
 		PurchaseTime:     formatUnixText(sub.StartTime),
 		PoolContribution: plan.PoolContribution,
+		SubscriptionID:   sub.ID,
+		UserID:           user.ID,
+		Username:         user.Username,
+	}, nil
+}
+
+func fallbackSubscriptionLoginCardPlan(user subscriptionUpstreamUser, sub subscriptionSummary, cfg activity.Config, quotaUnit int64) (loginCardPlan, error) {
+	dollars := activity.DollarsTier(sub.AmountTotal, quotaUnit)
+	if dollars <= 0 {
+		return loginCardPlan{}, httpErr{http.StatusForbidden, "该用户没有可参与活动的订阅额度"}
+	}
+	totalDraws := cfg.DrawCountForTier(dollars)
+	if totalDraws <= 0 {
+		totalDraws = 1
+	}
+	contribution, _ := activity.DynamicPoolContributionForTier(cfg, dollars)
+	return loginCardPlan{
+		CardName:         firstNonEmpty(user.Username, fmt.Sprintf("user-%d", user.ID)),
+		Dollars:          dollars,
+		TotalSpins:       totalDraws,
+		Source:           "subscription",
+		PurchaseTime:     formatUnixText(sub.StartTime),
+		PoolContribution: contribution,
 		SubscriptionID:   sub.ID,
 		UserID:           user.ID,
 		Username:         user.Username,

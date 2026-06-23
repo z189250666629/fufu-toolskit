@@ -179,6 +179,34 @@ func TestHandleLoginWithSubscriptionIdentityCreatesAndReusesOpaqueCard(t *testin
 	}
 }
 
+func TestHandleLoginWithSubscriptionIdentityAllowsUnconfiguredSubscriptionAmount(t *testing.T) {
+	setupScratchLockTestDB(t)
+	useSubscriptionRuntimeServer(t, 123, "alice", []subscriptionSummary{{
+		ID:          902,
+		UserID:      123,
+		PlanID:      1,
+		AmountTotal: newapi.DefaultQuotaUnit * 10,
+		StartTime:   actStartTS + 60,
+		EndTime:     actEndTS + 3600,
+		Status:      "active",
+	}}, nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"userId":123,"username":"alice"}`))
+	w := httptest.NewRecorder()
+	handleLogin(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("code=%d body=%s", w.Code, w.Body.String())
+	}
+
+	card, ok, err := lookupCardBySubscriptionID(902)
+	if err != nil || !ok {
+		t.Fatalf("lookup subscription card ok=%v err=%v", ok, err)
+	}
+	if card.Dollars != 10 || card.TotalSpins != 1 {
+		t.Fatalf("fallback subscription card dollars/spins = %v/%d, want 10/1", card.Dollars, card.TotalSpins)
+	}
+}
+
 func TestHandleLoginWithSubscriptionIdentityRejectsUsernameMismatch(t *testing.T) {
 	setupScratchLockTestDB(t)
 	useSubscriptionRuntimeServer(t, 123, "alice", nil, nil)
