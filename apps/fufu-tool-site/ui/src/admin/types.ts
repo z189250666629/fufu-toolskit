@@ -46,6 +46,13 @@ export type ActivityGameConfig = {
   targetExpectedValue?: number;
 };
 
+export type SubscriptionPlanMapping = {
+  planId?: number;
+  title?: string;
+  match?: 'contains' | 'exact' | string;
+  dollars: number;
+};
+
 export type DynamicPrizePoolTier = {
   dollars: number;
   revenue?: number;
@@ -75,6 +82,7 @@ export type ActivityConfig = {
   scratchMaxReveals?: number;
   gameRoutes?: ActivityGameRoute[];
   scratchTiers?: number[];
+  subscriptionPlanMappings?: SubscriptionPlanMapping[];
   [key: string]: unknown;
 };
 

@@ -59,6 +59,33 @@ func TestLegacyScratchTiersProjectToGameRoutes(t *testing.T) {
 	}
 }
 
+func TestSubscriptionPlanMappingsNormalizeAndRoundTrip(t *testing.T) {
+	cfg := NormalizeConfig(Config{SubscriptionPlanMappings: []SubscriptionPlanMapping{
+		{PlanID: 77, Dollars: 100},
+		{Title: " VIP 月卡 ", Dollars: 150},
+		{Title: "bad", Dollars: 0},
+		{Dollars: 300},
+	}})
+	if len(cfg.SubscriptionPlanMappings) != 2 {
+		t.Fatalf("valid subscription mappings should be kept only: %#v", cfg.SubscriptionPlanMappings)
+	}
+	if cfg.SubscriptionPlanMappings[1].Title != "VIP 月卡" || cfg.SubscriptionPlanMappings[1].Match != "contains" {
+		t.Fatalf("title mapping should be trimmed and default to contains: %#v", cfg.SubscriptionPlanMappings[1])
+	}
+
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Config
+	if err := json.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+	if len(back.SubscriptionPlanMappings) != 2 || back.SubscriptionPlanMappings[0].PlanID != 77 || back.SubscriptionPlanMappings[1].Dollars != 150 {
+		t.Fatalf("subscription mappings should survive JSON round-trip: cfg=%#v raw=%s", back.SubscriptionPlanMappings, raw)
+	}
+}
+
 func TestGameConfigsDriveExpectedValuesOnly(t *testing.T) {
 	cfg := NormalizeConfig(Config{GameConfigs: []GameConfig{
 		{Game: GameSlot, TargetExpectedValue: 4.5, ActualExpectedValue: 3.5},

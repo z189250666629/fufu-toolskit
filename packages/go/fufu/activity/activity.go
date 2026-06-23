@@ -50,6 +50,13 @@ type GameConfig struct {
 	ActualExpectedValue float64 `json:"actualExpectedValue,omitempty"`
 }
 
+type SubscriptionPlanMapping struct {
+	PlanID  int64   `json:"planId,omitempty"`
+	Title   string  `json:"title,omitempty"`
+	Match   string  `json:"match,omitempty"`
+	Dollars float64 `json:"dollars"`
+}
+
 type Config struct {
 	StartText              string              `json:"startText"`
 	EndText                string              `json:"endText"`
@@ -68,8 +75,9 @@ type Config struct {
 	ScratchMaxReveals      int                 `json:"scratchMaxReveals,omitempty"`
 	// GameRoutes is the source of truth for card-tier gameplay routing.
 	// ScratchTiers is kept as a compatibility projection for older admin payloads.
-	GameRoutes   []GameRoute `json:"gameRoutes"`
-	ScratchTiers []int       `json:"scratchTiers"`
+	GameRoutes               []GameRoute               `json:"gameRoutes"`
+	ScratchTiers             []int                     `json:"scratchTiers"`
+	SubscriptionPlanMappings []SubscriptionPlanMapping `json:"subscriptionPlanMappings,omitempty"`
 }
 
 type LoginCardRejection string
@@ -115,23 +123,24 @@ type gameConfigJSON struct {
 }
 
 type configJSON struct {
-	StartText              string              `json:"startText"`
-	EndText                string              `json:"endText"`
-	StartTS                int64               `json:"startTS"`
-	EndTS                  int64               `json:"endTS"`
-	TargetExpectedValue    float64             `json:"targetExpectedValue,omitempty"`
-	ActualExpectedValue    float64             `json:"actualExpectedValue,omitempty"`
-	SpinMap                map[string]int      `json:"spinMap"`
-	GameConfigs            []gameConfigJSON    `json:"gameConfigs"`
-	PrizePool              []Prize             `json:"prizePool"`
-	SpinGuarantees         []SpinGuaranteeRule `json:"spinGuarantees"`
-	JackpotPrizeDollars    int                 `json:"jackpotPrizeDollars"`
-	JackpotEligibleDollars []float64           `json:"jackpotEligibleDollars"`
-	DynamicPrizePool       poolfundcore.Config `json:"dynamicPrizePool,omitempty"`
-	ScratchRewards         []int               `json:"scratchRewards"`
-	ScratchMaxReveals      int                 `json:"scratchMaxReveals,omitempty"`
-	GameRoutes             []GameRoute         `json:"gameRoutes"`
-	ScratchTiers           []int               `json:"scratchTiers"`
+	StartText                string                    `json:"startText"`
+	EndText                  string                    `json:"endText"`
+	StartTS                  int64                     `json:"startTS"`
+	EndTS                    int64                     `json:"endTS"`
+	TargetExpectedValue      float64                   `json:"targetExpectedValue,omitempty"`
+	ActualExpectedValue      float64                   `json:"actualExpectedValue,omitempty"`
+	SpinMap                  map[string]int            `json:"spinMap"`
+	GameConfigs              []gameConfigJSON          `json:"gameConfigs"`
+	PrizePool                []Prize                   `json:"prizePool"`
+	SpinGuarantees           []SpinGuaranteeRule       `json:"spinGuarantees"`
+	JackpotPrizeDollars      int                       `json:"jackpotPrizeDollars"`
+	JackpotEligibleDollars   []float64                 `json:"jackpotEligibleDollars"`
+	DynamicPrizePool         poolfundcore.Config       `json:"dynamicPrizePool,omitempty"`
+	ScratchRewards           []int                     `json:"scratchRewards"`
+	ScratchMaxReveals        int                       `json:"scratchMaxReveals,omitempty"`
+	GameRoutes               []GameRoute               `json:"gameRoutes"`
+	ScratchTiers             []int                     `json:"scratchTiers"`
+	SubscriptionPlanMappings []SubscriptionPlanMapping `json:"subscriptionPlanMappings,omitempty"`
 }
 
 var defaultSpinMap = map[float64]int{0.1: 100, 100: 1, 150: 1, 300: 3, 500: 4, 1000: 10}
@@ -329,6 +338,30 @@ func normalizeGameRoutes(routes []GameRoute) []GameRoute {
 	return out
 }
 
+func normalizeSubscriptionPlanMappings(mappings []SubscriptionPlanMapping) []SubscriptionPlanMapping {
+	out := make([]SubscriptionPlanMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		mapping.Title = strings.TrimSpace(mapping.Title)
+		mapping.Match = strings.TrimSpace(strings.ToLower(mapping.Match))
+		if mapping.Match == "" && mapping.Title != "" {
+			mapping.Match = "contains"
+		}
+		switch mapping.Match {
+		case "", "exact", "contains":
+		default:
+			mapping.Match = "contains"
+		}
+		if mapping.Dollars <= 0 {
+			continue
+		}
+		if mapping.PlanID <= 0 && mapping.Title == "" {
+			continue
+		}
+		out = append(out, mapping)
+	}
+	return out
+}
+
 func gameRoutesFromScratchTiers(tiers []int) []GameRoute {
 	tiers = normalizeScratchTiers(tiers)
 	out := make([]GameRoute, 0, len(tiers))
@@ -383,6 +416,7 @@ func CloneConfig(cfg Config) Config {
 	out.ScratchMaxReveals = cfg.ScratchMaxReveals
 	out.GameRoutes = append([]GameRoute(nil), cfg.GameRoutes...)
 	out.ScratchTiers = append(make([]int, 0, len(cfg.ScratchTiers)), cfg.ScratchTiers...)
+	out.SubscriptionPlanMappings = append([]SubscriptionPlanMapping(nil), cfg.SubscriptionPlanMappings...)
 	return out
 }
 
@@ -510,29 +544,31 @@ func NormalizeConfig(cfg Config) Config {
 		cfg.GameRoutes = normalizeGameRoutes(cfg.GameRoutes)
 	}
 	cfg.ScratchTiers = scratchTiersFromGameRoutes(cfg.GameRoutes)
+	cfg.SubscriptionPlanMappings = normalizeSubscriptionPlanMappings(cfg.SubscriptionPlanMappings)
 	return cfg
 }
 
 func (cfg Config) MarshalJSON() ([]byte, error) {
 	cfg = NormalizeConfig(cfg)
 	return json.Marshal(configJSON{
-		StartText:              cfg.StartText,
-		EndText:                cfg.EndText,
-		StartTS:                cfg.StartTS,
-		EndTS:                  cfg.EndTS,
-		TargetExpectedValue:    cfg.TargetExpectedValue,
-		ActualExpectedValue:    cfg.ActualExpectedValue,
-		SpinMap:                spinMapToJSON(cfg.SpinMap),
-		GameConfigs:            gameConfigsToJSON(cfg.GameConfigs),
-		PrizePool:              cfg.PrizePool,
-		SpinGuarantees:         cfg.SpinGuarantees,
-		JackpotPrizeDollars:    cfg.JackpotPrizeDollars,
-		JackpotEligibleDollars: cfg.JackpotEligibleDollars,
-		DynamicPrizePool:       cfg.DynamicPrizePool,
-		ScratchRewards:         cfg.ScratchRewards,
-		ScratchMaxReveals:      cfg.ScratchMaxReveals,
-		GameRoutes:             cfg.GameRoutes,
-		ScratchTiers:           cfg.ScratchTiers,
+		StartText:                cfg.StartText,
+		EndText:                  cfg.EndText,
+		StartTS:                  cfg.StartTS,
+		EndTS:                    cfg.EndTS,
+		TargetExpectedValue:      cfg.TargetExpectedValue,
+		ActualExpectedValue:      cfg.ActualExpectedValue,
+		SpinMap:                  spinMapToJSON(cfg.SpinMap),
+		GameConfigs:              gameConfigsToJSON(cfg.GameConfigs),
+		PrizePool:                cfg.PrizePool,
+		SpinGuarantees:           cfg.SpinGuarantees,
+		JackpotPrizeDollars:      cfg.JackpotPrizeDollars,
+		JackpotEligibleDollars:   cfg.JackpotEligibleDollars,
+		DynamicPrizePool:         cfg.DynamicPrizePool,
+		ScratchRewards:           cfg.ScratchRewards,
+		ScratchMaxReveals:        cfg.ScratchMaxReveals,
+		GameRoutes:               cfg.GameRoutes,
+		ScratchTiers:             cfg.ScratchTiers,
+		SubscriptionPlanMappings: cfg.SubscriptionPlanMappings,
 	})
 }
 
@@ -543,23 +579,24 @@ func (cfg *Config) UnmarshalJSON(data []byte) error {
 	}
 	gameConfigs, legacyDrawCounts := gameConfigsFromJSON(raw.GameConfigs)
 	normalized := NormalizeConfig(Config{
-		StartText:              raw.StartText,
-		EndText:                raw.EndText,
-		StartTS:                raw.StartTS,
-		EndTS:                  raw.EndTS,
-		TargetExpectedValue:    raw.TargetExpectedValue,
-		ActualExpectedValue:    raw.ActualExpectedValue,
-		SpinMap:                spinMapFromJSON(raw.SpinMap),
-		GameConfigs:            gameConfigs,
-		PrizePool:              raw.PrizePool,
-		SpinGuarantees:         raw.SpinGuarantees,
-		JackpotPrizeDollars:    raw.JackpotPrizeDollars,
-		JackpotEligibleDollars: raw.JackpotEligibleDollars,
-		DynamicPrizePool:       raw.DynamicPrizePool,
-		ScratchRewards:         raw.ScratchRewards,
-		ScratchMaxReveals:      raw.ScratchMaxReveals,
-		GameRoutes:             raw.GameRoutes,
-		ScratchTiers:           raw.ScratchTiers,
+		StartText:                raw.StartText,
+		EndText:                  raw.EndText,
+		StartTS:                  raw.StartTS,
+		EndTS:                    raw.EndTS,
+		TargetExpectedValue:      raw.TargetExpectedValue,
+		ActualExpectedValue:      raw.ActualExpectedValue,
+		SpinMap:                  spinMapFromJSON(raw.SpinMap),
+		GameConfigs:              gameConfigs,
+		PrizePool:                raw.PrizePool,
+		SpinGuarantees:           raw.SpinGuarantees,
+		JackpotPrizeDollars:      raw.JackpotPrizeDollars,
+		JackpotEligibleDollars:   raw.JackpotEligibleDollars,
+		DynamicPrizePool:         raw.DynamicPrizePool,
+		ScratchRewards:           raw.ScratchRewards,
+		ScratchMaxReveals:        raw.ScratchMaxReveals,
+		GameRoutes:               raw.GameRoutes,
+		ScratchTiers:             raw.ScratchTiers,
+		SubscriptionPlanMappings: raw.SubscriptionPlanMappings,
 	})
 	normalized = applyLegacyGameDrawCounts(normalized, legacyDrawCounts)
 	*cfg = NormalizeConfig(normalized)

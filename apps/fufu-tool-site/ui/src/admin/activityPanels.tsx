@@ -16,6 +16,7 @@ import {
   normalizeGameMode,
   normalizeGameRoutes,
   normalizeScratchMaxReveals,
+  normalizeSubscriptionPlanMappings,
   numberValue,
   patchGameConfig,
   percentInputToRate,
@@ -27,7 +28,7 @@ import {
   upsertGameRoute,
   type GameMode
 } from './activityConfigCore';
-import type { ActivityConfig, ActivityGameConfig, ActivityGameRoute, ActivityStats, DynamicPrizePoolConfig, DynamicPrizePoolTier, PrizeConfigResponse, SaleCardPlan, SaleCardTestKeyResult } from './types';
+import type { ActivityConfig, ActivityGameConfig, ActivityGameRoute, ActivityStats, DynamicPrizePoolConfig, DynamicPrizePoolTier, PrizeConfigResponse, SaleCardPlan, SaleCardTestKeyResult, SubscriptionPlanMapping } from './types';
 
 type LocalMessage = {
   text: string;
@@ -103,6 +104,7 @@ export function ActivityConfigEditor({
   const [gameConfigs, setGameConfigs] = useState<ActivityGameConfig[]>(() => normalizeGameConfigs(activity.gameConfigs, activity));
   const [gameRoutes, setGameRoutes] = useState<ActivityGameRoute[]>(() => gameRoutesFromActivity(activity));
   const [dynamicPool, setDynamicPool] = useState<DynamicPrizePoolConfig>(() => normalizeDynamicPrizePool(activity.dynamicPrizePool));
+  const [subscriptionMappings, setSubscriptionMappings] = useState<SubscriptionPlanMapping[]>(() => normalizeSubscriptionPlanMappings(activity.subscriptionPlanMappings));
   const [testKeyCount, setTestKeyCount] = useState(1);
   const [generatingTestPlan, setGeneratingTestPlan] = useState('');
   const [testKeyResult, setTestKeyResult] = useState<SaleCardTestKeyResult>();
@@ -115,6 +117,7 @@ export function ActivityConfigEditor({
     setGameConfigs(normalizeGameConfigs(activity.gameConfigs, activity));
     setGameRoutes(gameRoutesFromActivity(activity));
     setDynamicPool(normalizeDynamicPrizePool(activity.dynamicPrizePool));
+    setSubscriptionMappings(normalizeSubscriptionPlanMappings(activity.subscriptionPlanMappings));
   }, [activity]);
 
   function emit(next: ActivityConfig) {
@@ -141,9 +144,23 @@ export function ActivityConfigEditor({
     setDynamicPool(normalized);
     emit({ ...activity, dynamicPrizePool: normalized });
   };
+  const emitSubscriptionMappings = (values: SubscriptionPlanMapping[]) => {
+    setSubscriptionMappings(values);
+    emit({ ...activity, subscriptionPlanMappings: values });
+  };
   const patchDynamicPool = (patch: Partial<DynamicPrizePoolConfig>) => emitDynamicPool({ ...dynamicPool, ...patch });
   const updateGameForTier = (quota: number, game: GameMode) => emitGameRoutes(upsertGameRoute(gameRoutes, quota, { game }));
   const updateDrawCountForTier = (quota: number, drawCount: number) => emitGameRoutes(upsertGameRoute(gameRoutes, quota, { drawCount }));
+  const patchSubscriptionMapping = (index: number, patch: Partial<SubscriptionPlanMapping>) => {
+    const next = subscriptionMappings.map((mapping, rowIndex) => rowIndex === index ? { ...mapping, ...patch } : mapping);
+    emitSubscriptionMappings(next);
+  };
+  const addSubscriptionMapping = () => {
+    emitSubscriptionMappings([...subscriptionMappings, { match: 'contains', dollars: saleTierOptions[0]?.quota ?? 100 }]);
+  };
+  const removeSubscriptionMapping = (index: number) => {
+    emitSubscriptionMappings(subscriptionMappings.filter((_, rowIndex) => rowIndex !== index));
+  };
   const updateTestKeyCount = (value: string) => {
     const next = Math.max(1, Math.min(20, Math.floor(Number(value) || 1)));
     setTestKeyCount(next);
@@ -258,6 +275,61 @@ export function ActivityConfigEditor({
           </div>
         </div>
       ) : null}
+
+      <div className="config-subhead">订阅档位映射（可选）</div>
+      <p className="inline-help">
+        订阅登录会先按这里的计划 ID / 标题关键词映射到次数卡档位；未命中时再智能识别标题里的“100次卡 / 100 quota / 一百次卡”，最后才回退到订阅 total quota。
+      </p>
+      <div className="subscription-mapping-toolbar">
+        <Button className="blueprint-button" onPress={addSubscriptionMapping}>新增订阅映射</Button>
+      </div>
+      <div className="subscription-mapping-editor">
+        <div className="subscription-mapping-row subscription-mapping-row--head">
+          <span>订阅计划 ID</span><span>标题/关键词</span><span>匹配方式</span><span>次数卡档位</span><span>操作</span>
+        </div>
+        {subscriptionMappings.length === 0 ? <p className="inline-help">不配置也能用：系统会自动从套餐标题或 total quota 对档；这里用于处理订阅套餐额度和次数卡不一致的情况。</p> : null}
+        {subscriptionMappings.map((mapping, index) => (
+          <div className="subscription-mapping-row" key={`${mapping.planId ?? 'title'}-${mapping.title ?? ''}-${index}`}>
+            <Input
+              className="mini-input blueprint-input subscription-mapping-id"
+              type="number"
+              min={1}
+              value={numberValue(mapping.planId) > 0 ? String(mapping.planId) : ''}
+              aria-label={`订阅映射 ${index + 1} 计划 ID`}
+              onChange={(event) => patchSubscriptionMapping(index, { planId: Number(event.target.value) || undefined })}
+            />
+            <Input
+              className="blueprint-input subscription-mapping-title"
+              value={String(mapping.title ?? '')}
+              placeholder="如：VIP 月卡"
+              aria-label={`订阅映射 ${index + 1} 标题关键词`}
+              onChange={(event) => patchSubscriptionMapping(index, { title: event.target.value })}
+            />
+            <select
+              className="native-select subscription-mapping-match"
+              value={String(mapping.match ?? 'contains') === 'exact' ? 'exact' : 'contains'}
+              onChange={(event) => patchSubscriptionMapping(index, { match: event.target.value })}
+            >
+              <option value="contains">包含</option>
+              <option value="exact">完全等于</option>
+            </select>
+            <Input
+              className="mini-input blueprint-input subscription-mapping-dollars"
+              type="number"
+              step="0.01"
+              min={0}
+              list="subscription-tier-options"
+              value={numberValue(mapping.dollars) > 0 ? String(mapping.dollars) : ''}
+              aria-label={`订阅映射 ${index + 1} 次数卡档位`}
+              onChange={(event) => patchSubscriptionMapping(index, { dollars: Number(event.target.value) })}
+            />
+            <Button className="blueprint-button blueprint-button--ghost" onPress={() => removeSubscriptionMapping(index)}>删除</Button>
+          </div>
+        ))}
+      </div>
+      <datalist id="subscription-tier-options">
+        {saleTierOptions.map((option) => <option key={option.quota} value={option.quota}>{option.label}</option>)}
+      </datalist>
 
       <div className="config-subhead">动态奖池</div>
       <div className="dynamic-pool-panel">

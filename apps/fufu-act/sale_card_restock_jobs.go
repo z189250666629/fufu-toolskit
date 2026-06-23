@@ -271,7 +271,10 @@ func requeueSaleCardRestockJob(id int64, currentStock, uploaded int, message str
 	if timeout && consecutiveTimeouts >= saleCardRestockMaxTimeouts {
 		status = saleCardRestockStatusFailed
 	}
-	retryAt := time.Now().Add(saleCardRestockRetryDelay).Unix()
+	retryAt := int64(0)
+	if saleCardRestockRetryDelay > 0 {
+		retryAt = time.Now().Add(saleCardRestockRetryDelay).Unix()
+	}
 	if _, err := db.Exec(`UPDATE sale_card_restock_jobs
 		SET status=?, consecutive_timeouts=?, current_stock=?, uploaded=uploaded+?, last_error=?,
 			failure_reason=CASE WHEN ? THEN ? ELSE failure_reason END,

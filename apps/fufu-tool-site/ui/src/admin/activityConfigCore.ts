@@ -1,4 +1,4 @@
-import type { ActivityConfig, ActivityGameConfig, ActivityGameRoute, DynamicPrizePoolConfig, DynamicPrizePoolTier, SaleCardPlan } from './types';
+import type { ActivityConfig, ActivityGameConfig, ActivityGameRoute, DynamicPrizePoolConfig, DynamicPrizePoolTier, SaleCardPlan, SubscriptionPlanMapping } from './types';
 
 export type GameMode = 'slot' | 'scratch' | 'dragonboat';
 
@@ -125,6 +125,28 @@ export function normalizeGameRoutes(routes: ActivityGameRoute[] = []): ActivityG
   return [...byTier.entries()]
     .sort(([a], [b]) => a - b)
     .map(([, route]) => route);
+}
+
+export function normalizeSubscriptionPlanMappings(mappings: SubscriptionPlanMapping[] = []): SubscriptionPlanMapping[] {
+  return mappings
+    .map((mapping) => {
+      const planId = Math.floor(numberValue(mapping.planId));
+      const title = String(mapping.title ?? '').trim();
+      const dollars = numberValue(mapping.dollars);
+      const match = String(mapping.match ?? '').trim().toLowerCase() === 'exact' ? 'exact' : 'contains';
+      return {
+        ...(planId > 0 ? { planId } : {}),
+        ...(title ? { title, match } : {}),
+        dollars
+      } as SubscriptionPlanMapping;
+    })
+    .filter((mapping) => numberValue(mapping.dollars) > 0 && (numberValue(mapping.planId) > 0 || String(mapping.title ?? '').trim() !== ''));
+}
+
+export function upsertSubscriptionPlanMapping(mappings: SubscriptionPlanMapping[], index: number, patch: Partial<SubscriptionPlanMapping>): SubscriptionPlanMapping[] {
+  const current = [...mappings];
+  current[index] = { ...(current[index] ?? { dollars: 0 }), ...patch };
+  return normalizeSubscriptionPlanMappings(current);
 }
 
 export function gameRoutesFromActivity(activity: ActivityConfig): ActivityGameRoute[] {

@@ -1229,6 +1229,39 @@ tr:last-child td {
   letter-spacing: 0.04em;
 }
 
+.subscription-mapping-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subscription-mapping-editor {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.subscription-mapping-row {
+  display: grid;
+  grid-template-columns: 130px minmax(210px, 1fr) 110px 110px 82px;
+  gap: 8px;
+  align-items: center;
+  min-width: 680px;
+}
+
+.subscription-mapping-row--head {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blueprint-text-secondary);
+}
+
+.subscription-mapping-title {
+  min-width: 0;
+}
+
 .game-mode-select {
   width: 100%;
 }

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"fufu/activity"
 	"fufu/newapi"
 )
 
@@ -233,10 +234,150 @@ func TestHandleLoginWithSubscriptionIdentityMapsSaleCardPlanTitle(t *testing.T) 
 	}
 }
 
+func TestPlanLoginCardForSubscriptionUsesManualPlanIDMapping(t *testing.T) {
+	cfg := activity.DefaultConfig()
+	cfg.SubscriptionPlanMappings = []activity.SubscriptionPlanMapping{{PlanID: 777, Dollars: 100}}
+
+	plan, err := planLoginCardForSubscription(
+		subscriptionUpstreamUser{ID: 123, Username: "alice"},
+		subscriptionSummary{
+			ID:          904,
+			UserID:      123,
+			PlanID:      777,
+			AmountTotal: newapi.DefaultQuotaUnit * 10,
+			StartTime:   cfg.StartTS + 60,
+			Status:      "active",
+		},
+		"upstream odd quota plan",
+		cfg,
+		newapi.DefaultQuotaUnit,
+	)
+	if err != nil {
+		t.Fatalf("planLoginCardForSubscription: %v", err)
+	}
+	if plan.Dollars != 100 || plan.TotalSpins != 1 {
+		t.Fatalf("plan tier/draws = (%v,%d), want (100,1)", plan.Dollars, plan.TotalSpins)
+	}
+}
+
+func TestPlanLoginCardForSubscriptionUsesManualTitleMapping(t *testing.T) {
+	cfg := activity.DefaultConfig()
+	cfg.SubscriptionPlanMappings = []activity.SubscriptionPlanMapping{{Title: "VIP 月卡", Match: "contains", Dollars: 150}}
+
+	plan, err := planLoginCardForSubscription(
+		subscriptionUpstreamUser{ID: 123, Username: "alice"},
+		subscriptionSummary{
+			ID:          905,
+			UserID:      123,
+			PlanID:      778,
+			AmountTotal: newapi.DefaultQuotaUnit * 10,
+			StartTime:   cfg.StartTS + 60,
+			Status:      "active",
+		},
+		"超级 VIP 月卡",
+		cfg,
+		newapi.DefaultQuotaUnit,
+	)
+	if err != nil {
+		t.Fatalf("planLoginCardForSubscription: %v", err)
+	}
+	if plan.Dollars != 150 || plan.TotalSpins != 1 {
+		t.Fatalf("plan tier/draws = (%v,%d), want (150,1)", plan.Dollars, plan.TotalSpins)
+	}
+}
+
+func TestPlanLoginCardForSubscriptionSmartMapsGenericTitleTier(t *testing.T) {
+	cfg := activity.DefaultConfig()
+	cfg.SpinMap[42] = 2
+
+	plan, err := planLoginCardForSubscription(
+		subscriptionUpstreamUser{ID: 123, Username: "alice"},
+		subscriptionSummary{
+			ID:          906,
+			UserID:      123,
+			PlanID:      779,
+			AmountTotal: newapi.DefaultQuotaUnit * 10,
+			StartTime:   cfg.StartTS + 60,
+			Status:      "active",
+		},
+		"混合卡 月42次卡",
+		cfg,
+		newapi.DefaultQuotaUnit,
+	)
+	if err != nil {
+		t.Fatalf("planLoginCardForSubscription: %v", err)
+	}
+	if plan.Dollars != 42 || plan.TotalSpins != 2 {
+		t.Fatalf("plan tier/draws = (%v,%d), want (42,2)", plan.Dollars, plan.TotalSpins)
+	}
+}
+
+func TestPlanLoginCardForSubscriptionFallsBackToAmountTotal(t *testing.T) {
+	cfg := activity.DefaultConfig()
+
+	plan, err := planLoginCardForSubscription(
+		subscriptionUpstreamUser{ID: 123, Username: "alice"},
+		subscriptionSummary{
+			ID:          907,
+			UserID:      123,
+			PlanID:      780,
+			AmountTotal: newapi.DefaultQuotaUnit * 100,
+			StartTime:   cfg.StartTS + 60,
+			Status:      "active",
+		},
+		"unmapped upstream plan",
+		cfg,
+		newapi.DefaultQuotaUnit,
+	)
+	if err != nil {
+		t.Fatalf("planLoginCardForSubscription: %v", err)
+	}
+	if plan.Dollars != 100 || plan.TotalSpins != 1 {
+		t.Fatalf("plan tier/draws = (%v,%d), want (100,1)", plan.Dollars, plan.TotalSpins)
+	}
+}
+
+func TestPlanLoginCardForSubscriptionRejectsManualUnconfiguredTier(t *testing.T) {
+	cfg := activity.DefaultConfig()
+	cfg.SubscriptionPlanMappings = []activity.SubscriptionPlanMapping{{PlanID: 781, Dollars: 42}}
+
+	_, err := planLoginCardForSubscription(
+		subscriptionUpstreamUser{ID: 123, Username: "alice"},
+		subscriptionSummary{
+			ID:          908,
+			UserID:      123,
+			PlanID:      781,
+			AmountTotal: newapi.DefaultQuotaUnit * 100,
+			StartTime:   cfg.StartTS + 60,
+			Status:      "active",
+		},
+		"manual bad tier",
+		cfg,
+		newapi.DefaultQuotaUnit,
+	)
+	if err == nil || !strings.Contains(err.Error(), "未匹配活动次数卡档位") {
+		t.Fatalf("err=%v, want unconfigured tier rejection", err)
+	}
+}
+
 func TestSubscriptionSaleCardDollarsFromPlanTitlePrefersLongerTier(t *testing.T) {
 	dollars, ok := subscriptionSaleCardDollarsFromPlanTitle("混合卡 月一千次卡")
 	if !ok || dollars != 1000 {
 		t.Fatalf("mapped dollars=(%v,%v), want (1000,true)", dollars, ok)
+	}
+}
+
+func TestSubscriptionSaleCardDollarsFromPlanTitleParsesGenericTiers(t *testing.T) {
+	cases := map[string]float64{
+		"混合卡 月42次卡":          42,
+		"fufu 88 quota plan": 88,
+		"混合卡 月三百二十次卡":        320,
+	}
+	for title, want := range cases {
+		got, ok := subscriptionSaleCardDollarsFromPlanTitle(title)
+		if !ok || got != want {
+			t.Fatalf("%q mapped dollars=(%v,%v), want (%v,true)", title, got, ok, want)
+		}
 	}
 }
 
