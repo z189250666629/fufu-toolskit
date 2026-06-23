@@ -1,6 +1,7 @@
 package activityapp
 
 import (
+	"net/url"
 	"strings"
 	"sync"
 
@@ -42,20 +43,13 @@ func activitySubscriptionSite(sites []newapi.Site) (newapi.Site, bool) {
 	bestIndex := -1
 	bestScore := -1
 	for i, site := range sites {
-		if !strings.EqualFold(strings.TrimSpace(site.Category), "token") {
-			continue
-		}
 		site = normalizeSubscriptionRuntimeSite(site)
 		if site.URL == "" || site.Token == "" {
 			continue
 		}
-		score := 1
-		name := strings.ToLower(strings.TrimSpace(site.Name))
-		switch {
-		case name == "token-fufu":
-			score = 3
-		case strings.Contains(name, "token-fufu"):
-			score = 2
+		score := subscriptionRuntimeSiteScore(site)
+		if score < 0 {
+			continue
 		}
 		if score > bestScore {
 			bestIndex = i
@@ -66,6 +60,45 @@ func activitySubscriptionSite(sites []newapi.Site) (newapi.Site, bool) {
 		return newapi.Site{}, false
 	}
 	return normalizeSubscriptionRuntimeSite(sites[bestIndex]), true
+}
+
+func subscriptionRuntimeSiteScore(site newapi.Site) int {
+	category := normalizedSubscriptionRuntimeSiteField(site.Category)
+	kind := normalizedSubscriptionRuntimeSiteField(site.Kind)
+	name := normalizedSubscriptionRuntimeSiteField(site.Name)
+	lineName := normalizedSubscriptionRuntimeSiteField(site.LineName)
+	host := subscriptionRuntimeSiteHost(site.URL)
+
+	switch {
+	case name == "token-fufu":
+		return 100
+	case strings.Contains(name, "token-fufu"):
+		return 90
+	case category == "token":
+		return 80
+	case kind == "token":
+		return 70
+	case strings.Contains(name, "token"):
+		return 60
+	case strings.Contains(lineName, "token"):
+		return 50
+	case strings.Contains(host, "token"):
+		return 40
+	default:
+		return -1
+	}
+}
+
+func normalizedSubscriptionRuntimeSiteField(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func subscriptionRuntimeSiteHost(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return normalizedSubscriptionRuntimeSiteField(rawURL)
+	}
+	return normalizedSubscriptionRuntimeSiteField(parsed.Hostname())
 }
 
 func normalizeSubscriptionRuntimeSite(site newapi.Site) newapi.Site {
