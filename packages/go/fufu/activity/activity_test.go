@@ -307,6 +307,33 @@ func TestConfigJSONDropsLegacyPostJackpotPool(t *testing.T) {
 	}
 }
 
+func TestNormalizeConfigPrefersActivityWindowTextOverStaleTimestamps(t *testing.T) {
+	cfg := NormalizeConfig(Config{
+		StartText: "2026-06-18 00:00:00",
+		EndText:   "2026-06-30 23:59:59",
+		StartTS:   StartTS,
+		EndTS:     EndTS,
+	})
+
+	if cfg.StartTS != 1781712000 || cfg.EndTS != 1782835199 {
+		t.Fatalf("window timestamps not realigned from text: start=%d end=%d", cfg.StartTS, cfg.EndTS)
+	}
+	if cfg.StartText != "2026-06-18 00:00:00" || cfg.EndText != "2026-06-30 23:59:59" {
+		t.Fatalf("window text changed unexpectedly: %#v", cfg)
+	}
+}
+
+func TestNormalizeConfigBackfillsActivityWindowTextFromTimestamps(t *testing.T) {
+	cfg := NormalizeConfig(Config{
+		StartTS: 1781712000,
+		EndTS:   1782835199,
+	})
+
+	if cfg.StartText != "2026-06-18 00:00:00" || cfg.EndText != "2026-06-30 23:59:59" {
+		t.Fatalf("window text not backfilled from timestamps: %#v", cfg)
+	}
+}
+
 func TestNormalizeConfigAddsAdvertisedPrizeMetadataForLegacyPools(t *testing.T) {
 	cfg := NormalizeConfig(Config{
 		PrizePool: []Prize{

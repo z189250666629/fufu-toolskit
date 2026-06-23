@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"fufu/poolfundcore"
 	"fufu/prizepoolcore"
@@ -27,6 +28,10 @@ const (
 	GameScratch = "scratch"
 	GameDragon  = "dragonboat"
 )
+
+const activityTimeLayout = "2006-01-02 15:04:05"
+
+var activityTimeLocation = loadActivityTimeLocation()
 
 type Prize = prizepoolcore.Prize
 type SpinGuaranteeRule = spincore.GuaranteeRule
@@ -376,6 +381,42 @@ func CloneConfig(cfg Config) Config {
 	return out
 }
 
+func loadActivityTimeLocation() *time.Location {
+	if loc, err := time.LoadLocation("Asia/Shanghai"); err == nil {
+		return loc
+	}
+	return time.FixedZone("UTC+8", 8*60*60)
+}
+
+func parseActivityTimeText(raw string) (int64, string, bool) {
+	text := strings.TrimSpace(raw)
+	if text == "" {
+		return 0, "", false
+	}
+	parsed, err := time.ParseInLocation(activityTimeLayout, text, activityTimeLocation)
+	if err != nil {
+		return 0, "", false
+	}
+	return parsed.Unix(), parsed.In(activityTimeLocation).Format(activityTimeLayout), true
+}
+
+func formatActivityTimeText(ts int64) string {
+	if ts <= 0 {
+		return ""
+	}
+	return time.Unix(ts, 0).In(activityTimeLocation).Format(activityTimeLayout)
+}
+
+func normalizeActivityWindow(text string, ts, defaultTS int64, defaultText string) (string, int64) {
+	if parsedTS, parsedText, ok := parseActivityTimeText(text); ok {
+		return parsedText, parsedTS
+	}
+	if ts > 0 {
+		return formatActivityTimeText(ts), ts
+	}
+	return defaultText, defaultTS
+}
+
 func NormalizeConfig(cfg Config) Config {
 	hasGameConfigs := cfg.GameConfigs != nil
 	defaults := Config{
@@ -396,18 +437,8 @@ func NormalizeConfig(cfg Config) Config {
 		GameRoutes:             DefaultGameRoutes(),
 		ScratchTiers:           DefaultScratchTiers(),
 	}
-	if strings.TrimSpace(cfg.StartText) == "" {
-		cfg.StartText = defaults.StartText
-	}
-	if strings.TrimSpace(cfg.EndText) == "" {
-		cfg.EndText = defaults.EndText
-	}
-	if cfg.StartTS <= 0 {
-		cfg.StartTS = defaults.StartTS
-	}
-	if cfg.EndTS <= 0 {
-		cfg.EndTS = defaults.EndTS
-	}
+	cfg.StartText, cfg.StartTS = normalizeActivityWindow(cfg.StartText, cfg.StartTS, defaults.StartTS, defaults.StartText)
+	cfg.EndText, cfg.EndTS = normalizeActivityWindow(cfg.EndText, cfg.EndTS, defaults.EndTS, defaults.EndText)
 	if cfg.TargetExpectedValue < 0 {
 		cfg.TargetExpectedValue = 0
 	}
