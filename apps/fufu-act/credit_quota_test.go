@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"fufu/newapi"
+	"fufu/tokens"
 )
 
 func TestNewAPICreditQuotaAdapterCreatesPoolPlanAndBindsUserSubscription(t *testing.T) {
@@ -151,6 +153,26 @@ func TestNewAPICreditQuotaAdapterRequiresSubscriptionIDsForRewardFlow(t *testing
 	err := adapter.AddQuota(card, 10)
 	if err == nil || err.Error() != "subscription id is missing" {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestNewAPICreditQuotaAdapterClosesTokenIdleConnectionsAfterQuotaAttempt(t *testing.T) {
+	transport := &closeTrackingCreditTransport{}
+	client := newapi.NewClient(newapi.Site{URL: "https://newapi.example.test", Token: "token", UserID: "1"})
+	client.HTTPClient = &http.Client{Transport: transport}
+	adapter := newAPICreditQuotaAdapter{
+		service: tokens.NewService(client),
+	}
+	card := Card{CardKey: "sk-credit-close-123456"}
+
+	if err := adapter.AddQuota(card, 10); err != nil {
+		t.Fatalf("AddQuota: %v", err)
+	}
+	if got := transport.closeCount(); got == 0 {
+		t.Fatal("credit quota adapter should close idle NewAPI connections after the attempt")
+	}
+	if got := transport.missingCloseCount(); got != 0 {
+		t.Fatalf("credit quota NewAPI requests should use Connection: close, missing=%d", got)
 	}
 }
 
@@ -497,6 +519,8 @@ func TestNewAPICreditQuotaAdapterHoldsBusySlotAfterTimeoutAndUsesNextPoolSlot(t 
 	createBodies := []map[string]any{}
 	createdPlans := map[int64]string{}
 	nextPlanID := int64(70)
+	bindCanceled := make(chan struct{})
+	var bindCanceledOnce sync.Once
 	rewardSubsByUser := map[int64][]int64{
 		2: {902},
 	}
@@ -597,8 +621,15 @@ func TestNewAPICreditQuotaAdapterHoldsBusySlotAfterTimeoutAndUsesNextPoolSlot(t 
 				t.Fatalf("parse bind path %q: %v", r.URL.Path, err)
 			}
 			if userID == 1 {
-				time.Sleep(100 * time.Millisecond)
-				_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+				_, _ = io.ReadAll(r.Body)
+				_ = r.Body.Close()
+				select {
+				case <-r.Context().Done():
+					bindCanceledOnce.Do(func() { close(bindCanceled) })
+					return
+				case <-time.After(100 * time.Millisecond):
+					_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+				}
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
@@ -629,6 +660,11 @@ func TestNewAPICreditQuotaAdapterHoldsBusySlotAfterTimeoutAndUsesNextPoolSlot(t 
 
 	if err := adapter.AddQuota(first, 10); err == nil {
 		t.Fatal("first AddQuota should time out and keep its pool slot leased")
+	}
+	select {
+	case <-bindCanceled:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed-out subscription bind request was not canceled")
 	}
 	var firstSlot int
 	var firstState string
@@ -709,4 +745,56 @@ func assertRewardPlanPayload(t *testing.T, raw any, title string, totalAmount in
 	if got, _ := plan["enabled"].(bool); got {
 		t.Fatalf("enabled=%v", got)
 	}
+}
+
+type closeTrackingCreditTransport struct {
+	mu         sync.Mutex
+	closeCalls int
+	missing    int
+}
+
+func (t *closeTrackingCreditTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !req.Close || !strings.EqualFold(req.Header.Get("Connection"), "close") {
+		t.mu.Lock()
+		t.missing++
+		t.mu.Unlock()
+	}
+	body := `{"success":true}`
+	switch {
+	case req.Method == http.MethodGet && req.URL.Path == "/api/token/search":
+		body = `{"success":true,"data":[{"id":7,"key":"sk-credit-close-123456","name":"credit-card","remain_quota":10,"status":1}]}`
+	case req.Method == http.MethodPut && req.URL.Path == "/api/token/":
+		body = `{"success":true}`
+	default:
+		return &http.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       io.NopCloser(strings.NewReader(`{"success":false,"message":"unexpected request"}`)),
+			Header:     make(http.Header),
+			Request:    req,
+		}, nil
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     make(http.Header),
+		Request:    req,
+	}, nil
+}
+
+func (t *closeTrackingCreditTransport) CloseIdleConnections() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.closeCalls++
+}
+
+func (t *closeTrackingCreditTransport) closeCount() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.closeCalls
+}
+
+func (t *closeTrackingCreditTransport) missingCloseCount() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.missing
 }

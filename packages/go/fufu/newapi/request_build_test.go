@@ -43,3 +43,16 @@ func TestBuildHTTPRequestSkipsJSONContentTypeForGet(t *testing.T) {
 		t.Fatalf("headers = %#v", req.Header)
 	}
 }
+
+func TestBuildHTTPRequestHonorsConnectionCloseContext(t *testing.T) {
+	client := NewClient(Site{URL: "https://api.example.test"})
+
+	req, err := buildHTTPRequest(WithConnectionClose(context.Background()), client, http.MethodGet, "/api/status", nil)
+	if err != nil {
+		t.Fatalf("buildHTTPRequest: %v", err)
+	}
+
+	if !req.Close || req.Header.Get("Connection") != "close" {
+		t.Fatalf("request should close connection, close=%v headers=%#v", req.Close, req.Header)
+	}
+}

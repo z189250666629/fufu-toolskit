@@ -23,7 +23,11 @@ type newAPICreditQuotaAdapter struct {
 
 func (a newAPICreditQuotaAdapter) AddQuota(card Card, prizeDollars int) error {
 	ctx, cancel := creditQuotaContext()
-	defer cancel()
+	ctx = newapi.WithConnectionClose(ctx)
+	defer func() {
+		cancel()
+		closeCreditQuotaHTTPConnections(a)
+	}()
 
 	if isSubscriptionCard(card) {
 		if !card.SubscriptionID.Valid || card.SubscriptionID.Int64 <= 0 {
@@ -48,4 +52,13 @@ func creditQuotaContext() (context.Context, context.CancelFunc) {
 		return context.WithCancel(context.Background())
 	}
 	return context.WithTimeout(context.Background(), creditQuotaTimeout)
+}
+
+func closeCreditQuotaHTTPConnections(a newAPICreditQuotaAdapter) {
+	if a.service != nil && a.service.Client != nil && a.service.Client.HTTPClient != nil {
+		a.service.Client.HTTPClient.CloseIdleConnections()
+	}
+	if a.subscriptionClient != nil && a.subscriptionClient.HTTPClient != nil {
+		a.subscriptionClient.HTTPClient.CloseIdleConnections()
+	}
 }

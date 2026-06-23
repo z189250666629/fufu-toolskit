@@ -9,6 +9,18 @@ import (
 	"strings"
 )
 
+type closeConnectionContextKey struct{}
+
+// WithConnectionClose marks NewAPI requests built with this context as
+// single-use HTTP requests. This is useful for bounded background jobs where a
+// timed-out upstream call must not leave a keep-alive connection behind.
+func WithConnectionClose(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, closeConnectionContextKey{}, true)
+}
+
 func buildHTTPRequest(ctx context.Context, client *Client, method, endpoint string, body any) (*http.Request, error) {
 	var reader io.Reader
 	if body != nil {
@@ -30,5 +42,17 @@ func buildHTTPRequest(ctx context.Context, client *Client, method, endpoint stri
 	if shouldSetJSONContentType(method, body) {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if shouldCloseConnection(ctx) {
+		req.Header.Set("Connection", "close")
+		req.Close = true
+	}
 	return req, nil
+}
+
+func shouldCloseConnection(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	closeConnection, _ := ctx.Value(closeConnectionContextKey{}).(bool)
+	return closeConnection
 }
