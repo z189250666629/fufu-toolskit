@@ -58,6 +58,9 @@ type SubscriptionPlanMapping struct {
 }
 
 type Config struct {
+	// Disabled hides the public activity entry while keeping admin/stats APIs
+	// available. JSON uses the friendlier "enabled" projection for the admin UI.
+	Disabled               bool                `json:"disabled,omitempty"`
 	StartText              string              `json:"startText"`
 	EndText                string              `json:"endText"`
 	StartTS                int64               `json:"startTS"`
@@ -123,6 +126,8 @@ type gameConfigJSON struct {
 }
 
 type configJSON struct {
+	Enabled                  *bool                     `json:"enabled,omitempty"`
+	Disabled                 bool                      `json:"disabled,omitempty"`
 	StartText                string                    `json:"startText"`
 	EndText                  string                    `json:"endText"`
 	StartTS                  int64                     `json:"startTS"`
@@ -217,6 +222,11 @@ func DefaultGameConfigs() []GameConfig {
 
 func DefaultScratchTiers() []int {
 	return scratchTiersFromGameRoutes(defaultGameRoutes)
+}
+
+func (cfg Config) IsEnabled() bool {
+	cfg = NormalizeConfig(cfg)
+	return !cfg.Disabled
 }
 
 // GameForTier returns the configured gameplay for a card dollar tier.
@@ -551,6 +561,7 @@ func NormalizeConfig(cfg Config) Config {
 func (cfg Config) MarshalJSON() ([]byte, error) {
 	cfg = NormalizeConfig(cfg)
 	return json.Marshal(configJSON{
+		Enabled:                  boolPtr(!cfg.Disabled),
 		StartText:                cfg.StartText,
 		EndText:                  cfg.EndText,
 		StartTS:                  cfg.StartTS,
@@ -577,8 +588,13 @@ func (cfg *Config) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	disabled := raw.Disabled
+	if raw.Enabled != nil {
+		disabled = !*raw.Enabled
+	}
 	gameConfigs, legacyDrawCounts := gameConfigsFromJSON(raw.GameConfigs)
 	normalized := NormalizeConfig(Config{
+		Disabled:                 disabled,
 		StartText:                raw.StartText,
 		EndText:                  raw.EndText,
 		StartTS:                  raw.StartTS,
@@ -697,6 +713,10 @@ func cloneDynamicPrizePoolConfig(in poolfundcore.Config) poolfundcore.Config {
 	out := in
 	out.TierEconomics = append([]poolfundcore.TierEconomics(nil), in.TierEconomics...)
 	return out
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func isZeroDynamicPrizePoolConfig(cfg poolfundcore.Config) bool {

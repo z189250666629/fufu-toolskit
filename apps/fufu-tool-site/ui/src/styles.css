@@ -685,6 +685,7 @@ select {
 .business-stack > *,
 .metrics,
 .dynamic-pool-panel,
+.activity-control-panel,
 .table-root,
 .blueprint-table,
 .site-groups > * {
@@ -794,6 +795,26 @@ select {
 .activity-window-grid .blueprint-date-input {
   width: 100%;
   min-width: 0;
+}
+
+.activity-control-panel {
+  display: grid;
+  grid-template-columns: minmax(210px, 260px) minmax(0, 1fr);
+  gap: 12px 18px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--blueprint-line);
+  border-radius: var(--blueprint-radius-card);
+  background: var(--blueprint-canvas-raised);
+}
+
+.activity-enable-toggle {
+  min-height: 64px;
+}
+
+.activity-control-help {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .field,
@@ -1473,6 +1494,10 @@ tr:last-child td {
     column-gap: 28px;
   }
 
+  .activity-control-panel {
+    grid-template-columns: 1fr;
+  }
+
   .dynamic-pool-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1502,6 +1527,7 @@ tr:last-child td {
   .field-grid,
   .metrics,
   .business-grid,
+  .activity-control-panel,
   .dynamic-pool-controls,
   .sale-job-row,
   .sale-slot-card .sale-job-row {

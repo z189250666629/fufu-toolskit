@@ -24,6 +24,16 @@ export function numberValue(value: unknown): number {
   return Number.isFinite(next) ? next : 0;
 }
 
+export function isActivityEnabled(activity: ActivityConfig = {}): boolean {
+  if (typeof activity.enabled === 'boolean') return activity.enabled;
+  if (typeof activity.disabled === 'boolean') return !activity.disabled;
+  return true;
+}
+
+export function activityEnabledPatch(enabled: boolean): ActivityConfig {
+  return { enabled, disabled: undefined };
+}
+
 export function rateToPercentInput(value: unknown): string {
   const percent = numberValue(value) * 100;
   return String(Number(percent.toFixed(2)));

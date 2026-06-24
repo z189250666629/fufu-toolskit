@@ -417,6 +417,42 @@ func TestConfigMarshalsPrizesWithLowercaseJSONKeys(t *testing.T) {
 	}
 }
 
+func TestConfigActivityEnabledRoundTripDefaultsToOn(t *testing.T) {
+	if !DefaultConfig().IsEnabled() || !NormalizeConfig(Config{}).IsEnabled() {
+		t.Fatal("activity should be enabled by default for existing configs")
+	}
+	data, err := json.Marshal(DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"enabled":true`) {
+		t.Fatalf("config JSON should expose enabled=true, got %s", data)
+	}
+
+	var disabled Config
+	if err := json.Unmarshal([]byte(`{"enabled":false}`), &disabled); err != nil {
+		t.Fatal(err)
+	}
+	if disabled.IsEnabled() || !disabled.Disabled {
+		t.Fatalf("enabled=false should disable activity, got %#v", disabled)
+	}
+	roundTrip, err := json.Marshal(disabled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(roundTrip), `"enabled":false`) {
+		t.Fatalf("disabled config should marshal enabled=false, got %s", roundTrip)
+	}
+
+	var legacyDisabled Config
+	if err := json.Unmarshal([]byte(`{"disabled":true}`), &legacyDisabled); err != nil {
+		t.Fatal(err)
+	}
+	if legacyDisabled.IsEnabled() {
+		t.Fatalf("disabled=true should be honored for compatibility: %#v", legacyDisabled)
+	}
+}
+
 func TestSpinGuaranteeForThousandCard(t *testing.T) {
 	got := Spin(1000, false, 9, 10, 0, 0, func(max int) int { return 0 })
 	if got.Type != "win" || got.Dollars != 100 {

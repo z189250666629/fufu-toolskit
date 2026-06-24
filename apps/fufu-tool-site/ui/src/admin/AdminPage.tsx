@@ -278,13 +278,7 @@ export function AdminPage() {
             </Tabs.Panel>
 
             <Tabs.Panel id="activity" className="admin-tab-panel">
-              <ConfigCard title="活动统计" description="统计来自活动模块后台接口，登录态通过统一后台转发。">
-                <ActivityStatsPanel stats={activityStats} />
-              </ConfigCard>
-              <ConfigCard title="当前奖池中奖率" description="读取当前 /api/prizes，可用于核对目标期望值平衡后的概率。">
-                <CurrentPrizePanel prizes={prizes} />
-              </ConfigCard>
-              <ConfigCard title="活动配置" description="配置活动日期、玩法参数和卡档玩法。">
+              <ConfigCard title="活动配置" description="配置活动总开关、活动日期、玩法参数和卡档玩法。">
                 <ActivityConfigEditor
                   activity={config.activity}
                   stats={activityStats}
@@ -292,6 +286,12 @@ export function AdminPage() {
                   onGenerateTestKey={generateSaleCardTestKey}
                   onChange={(activity) => setConfig((current) => ({ ...current, activity }))}
                 />
+              </ConfigCard>
+              <ConfigCard title="活动统计" description="统计来自活动模块后台接口，登录态通过统一后台转发。">
+                <ActivityStatsPanel stats={activityStats} />
+              </ConfigCard>
+              <ConfigCard title="当前奖池中奖率" description="读取当前 /api/prizes，可用于核对目标期望值平衡后的概率。">
+                <CurrentPrizePanel prizes={prizes} />
               </ConfigCard>
             </Tabs.Panel>
           </Tabs>

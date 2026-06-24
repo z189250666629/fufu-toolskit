@@ -69,6 +69,8 @@ export type DynamicPrizePoolConfig = {
 };
 
 export type ActivityConfig = {
+  enabled?: boolean;
+  disabled?: boolean;
   startText?: string;
   endText?: string;
   startTS?: number;

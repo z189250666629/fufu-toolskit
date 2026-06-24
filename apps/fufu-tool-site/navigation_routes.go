@@ -33,6 +33,9 @@ func navigationToolsForRuntime() []NavigationCardConfig {
 func navigationCardsWithRuntimeLines(cards []NavigationCardConfig, categories []navLineCategory) []NavigationCardConfig {
 	out := make([]NavigationCardConfig, 0, len(cards))
 	for _, card := range cards {
+		if isActivityNavigationCard(card) && !activityFrontendEnabled() {
+			continue
+		}
 		if strings.TrimSpace(card.LineKind) != "" {
 			card.LineKind = strings.ToLower(strings.TrimSpace(card.LineKind))
 			card.Href = ""
@@ -44,6 +47,13 @@ func navigationCardsWithRuntimeLines(cards []NavigationCardConfig, categories []
 		out = append(out, card)
 	}
 	return sortNavigationCardsForDisplay(out)
+}
+
+func isActivityNavigationCard(card NavigationCardConfig) bool {
+	if strings.EqualFold(strings.TrimSpace(card.ID), "activity") {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(card.Href), "/activity")
 }
 
 func navigationLinksForLineKind(categories []navLineCategory, kind string) []NavigationLinkConfig {

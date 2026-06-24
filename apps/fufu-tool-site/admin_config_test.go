@@ -180,6 +180,7 @@ func TestProductionAdminShellReferencesActualBusinessAPIs(t *testing.T) {
 		"/api/nav/tools",
 		"首页导航线路",
 		"首页卡片",
+		"活动页总开关",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("production admin shell should reference %q", want)

@@ -73,6 +73,47 @@ func TestToolSiteMergedPageRoutes(t *testing.T) {
 	}
 }
 
+
+func TestActivityFrontendCanBeDisabledFromAdminConfig(t *testing.T) {
+	root := t.TempDir()
+	writeToolSiteFixture(t, root)
+	t.Setenv("ADMIN_TOKEN", "secret-admin-token")
+	if err := initRuntime(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(shutdownRuntime)
+
+	saveAdminConfig(t, map[string]any{
+		"activity": map[string]any{"enabled": false},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/activity", nil)
+	w := httptest.NewRecorder()
+	route(w, req)
+	if w.Code == http.StatusOK || strings.Contains(w.Body.String(), "活动中心") {
+		t.Fatalf("disabled activity should not render /activity: code=%d body=%s", w.Code, w.Body.String())
+	}
+
+	navReq := httptest.NewRequest(http.MethodGet, "/api/nav/tools", nil)
+	navW := httptest.NewRecorder()
+	route(navW, navReq)
+	if navW.Code != http.StatusOK {
+		t.Fatalf("nav tools code=%d body=%s", navW.Code, navW.Body.String())
+	}
+	if strings.Contains(navW.Body.String(), `"/activity"`) || strings.Contains(navW.Body.String(), `"id":"activity"`) {
+		t.Fatalf("disabled activity should hide homepage activity card, got %s", navW.Body.String())
+	}
+
+	saveAdminConfig(t, map[string]any{
+		"activity": map[string]any{"enabled": true},
+	})
+	enabledW := httptest.NewRecorder()
+	route(enabledW, httptest.NewRequest(http.MethodGet, "/activity", nil))
+	if enabledW.Code != http.StatusOK || !strings.Contains(enabledW.Body.String(), "活动中心") {
+		t.Fatalf("enabled activity should render again: code=%d body=%s", enabledW.Code, enabledW.Body.String())
+	}
+}
+
 func TestToolSiteAdminShellIsIntegrated(t *testing.T) {
 	root := t.TempDir()
 	writeToolSiteFixture(t, root)

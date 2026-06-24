@@ -85,6 +85,10 @@ func staticRoute(w http.ResponseWriter, r *http.Request) {
 	if p == "/" {
 		p = "/index.html"
 	}
+	if p == "/index.html" && !SnapshotRuntimeConfig().IsEnabled() {
+		webutil.WriteStaticNotFound(w, r)
+		return
+	}
 	if !webutil.IsPublicStaticPath(p) {
 		webutil.WriteStaticNotFound(w, r)
 		return

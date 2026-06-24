@@ -5,12 +5,14 @@ import { MessageLine } from '../blueprint';
 import { DataTable, Metric } from './adminShared';
 import {
   GAME_MODE_OPTIONS,
+  activityEnabledPatch,
   activityDatePatch,
   activityDateTimeValue,
   buildActivityTierOptions,
   dynamicTierForQuota,
   gameModeLabel,
   gameRoutesFromActivity,
+  isActivityEnabled,
   normalizeDynamicPrizePool,
   normalizeGameConfigs,
   normalizeGameMode,
@@ -194,6 +196,7 @@ export function ActivityConfigEditor({
   const updateWindow = (patch: ActivityConfig) => emit({ ...activity, ...patch });
   const startDateValue = activityDateTimeValue(activity.startText, activity.startTS);
   const endDateValue = activityDateTimeValue(activity.endText, activity.endTS);
+  const enabled = isActivityEnabled(activity);
   const scratchMaxReveals = normalizeScratchMaxReveals(activity.scratchMaxReveals);
   const metricConfig = gameConfigs.find((item) => normalizeGameMode(item.game) === 'slot') ?? gameConfigs[0];
   const actualExpectedValue = stats?.expectedValue;
@@ -201,14 +204,28 @@ export function ActivityConfigEditor({
 
   return (
     <div className="business-stack">
+      <div className="config-subhead">活动总控</div>
+      <div className="activity-control-panel">
+        <label className="field activity-enable-toggle">
+          活动页总开关
+          <span className="dynamic-toggle-control">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(event) => emit({ ...activity, ...activityEnabledPatch(event.target.checked) })}
+            />
+            <span>{enabled ? '已开启：展示 /activity 活动页' : '已关闭：隐藏 /activity 活动页'}</span>
+          </span>
+        </label>
+        <div className="field-grid activity-window-grid">
+          <label className="field">开始时间<Input className="blueprint-input blueprint-date-input" type="datetime-local" step={1} value={startDateValue} onChange={(event) => updateWindow(activityDatePatch('start', event.target.value))} /></label>
+          <label className="field">结束时间<Input className="blueprint-input blueprint-date-input" type="datetime-local" step={1} value={endDateValue} onChange={(event) => updateWindow(activityDatePatch('end', event.target.value))} /></label>
+        </div>
+        <p className="inline-help activity-control-help">关闭后前台入口和首页活动卡片不展示；后台统计、奖池和配置仍可继续维护。</p>
+      </div>
       <div className="metrics">
         <Metric label="目标期望值" value={metricConfig?.targetExpectedValue} />
         <Metric label="实际期望值" value={actualExpectedValue} />
-      </div>
-      <div className="config-subhead">活动窗口</div>
-      <div className="field-grid activity-window-grid">
-        <label className="field">开始时间<Input className="blueprint-input blueprint-date-input" type="datetime-local" step={1} value={startDateValue} onChange={(event) => updateWindow(activityDatePatch('start', event.target.value))} /></label>
-        <label className="field">结束时间<Input className="blueprint-input blueprint-date-input" type="datetime-local" step={1} value={endDateValue} onChange={(event) => updateWindow(activityDatePatch('end', event.target.value))} /></label>
       </div>
 
       <div className="config-subhead">玩法参数</div>
