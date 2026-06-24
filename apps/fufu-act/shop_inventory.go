@@ -45,6 +45,10 @@ func queryMCYUsableStock(ctx context.Context, itemID, skuID int) (int, error) {
 // shop's body-level 登录已过期 signal (HTTP 200 + code!=200); HTTP 401/403 is
 // treated as a credential/configuration problem and surfaced to the admin.
 func mcyCardGet(ctx context.Context, payload map[string]any) (map[string]any, error) {
+	return mcyCardGetWithFailureMessage(ctx, payload, "MCY 库存查询失败")
+}
+
+func mcyCardGetWithFailureMessage(ctx context.Context, payload map[string]any, fallbackMessage string) (map[string]any, error) {
 	staleCookie := getMCYCookie()
 	data, err := mcyEncryptedPost(ctx, mcyCardGetEndpoint, payload)
 	if err != nil {
@@ -54,13 +58,13 @@ func mcyCardGet(ctx context.Context, payload map[string]any) (map[string]any, er
 		return data, nil
 	}
 	if !mcyIsSessionExpired(data) {
-		return nil, fmt.Errorf("%w: %s", ErrShopRequestFailed, mcyPayloadMessage(data, "MCY 库存查询失败"))
+		return nil, fmt.Errorf("%w: %s", ErrShopRequestFailed, mcyPayloadMessage(data, fallbackMessage))
 	}
 	if data, err = mcyRetryCardGetAfterRelogin(ctx, staleCookie, payload); err != nil {
 		return nil, err
 	}
 	if !mcyPayloadOK(data) {
-		return nil, fmt.Errorf("%w: %s", ErrShopRequestFailed, mcyPayloadMessage(data, "MCY 库存查询失败"))
+		return nil, fmt.Errorf("%w: %s", ErrShopRequestFailed, mcyPayloadMessage(data, fallbackMessage))
 	}
 	return data, nil
 }

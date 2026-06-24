@@ -238,6 +238,33 @@ func TestFindShopPurchaseRelogsInOnExpiredPayload(t *testing.T) {
 	}
 }
 
+func TestFindShopPurchaseUsesEncryptedCardGet(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=test")
+
+	var gotPayload map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/plugin/virtual-card-ship/card/get" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+		secret := r.Header.Get("Secret")
+		if len(secret) < 16 || r.Header.Get("Signature") == "" {
+			t.Fatalf("purchase lookup must use encrypted MCY protocol: Secret=%q Signature=%q", secret, r.Header.Get("Signature"))
+		}
+		gotPayload = testDecodeMCYRequest(t, r.Body, secret)
+		testWriteEncryptedMCYResponse(t, w, map[string]any{"code": 200, "data": map[string]any{"list": []any{map[string]any{"purchase_time": "2026-06-10 12:00:00"}}}})
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+
+	purchase, err := findShopPurchase(context.Background(), "card-1")
+	if err != nil || purchase.PurchaseTime != "2026-06-10 12:00:00" {
+		t.Fatalf("purchase=%#v err=%v, want encrypted lookup success", purchase, err)
+	}
+	if gotPayload["equal-card"] != "card-1" || gotPayload["page"] != float64(1) || gotPayload["limit"] != float64(1) {
+		t.Fatalf("purchase payload=%#v", gotPayload)
+	}
+}
+
 // TestQueryMCYUsableStockUsesEqualFilterTotal proves the per-SKU stock query
 // uses the precise equal-<field> filter (the only one the shop honors) and reads
 // the resulting data.total — no full-list scan.
