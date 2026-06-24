@@ -62,13 +62,24 @@ func scratchRewardsForPoolBalance(cfg activity.Config, poolBalance float64) []in
 		return rewards
 	}
 	fullPrize := int(math.Round(math.Max(0, poolBalance) * scratchDynamicPoolRate))
+	if capPrize := maxScratchReward(rewards); capPrize > 0 && fullPrize > capPrize {
+		fullPrize = capPrize
+	}
 	if fullPrize <= 0 {
 		return make([]int, steps)
 	}
-	out := make([]int, steps)
+	return scaledScratchRewardProfile(rewards, fullPrize)
+}
+
+func scaledScratchRewardProfile(rewards []int, fullPrize int) []int {
+	capPrize := maxScratchReward(rewards)
+	if capPrize <= 0 || fullPrize <= 0 {
+		return make([]int, len(rewards))
+	}
+	out := make([]int, len(rewards))
 	last := 0
 	for i := range out {
-		prize := int(math.Round(float64(fullPrize) * float64(i+1) / float64(len(out))))
+		prize := int(math.Round(float64(rewards[i]) * float64(fullPrize) / float64(capPrize)))
 		if prize < last {
 			prize = last
 		}
@@ -83,6 +94,16 @@ func scratchRewardsForPoolBalance(cfg activity.Config, poolBalance float64) []in
 	}
 	out[len(out)-1] = fullPrize
 	return out
+}
+
+func maxScratchReward(rewards []int) int {
+	maxReward := 0
+	for _, reward := range rewards {
+		if reward > maxReward {
+			maxReward = reward
+		}
+	}
+	return maxReward
 }
 
 func currentScratchMaxReveals() int {

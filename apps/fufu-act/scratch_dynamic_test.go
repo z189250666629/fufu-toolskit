@@ -23,7 +23,7 @@ func TestScratchDynamicRewardsUseSeparatePoolAndConfiguredSteps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantRewards := []int{25, 50, 75, 100}
+	wantRewards := []int{2, 4, 6, 8}
 	if !sameScratchRewardInts(rewards, wantRewards) {
 		t.Fatalf("dynamic scratch rewards=%+v, want %+v", rewards, wantRewards)
 	}
@@ -46,8 +46,8 @@ func TestScratchDynamicRewardsUseSeparatePoolAndConfiguredSteps(t *testing.T) {
 	if revealBody.MaxReveals != 4 {
 		t.Fatalf("maxReveals=%d, want 4", revealBody.MaxReveals)
 	}
-	if revealBody.Prize != 25 {
-		t.Fatalf("first safe prize=%d, want 25", revealBody.Prize)
+	if revealBody.Prize != 2 {
+		t.Fatalf("first safe prize=%d, want 2", revealBody.Prize)
 	}
 
 	cashout := postScratch(t, "/api/scratch/cashout", `{"cardKey":"scratch-dynamic-card"}`)
@@ -59,8 +59,8 @@ func TestScratchDynamicRewardsUseSeparatePoolAndConfiguredSteps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if balance != 975 {
-		t.Fatalf("scratch pool balance=%v, want 975 after $25 scratch payout", balance)
+	if balance != 998 {
+		t.Fatalf("scratch pool balance=%v, want 998 after $2 scratch payout", balance)
 	}
 	mainBalance, err := currentPrizePoolBalance()
 	if err != nil {
@@ -75,6 +75,18 @@ func TestScratchDynamicRewardsUseSeparatePoolAndConfiguredSteps(t *testing.T) {
 	}
 	if rank != "scratch" || label != "刮刮乐" {
 		t.Fatalf("scratch payout ledger metadata=(%q,%q)", rank, label)
+	}
+}
+
+func TestScratchDynamicRewardsScaleButStayCappedByConfiguredProfile(t *testing.T) {
+	cfg := activity.DefaultConfig()
+	cfg.DynamicPrizePool = poolfundcore.Config{Enabled: true}
+
+	if got := scratchRewardsForPoolBalance(cfg, 1000); !sameScratchRewardInts(got, []int{2, 4, 6, 8, 12, 15}) {
+		t.Fatalf("high-balance scratch rewards=%+v, want configured cap profile", got)
+	}
+	if got := scratchRewardsForPoolBalance(cfg, 50); !sameScratchRewardInts(got, []int{1, 1, 2, 3, 4, 5}) {
+		t.Fatalf("low-balance scratch rewards=%+v, want scaled profile", got)
 	}
 }
 
