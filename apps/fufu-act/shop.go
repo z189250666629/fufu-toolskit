@@ -28,15 +28,36 @@ func findShopPurchase(ctx context.Context, cardKey string) (ShopPurchaseLookup, 
 	if err := ensureMCYCookie(ctx); err != nil {
 		return lookup, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
 	}
-	data, err := mcyPost(ctx, "/plugin/virtual-card-ship/card/get", map[string]any{"equal-card": cardKey, "page": 1, "limit": 1})
+	staleCookie := getMCYCookie()
+	data, err := mcyPost(ctx, "/plugin/virtual-card-ship/card/get", shopPurchasePayload(cardKey))
 	if err != nil {
 		return lookup, classifyShopRequestError(err)
+	}
+	if !mcyPayloadOK(data) {
+		if mcyIsSessionExpired(data) {
+			if err := refreshMCYCookie(ctx, staleCookie); err != nil {
+				return lookup, fmt.Errorf("%w: %v", ErrShopLoginFailed, err)
+			}
+			data, err = mcyPost(ctx, "/plugin/virtual-card-ship/card/get", shopPurchasePayload(cardKey))
+			if err != nil {
+				return lookup, classifyShopRequestError(err)
+			}
+			if !mcyPayloadOK(data) {
+				return lookup, fmt.Errorf("%w: %s", ErrShopRequestFailed, mcyPayloadMessage(data, "MCY 卡密查询失败"))
+			}
+		} else {
+			return lookup, fmt.Errorf("%w: %s", ErrShopRequestFailed, mcyPayloadMessage(data, "MCY 卡密查询失败"))
+		}
 	}
 	if d, ok := data["data"].(map[string]any); ok {
 		lookup.PurchaseTime = extractPurchaseTime(d)
 		return lookup, nil
 	}
 	return lookup, ErrShopInvalidResponse
+}
+
+func shopPurchasePayload(cardKey string) map[string]any {
+	return map[string]any{"equal-card": cardKey, "page": 1, "limit": 1}
 }
 
 func classifyShopRequestError(err error) error {

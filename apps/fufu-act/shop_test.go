@@ -203,6 +203,41 @@ func TestFindShopPurchaseConcurrentAuthRefreshIsRaceFree(t *testing.T) {
 	}
 }
 
+func TestFindShopPurchaseRelogsInOnExpiredPayload(t *testing.T) {
+	setMCYCookieForTest(t, "manage_token=stale")
+
+	var loginHits, getHits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/admin/login":
+			loginHits.Add(1)
+			http.SetCookie(w, &http.Cookie{Name: "manage_token", Value: "fresh"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodPost && r.URL.Path == "/plugin/virtual-card-ship/card/get":
+			getHits.Add(1)
+			if r.Header.Get("Cookie") == "manage_token=stale" {
+				_ = json.NewEncoder(w).Encode(map[string]any{"code": 0, "msg": "登录已过期"})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"code": 200, "data": map[string]any{"list": []any{map[string]any{"purchase_time": "2026-06-10 12:00:00"}}}})
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("MCY_BASE_URL", srv.URL)
+	t.Setenv("MCY_USERNAME", "u")
+	t.Setenv("MCY_PASSWORD", "p")
+
+	purchase, err := findShopPurchase(context.Background(), "card-1")
+	if err != nil || purchase.PurchaseTime != "2026-06-10 12:00:00" {
+		t.Fatalf("purchase=%#v err=%v, want retry success", purchase, err)
+	}
+	if loginHits.Load() != 1 || getHits.Load() != 2 {
+		t.Fatalf("expected 1 re-login + 2 card/get (stale fail, fresh ok), got login=%d get=%d", loginHits.Load(), getHits.Load())
+	}
+}
+
 // TestQueryMCYUsableStockUsesEqualFilterTotal proves the per-SKU stock query
 // uses the precise equal-<field> filter (the only one the shop honors) and reads
 // the resulting data.total — no full-list scan.
