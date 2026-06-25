@@ -46,6 +46,12 @@ async function deployDisciplinePaths() {
   for (const path of await listRepoFiles('apps', (path) => /\/(?:README|AGENTS|CLAUDE)\.md$/i.test(path) || path.endsWith('/docker-compose.yml'))) {
     paths.add(path);
   }
+  for (const path of await listRepoFiles('legacy', (path) => /\/(?:README|AGENTS|CLAUDE)\.md$/i.test(path) || path.endsWith('/docker-compose.yml'))) {
+    paths.add(path);
+  }
+  for (const path of await listRepoFiles('tools', (path) => /\/(?:README|AGENTS|CLAUDE)\.md$/i.test(path))) {
+    paths.add(path);
+  }
   for (const path of await listRepoFiles('.github/workflows', (path) => /\/deploy-.*\.ya?ml$/i.test(path))) {
     paths.add(path);
   }
@@ -85,7 +91,8 @@ test('dashboard-key discipline scans unified deploy docs env and agent files', a
     'docs/CI_CD.md',
     'docs/merge-notes.md',
     'apps/fufu-act/AGENTS.md',
-    'apps/network-detect/README.md',
+    'legacy/network-detect/README.md',
+    'tools/mcy-card-upload/README.md',
     '.github/workflows/deploy-fufu-tool-site.yml',
     'infra/deploy/fufu-tool-site/docker-compose.yml',
     'scripts/deploy-docker-app.sh'
@@ -148,8 +155,8 @@ test('docker context excludes non-production static assets from unified runtime 
     .filter((line) => line && !line.startsWith('#'));
 
   for (const staticRoot of [
-    'apps/fufu-tool-site/frontend',
-    'apps/fufu-tool-site/combine',
+    'apps/fufu-tool-site/web/status',
+    'apps/fufu-tool-site/web/combine',
     'apps/y2k-nav',
     'apps/fufu-act/public'
   ]) {
@@ -159,6 +166,9 @@ test('docker context excludes non-production static assets from unified runtime 
     }
   }
   for (const pattern of [
+    'legacy/',
+    'tools/',
+    'tests/',
     'apps/**/*.test.*',
     'apps/**/*_test.go',
     'scripts/*.test.mjs'
@@ -176,7 +186,7 @@ test('repo docs and agent instructions do not recommend cache-prone Go tests', a
     const source = await readRepoFile(path);
     assert.doesNotMatch(source, /(^|`|\s)go test \.\/\.\.\.(`|\s|$)/, `${path} must not recommend cache-prone go test ./...`);
     if (source.includes('go test')) {
-      assert.match(source, /go test -count=1 \.\/\.\.\.|go test -count=1 \./, `${path} should recommend uncached Go tests when showing direct Go commands`);
+      assert.match(source, /go test -count=1 \.\/(?:tests\/workspace|\.\.\.)|go test -count=1 \./, `${path} should recommend uncached Go tests when showing direct Go commands`);
     }
   }
 });

@@ -13,6 +13,7 @@ func (e *httpError) Error() string { return e.Message }
 var runModelTest = testModel
 
 type modelTestClientContextKey struct{}
+type modelTestPreferredURLContextKey struct{}
 
 func contextWithModelTestClient(ctx context.Context, client string) context.Context {
 	client = strings.TrimSpace(client)
@@ -28,6 +29,22 @@ func modelTestClientFromContext(ctx context.Context) string {
 	}
 	client, _ := ctx.Value(modelTestClientContextKey{}).(string)
 	return strings.TrimSpace(client)
+}
+
+func contextWithModelTestPreferredURL(ctx context.Context, preferredURL string) context.Context {
+	preferredURL = strings.TrimSpace(preferredURL)
+	if preferredURL == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, modelTestPreferredURLContextKey{}, preferredURL)
+}
+
+func modelTestPreferredURLFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	preferredURL, _ := ctx.Value(modelTestPreferredURLContextKey{}).(string)
+	return strings.TrimSpace(preferredURL)
 }
 
 func testModel(ctx context.Context, siteName, model, group string) (map[string]any, error) {
@@ -59,29 +76,55 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	if until, ok := reserveModelTestCooldown(&testCooldowns, key, now, next); !ok {
 		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: until}
 	}
-	channels, errMsg := loadSiteChannels(ctx, *site)
-	if errMsg != "" {
-		clearModelTestCooldownReservation(key, next)
-		clearClientModelTestCooldownReservation(clientCooldownKey, next)
-		return nil, &httpError{Status: 502, Message: errMsg}
-	}
-	candidates := selectModelTestChannels(channels, model, group)
-	if len(candidates) == 0 {
-		clearModelTestCooldownReservation(key, next)
-		return nil, &httpError{Status: 400, Message: "当前单元格没有启用通道可测试"}
-	}
-	if err := ctx.Err(); err != nil {
-		clearModelTestCooldownReservation(key, next)
-		clearClientModelTestCooldownReservation(clientCooldownKey, next)
-		return nil, err
-	}
 	stream := supportsStream(model)
+	candidateSites := orderedManualTestSites(*site, modelTestPreferredURLFromContext(ctx))
+	if len(candidateSites) == 0 {
+		candidateSites = []newapi.Site{*site}
+	}
 	var res apiResult
-	for _, ch := range candidates {
-		res = newAPIGet(ctx, *site, channelTestEndpoint(ch.ID, model, stream), 45*time.Second)
+	var lastChannelError string
+	loadedChannels := false
+	foundTestableChannel := false
+	for _, candidateSite := range candidateSites {
+		channels, errMsg := loadSiteChannels(ctx, candidateSite)
+		if errMsg != "" {
+			lastChannelError = errMsg
+			if err := ctx.Err(); err != nil {
+				clearModelTestCooldownReservation(key, next)
+				clearClientModelTestCooldownReservation(clientCooldownKey, next)
+				return nil, err
+			}
+			continue
+		}
+		loadedChannels = true
+		candidates := selectModelTestChannels(channels, model, group)
+		if len(candidates) == 0 {
+			continue
+		}
+		foundTestableChannel = true
+		for _, ch := range candidates {
+			res = newAPIGet(ctx, candidateSite, channelTestEndpoint(ch.ID, model, stream), 45*time.Second)
+			if res.OK {
+				break
+			}
+		}
+		if err := ctx.Err(); err != nil {
+			clearModelTestCooldownReservation(key, next)
+			clearClientModelTestCooldownReservation(clientCooldownKey, next)
+			return nil, err
+		}
 		if res.OK {
 			break
 		}
+	}
+	if !loadedChannels {
+		clearModelTestCooldownReservation(key, next)
+		clearClientModelTestCooldownReservation(clientCooldownKey, next)
+		return nil, &httpError{Status: 502, Message: lastChannelError}
+	}
+	if !foundTestableChannel {
+		clearModelTestCooldownReservation(key, next)
+		return nil, &httpError{Status: 400, Message: "当前单元格没有启用通道可测试"}
 	}
 	if err := ctx.Err(); err != nil {
 		testCooldowns.Delete(key)

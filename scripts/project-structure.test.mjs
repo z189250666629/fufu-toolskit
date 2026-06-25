@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 
 const repoRoot = new URL('../', import.meta.url);
 
@@ -15,11 +15,78 @@ function nonCommentLines(source) {
     .filter((line) => line && !line.startsWith('#'));
 }
 
-test('repo ignores generated binaries at root and app module boundaries', async () => {
+async function listTopLevelDirs(path) {
+  const entries = await readdir(new URL(path, repoRoot), { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+}
+
+test('top-level directories separate active apps, legacy code and local tools', async () => {
+  assert.deepEqual(await listTopLevelDirs('apps/'), [
+    'fufu-act',
+    'fufu-tool-site',
+    'y2k-nav'
+  ]);
+  assert.deepEqual(await listTopLevelDirs('legacy/'), ['network-detect']);
+  assert.deepEqual(await listTopLevelDirs('tools/'), ['mcy-card-upload']);
+  assert.deepEqual(await listTopLevelDirs('tests/'), ['workspace']);
+});
+
+test('tool-site keeps page static assets under web buckets', async () => {
+  assert.deepEqual(await listTopLevelDirs('apps/fufu-tool-site/web/'), [
+    'combine',
+    'status'
+  ]);
+  const appRootDirs = await listTopLevelDirs('apps/fufu-tool-site/');
+  for (const staleRoot of ['admin', 'combine', 'frontend']) {
+    assert.equal(appRootDirs.includes(staleRoot), false, `${staleRoot} should live under web/ or be retired`);
+  }
+  const configFiles = await readRepoFile('apps/fufu-tool-site/config/newapi-managed-api-sites.example.json');
+  assert.match(configFiles, /managedApiSites/);
+});
+
+test('tool-site keeps entrypoint, runtime state and route adapters separated', async () => {
+  const main = await readRepoFile('apps/fufu-tool-site/main.go');
+  const runtime = await readRepoFile('apps/fufu-tool-site/runtime.go');
+  const runtimeState = await readRepoFile('apps/fufu-tool-site/runtime_state.go');
+  const apiRoutes = await readRepoFile('apps/fufu-tool-site/api_routes.go');
+  const staticRoutes = await readRepoFile('apps/fufu-tool-site/static.go');
+  const appReadme = await readRepoFile('apps/fufu-tool-site/README.md');
+
+  assert.match(main, /func main\(/);
+  assert.match(main, /func run\(/);
+  assert.doesNotMatch(main, /func initRuntime\(/);
+  assert.doesNotMatch(main, /\brootDir\b/);
+  assert.doesNotMatch(main, /\bmodelCache\b/);
+  assert.doesNotMatch(main, /type httpError struct/);
+
+  assert.match(runtime, /func initRuntime\(/);
+  assert.match(runtime, /func shutdownRuntime\(/);
+  assert.match(runtime, /func newHTTPServer\(/);
+  assert.match(runtimeState, /var modelCache = struct/);
+  assert.match(runtimeState, /type apiResult struct/);
+  assert.match(runtimeState, /type testRecord struct/);
+
+  assert.match(apiRoutes, /type toolAPIRouteSpec struct/);
+  assert.match(apiRoutes, /func findToolAPIPath/);
+  assert.doesNotMatch(apiRoutes, /networkAPIRoute|NetworkAPI/);
+  assert.match(staticRoutes, /func serveStatusStatic/);
+  assert.match(staticRoutes, /func isReferencedToolWebAsset/);
+  assert.doesNotMatch(staticRoutes, /serveFrontendStatic|ReferencedNetworkBrowserAsset/);
+
+  assert.match(appReadme, /`main\.go`：进程入口/);
+  assert.match(appReadme, /`runtime\.go` \/ `runtime_state\.go`：运行时初始化/);
+  assert.match(appReadme, /`model_status_\*`：模型状态/);
+});
+
+test('repo ignores generated binaries and excludes non-production buckets from Docker context', async () => {
   const ignored = new Set(nonCommentLines(await readRepoFile('.gitignore')));
   const dockerIgnored = new Set(nonCommentLines(await readRepoFile('.dockerignore')));
 
   for (const pattern of [
+    '.playwright-cli/',
     '/fufu-tool-site',
     '/fufu-tool-site.exe',
     '/fufu-act',
@@ -30,14 +97,49 @@ test('repo ignores generated binaries at root and app module boundaries', async 
     'apps/fufu-tool-site/fufu-tool-site.exe',
     'apps/fufu-act/fufu-act',
     'apps/fufu-act/fufu-act.exe',
-    'apps/network-detect/network-detect',
-    'apps/network-detect/network-detect.exe',
+    'legacy/network-detect/network-detect',
+    'legacy/network-detect/network-detect.exe',
     'apps/y2k-nav/y2k-nav',
     'apps/y2k-nav/y2k-nav.exe'
   ]) {
     assert.equal(ignored.has(pattern), true, `.gitignore should ignore ${pattern}`);
-    assert.equal(dockerIgnored.has(pattern), true, `.dockerignore should ignore ${pattern}`);
   }
+  for (const pattern of ['legacy/', 'tools/']) {
+    assert.equal(dockerIgnored.has(pattern), true, `.dockerignore should exclude ${pattern}`);
+  }
+  assert.equal(dockerIgnored.has('tests/'), true, '.dockerignore should exclude tests/');
+});
+
+test('root directory stays focused on entry files and shared config only', async () => {
+  const entries = await readdir(repoRoot, { withFileTypes: true });
+  const rootFiles = entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .sort();
+  const rootDirs = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+
+  assert.equal(rootFiles.includes('workspace_test.go'), false, 'workspace tests should live under tests/workspace');
+  for (const generatedDir of ['.tmp', '.playwright-cli']) {
+    assert.equal(rootDirs.includes(generatedDir), false, `root should not contain generated directory ${generatedDir}`);
+  }
+  for (const generated of [
+    '.codex-fufu-tool-site-8081.err.log',
+    '.codex-fufu-tool-site-8081.out.log',
+    'tmp-fufu-tool-site-8081.err.log',
+    'tmp-fufu-tool-site-8081.out.log',
+    'cover.out',
+    'coverage.out',
+    'fufu-tool-site.exe'
+  ]) {
+    assert.equal(rootFiles.includes(generated), false, `root should not contain generated artifact ${generated}`);
+  }
+
+  const workspaceTest = await readRepoFile('tests/workspace/workspace_test.go');
+  assert.match(workspaceTest, /package workspace/);
+  assert.match(workspaceTest, /func TestWorkspaceModules/);
 });
 
 test('docs describe the unified admin and legacy activity-admin redirect', async () => {
@@ -53,27 +155,36 @@ test('docs describe the unified admin and legacy activity-admin redirect', async
   assert.match(mergeNotes, /`\/activity-admin`：旧 activity 后台兼容地址，重定向到 `\/admin`。/);
 });
 
-test('workspace keeps apps and shared packages as separate modules', async () => {
+test('workspace keeps only active apps and shared packages as modules', async () => {
   const goWork = await readRepoFile('go.work');
   for (const modulePath of [
     './apps/fufu-tool-site',
     './apps/fufu-act',
     './apps/y2k-nav',
-    './apps/network-detect',
     './packages/go/fufu'
   ]) {
     assert.match(goWork, new RegExp(modulePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  for (const inactivePath of ['./legacy/network-detect', './tools/mcy-card-upload', './apps/network-detect', './apps/mcy-card-upload']) {
+    assert.doesNotMatch(goWork, new RegExp(inactivePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 });
 
 test('README points project cleanup to the requirements baseline first', async () => {
   const readme = await readRepoFile('README.md');
   const requirements = await readRepoFile('docs/requirements.md');
+  const structure = await readRepoFile('docs/project-structure.md');
 
   assert.match(readme, /docs\/requirements\.md/);
+  assert.match(readme, /docs\/project-structure\.md/);
+  assert.match(readme, /legacy\/network-detect/);
+  assert.match(readme, /tools\/mcy-card-upload/);
   assert.match(requirements, /谁用，怎么用，达成什么效果/);
   assert.match(requirements, /统一的是入口和运营体验，不是抹掉模块边界/);
   assert.match(requirements, /整理顺序/);
+  assert.match(structure, /`apps\/`\s*\|\s*当前仍参与统一工具站运行/);
+  assert.match(structure, /`legacy\/`\s*\|\s*已退出生产入口/);
+  assert.match(structure, /`tools\/`\s*\|\s*本地运营\/维护脚本/);
 });
 
 test('navigation configuration is isolated from generic admin config plumbing', async () => {
@@ -230,12 +341,12 @@ test('model status build separates cache, fetch, site build and projection', asy
   assert.doesNotMatch(projection, /func loadSiteLogs/);
 });
 
-test('network-detect keeps historical model status shell split by responsibility', async () => {
-  const build = await readRepoFile('apps/network-detect/model_status_build.go');
-  const cacheFlow = await readRepoFile('apps/network-detect/model_status_cache_flow.go');
-  const fetch = await readRepoFile('apps/network-detect/model_status_fetch_orchestration.go');
-  const siteBuild = await readRepoFile('apps/network-detect/model_status_site_build.go');
-  const projection = await readRepoFile('apps/network-detect/model_status_projection.go');
+test('legacy network-detect keeps historical model status shell split by responsibility', async () => {
+  const build = await readRepoFile('legacy/network-detect/model_status_build.go');
+  const cacheFlow = await readRepoFile('legacy/network-detect/model_status_cache_flow.go');
+  const fetch = await readRepoFile('legacy/network-detect/model_status_fetch_orchestration.go');
+  const siteBuild = await readRepoFile('legacy/network-detect/model_status_site_build.go');
+  const projection = await readRepoFile('legacy/network-detect/model_status_projection.go');
 
   assert.match(build, /func buildModelStatus/);
   assert.match(build, /func newModelStatusBuildPlan/);

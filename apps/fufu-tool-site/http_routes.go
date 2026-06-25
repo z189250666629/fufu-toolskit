@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const maxNetworkJSONBodyBytes int64 = 1 << 20
+const maxToolJSONBodyBytes int64 = 1 << 20
 
 var errRequestBodyTooLarge = errors.New("request body too large")
 
@@ -31,11 +31,11 @@ func route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if isCombinePagePath(path) {
-		serveFile(w, r, filepath.Join(combineDir, "index.html"), true)
+		serveFile(w, r, filepath.Join(combineWebDir, "index.html"), true)
 		return
 	}
 	if isStatusPagePath(path) {
-		serveFile(w, r, filepath.Join(frontendDir, "index.html"), true)
+		serveFile(w, r, filepath.Join(statusWebDir, "index.html"), true)
 		return
 	}
 	if isActivityPagePath(path) {
@@ -132,7 +132,7 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := r.URL.Path
-	route, ok := findNetworkAPIPath(path)
+	route, ok := findToolAPIPath(path)
 	if !ok {
 		writeJSONError(w, 404, "API not found")
 		return
@@ -214,7 +214,7 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 }
 
 func readJSON(r *http.Request, out any) error {
-	err := webutil.DecodeJSON(http.MaxBytesReader(nil, r.Body, maxNetworkJSONBodyBytes), out, webutil.WithUseNumber())
+	err := webutil.DecodeJSON(http.MaxBytesReader(nil, r.Body, maxToolJSONBodyBytes), out, webutil.WithUseNumber())
 	if err == nil {
 		return nil
 	}

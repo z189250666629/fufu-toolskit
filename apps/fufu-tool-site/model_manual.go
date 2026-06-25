@@ -8,9 +8,10 @@ import (
 
 func handleModelTest(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		SiteName string `json:"siteName"`
-		Model    string `json:"model"`
-		Group    string `json:"group"`
+		SiteName     string `json:"siteName"`
+		Model        string `json:"model"`
+		Group        string `json:"group"`
+		PreferredURL string `json:"preferredUrl"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		if errors.Is(err, errRequestBodyTooLarge) {
@@ -23,11 +24,14 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 	body.SiteName = strings.TrimSpace(body.SiteName)
 	body.Model = strings.TrimSpace(body.Model)
 	body.Group = strings.TrimSpace(body.Group)
+	body.PreferredURL = strings.TrimSpace(body.PreferredURL)
 	if body.SiteName == "" || body.Model == "" {
 		writeJSONError(w, 400, "siteName 和 model 必填")
 		return
 	}
-	result, err := runModelTest(contextWithModelTestClient(r.Context(), clientIP(r)), body.SiteName, body.Model, body.Group)
+	ctx := contextWithModelTestClient(r.Context(), clientIP(r))
+	ctx = contextWithModelTestPreferredURL(ctx, body.PreferredURL)
+	result, err := runModelTest(ctx, body.SiteName, body.Model, body.Group)
 	if err != nil {
 		var e *httpError
 		if errors.As(err, &e) {

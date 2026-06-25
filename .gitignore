@@ -4,6 +4,7 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+.playwright-cli/
 
 # Dependencies
 node_modules/
@@ -66,8 +67,8 @@ apps/**/backups/
 /fufu-act.exe
 /fufu-tool-site
 /fufu-tool-site.exe
-apps/network-detect/network-detect
-apps/network-detect/network-detect.exe
+legacy/network-detect/network-detect
+legacy/network-detect/network-detect.exe
 apps/fufu-act/fufu-act
 apps/fufu-act/fufu-act.exe
 apps/y2k-nav/y2k-nav

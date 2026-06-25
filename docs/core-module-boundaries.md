@@ -27,7 +27,7 @@
 | --- | --- | --- |
 | `apps/fufu-tool-site` | 统一生产入口、后台、首页、状态页、合卡/activity 嵌入 | 它负责 HTTP、SQLite、env 种子、cookie/session、静态资源和运行态装配，测试不能只靠普通对象完成。 |
 | `apps/fufu-act` | 活动 API、抽奖/刮刮卡执行、补卡执行、MCY 访问 | 它依赖 DB、锁、事务、NewAPI token 服务、MCY 登录/上传和 HTTP handler。 |
-| `apps/network-detect` | 历史状态面板源码和迁移参考 | 它的纯统计规则已指向 `modelcore`，剩余部分是历史 app 壳、HTTP、配置和静态资源。 |
+| `legacy/network-detect` | 历史状态面板源码和迁移参考 | 它的纯统计规则已指向 `modelcore`，剩余部分是历史 app 壳、HTTP、配置和静态资源；不进入活跃 `go.work` 或生产 Docker context。 |
 | `apps/y2k-nav` | 独立导航历史资源 | 当前主要是静态服务和浏览器主题行为，纯导航配置已由 `navcore` 承担。 |
 
 ## 本轮已分发拆分的 app 层
@@ -39,10 +39,10 @@
 | `apps/fufu-tool-site/model_status_*` | `buildModelStatus` 拆为 cache/inflight、fetch orchestration、per-site build、projection/manual 投影。 | NewAPI 拉日志、频道、价格和运行时缓存都不能进 core；模型统计的纯规则继续复用 `modelcore`。 |
 | `apps/fufu-tool-site/admin_config_store*` | store 生命周期、DB 读写、旧文件迁移、env seed、load/save 编排、normalize 入口分开。 | SQLite、旧 JSON 文件、env 首次种子和运行态 apply 都是外部边界；纯归一化继续委托 `admincore`。 |
 | `apps/fufu-tool-site/ui/src/admin/*` | `AdminPage.tsx` 缩成认证、加载、保存和布局；站点/导航、MCY、售卡、活动配置、通用 UI 组件各自成文件；`siteNavigationConfigCore.ts` / `activityConfigCore.ts` / `saleCardConfigCore.ts` 只保留可对象测试的前端配置规则。 | React 组件、HeroUI、fetch 和页面状态不进 core；前端编辑态的纯配置变换允许保留在同目录 TS core，并用 node 表驱动测试约束。 |
-| `apps/network-detect/model_status_*` | 历史状态页的 `buildModelStatus` 同样拆为 cache、fetch orchestration、per-site build、projection/manual 投影。 | 它仍是历史 app 壳，负责 config 文件、NewAPI HTTP 拉取、缓存和静态页面，不进 core；纯统计规则继续复用 `modelcore`。 |
+| `legacy/network-detect/model_status_*` | 历史状态页的 `buildModelStatus` 同样拆为 cache、fetch orchestration、per-site build、projection/manual 投影。 | 它仍是历史 app 壳，负责 config 文件、NewAPI HTTP 拉取、缓存和静态页面，不进 core；纯统计规则继续复用 `modelcore`。 |
 
 ## 后续拆分顺序
 
 1. 继续把 app 层薄包装的旧函数名逐步替换为直接调用 core 包；只有完全普通对象可测的规则才允许进入 core。
 2. 对 `apps/fufu-act` 剩余 handler 做同样的入口/编排/store/response 拆薄，但已有 `spin`、`scratch`、`dragonboat`、`shop`、`sale-card`、`login`、`credit` 的主边界，不需要再把外部依赖硬塞进 core。
-3. `apps/network-detect` 若最终只作为迁移参考保留，可再评估是否冻结为 legacy fixture，避免继续和 `fufu-tool-site` 双写状态页前端。
+3. `legacy/network-detect` 若最终只作为迁移参考保留，可再评估是否冻结为 legacy fixture，避免继续和 `fufu-tool-site` 双写状态页前端。

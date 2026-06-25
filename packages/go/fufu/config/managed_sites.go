@@ -137,7 +137,11 @@ func LoadManagedSites(rootDir string) ([]newapi.Site, string) {
 		}
 		candidates = append(candidates, configured)
 	} else {
-		candidates = append(candidates, filepath.Join(rootDir, "newapi-managed-api-sites.json"))
+		candidates = append(
+			candidates,
+			filepath.Join(rootDir, "config", "newapi-managed-api-sites.json"),
+			filepath.Join(rootDir, "newapi-managed-api-sites.json"),
+		)
 		if home, err := os.UserHomeDir(); err == nil {
 			candidates = append(candidates, filepath.Join(home, "Downloads", "newapi-manager-config-2026-05-06.json"))
 		}

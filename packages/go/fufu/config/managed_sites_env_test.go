@@ -109,6 +109,47 @@ func TestLoadManagedSitesResolvesRelativeExplicitConfigPathFromRoot(t *testing.T
 	}
 }
 
+func TestLoadManagedSitesUsesConfigDirectoryBeforeLegacyRootFile(t *testing.T) {
+	clearPrimaryEnv(t)
+	root := t.TempDir()
+	configDir := filepath.Join(root, "config")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "newapi-managed-api-sites.json"), []byte(`{"managedApiSites":[{"name":"config-site","url":"https://config.example.test","token":"config-token"}]}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "newapi-managed-api-sites.json"), []byte(`{"managedApiSites":[{"name":"legacy-site","url":"https://legacy.example.test","token":"legacy-token"}]}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	sites, msg := LoadManagedSites(root)
+
+	if msg != "" {
+		t.Fatalf("msg = %q", msg)
+	}
+	if len(sites) != 1 || sites[0].Name != "config-site" || sites[0].URL != "https://config.example.test" {
+		t.Fatalf("sites = %#v", sites)
+	}
+}
+
+func TestLoadManagedSitesKeepsLegacyRootFileFallback(t *testing.T) {
+	clearPrimaryEnv(t)
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "newapi-managed-api-sites.json"), []byte(`{"managedApiSites":[{"name":"legacy-site","url":"https://legacy.example.test","token":"legacy-token"}]}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	sites, msg := LoadManagedSites(root)
+
+	if msg != "" {
+		t.Fatalf("msg = %q", msg)
+	}
+	if len(sites) != 1 || sites[0].Name != "legacy-site" || sites[0].URL != "https://legacy.example.test" {
+		t.Fatalf("sites = %#v", sites)
+	}
+}
+
 func TestLoadManagedSitesReportsInlineShapeError(t *testing.T) {
 	clearPrimaryEnv(t)
 	t.Setenv("NEWAPI_MANAGED_API_SITES", `{"managedApiSites":{}}`)

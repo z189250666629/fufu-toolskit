@@ -1,6 +1,6 @@
-# API Site Usage Dashboard
+# network-detect（legacy）
 
-Go backend + existing static frontend dashboard for fixed NewAPI-managed API sites. The app also serves the migrated fufu-combine tool at `/combine` and reuses the same NewAPI token/config layer.
+历史 API / NewAPI 状态面板源码，保留为迁移参考和回归样本。生产入口已经收束到 `apps/fufu-tool-site`，本目录不进入 `go.work` 活跃模块，也不进入生产 Docker context；不要再把它作为独立生产服务部署。
 
 ## Local Development
 
@@ -16,7 +16,7 @@ Then open:
 Checks:
 
 ```powershell
-npm test
+go test -count=1 .
 ```
 
 ## NewAPI Config
@@ -53,7 +53,4 @@ Migrated combine-compatible APIs are also served by this app:
 
 ## Docker
 
-```powershell
-docker build -f apps/network-detect/Dockerfile -t network-detect:local .
-docker run --rm -p 8080:8080 network-detect:local
-```
+本目录的 Dockerfile / compose 只作为历史部署参考保留。根目录 `.dockerignore` 会排除 `legacy/`，生产镜像只构建 `apps/fufu-tool-site`。

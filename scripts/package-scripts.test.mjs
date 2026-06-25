@@ -26,11 +26,11 @@ test('root scripts expose one centralized test entry', () => {
 
 test('root test suite runs through one Node entrypoint without Go test executables', () => {
   assert.equal(NODE_TEST_FILES.includes('scripts/package-scripts.test.mjs'), true);
-  assert.equal(NODE_TEST_FILES.includes('apps/fufu-tool-site/frontend/api.test.mjs'), true);
+  assert.equal(NODE_TEST_FILES.includes('apps/fufu-tool-site/web/status/api.test.mjs'), true);
   assert.equal(NODE_TEST_FILES.includes('apps/y2k-nav/theme.test.mjs'), true);
   assert.equal(NODE_TEST_FILES.includes('apps/fufu-act/public/activity-api.test.mjs'), true);
   assert.equal(NODE_TEST_FILES.some((file) => file.includes('network-detect')), false);
-  assert.doesNotMatch(ROOT_TEST_SCRIPT, /apps\/fufu-act|apps\/network-detect|apps\/y2k-nav|go test/);
+  assert.doesNotMatch(ROOT_TEST_SCRIPT, /apps\/fufu-act|legacy\/network-detect|apps\/y2k-nav|go test/);
 });
 
 test('root scripts expose one centralized startup entry', () => {
@@ -62,9 +62,9 @@ test('tool-site package does not expose local test scripts', async () => {
   assert.equal(appPackage.scripts?.['test:frontend'], undefined);
 });
 
-test('embedded module packages do not expose local test scripts', async () => {
+test('embedded and legacy module packages do not expose local test scripts', async () => {
   for (const path of [
-    '../apps/network-detect/package.json',
+    '../legacy/network-detect/package.json',
     '../apps/fufu-act/package.json',
     '../apps/y2k-nav/package.json'
   ]) {

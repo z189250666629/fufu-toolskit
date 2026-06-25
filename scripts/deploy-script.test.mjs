@@ -39,7 +39,7 @@ test('deploy shell scripts pass bash syntax checks', { skip: bashProbe.error ? '
 });
 
 async function runDeployPortValidationCase(t, { hostPort }) {
-  const tmpName = `.tmp/deploy-script-port-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpName = `scripts/.tmp/deploy-script-port-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
   const fakeBinRel = `${tmpName}/bin`;
   const composeRel = `${tmpName}/docker-compose.yml`;
@@ -119,7 +119,7 @@ test('deploy script fails before ssh when fufu-tool-site HOST_PORT is missing or
 });
 
 test('deploy script cleans compose env file when deployment fails', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
-  const tmpName = `.tmp/deploy-script-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpName = `scripts/.tmp/deploy-script-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
   const fakeBinRel = `${tmpName}/bin`;
   const composeRel = `${tmpName}/docker-compose.yml`;
@@ -188,7 +188,7 @@ test('deploy script cleans compose env file when deployment fails', { skip: bash
 });
 
 test('deploy script uploads managed-site config file for fufu-tool-site', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
-  const tmpName = `.tmp/deploy-script-managed-config-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpName = `scripts/.tmp/deploy-script-managed-config-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
   const fakeBinRel = `${tmpName}/bin`;
   const composeRel = `${tmpName}/docker-compose.yml`;
@@ -260,7 +260,7 @@ test('deploy script uploads managed-site config file for fufu-tool-site', { skip
 });
 
 test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
-  const tmpName = `.tmp/deploy-script-spaces-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpName = `scripts/.tmp/deploy-script-spaces-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
   const fakeBinRel = `${tmpName}/bin`;
   const composeRel = `${tmpName}/docker-compose.yml`;
@@ -326,7 +326,7 @@ test('deploy script preserves ssh key path with spaces', { skip: bashProbe.error
 });
 
 test('deploy script quotes deploy path inside remote ssh commands', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
-  const tmpName = `.tmp/deploy-script-remote-quote-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpName = `scripts/.tmp/deploy-script-remote-quote-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
   const fakeBinRel = `${tmpName}/bin`;
   const composeRel = `${tmpName}/docker-compose.yml`;
@@ -386,7 +386,7 @@ test('deploy script quotes deploy path inside remote ssh commands', { skip: bash
 });
 
 test('deploy script prints diagnostics when health inspect fails', { skip: bashProbe.error ? 'bash is not available' : false }, async (t) => {
-  const tmpName = `.tmp/deploy-script-health-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const tmpName = `scripts/.tmp/deploy-script-health-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const tmpUrl = new URL(`${tmpName}/`, repoRootUrl);
   const fakeBinRel = `${tmpName}/bin`;
   const composeRel = `${tmpName}/docker-compose.yml`;

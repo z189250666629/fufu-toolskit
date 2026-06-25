@@ -2,32 +2,32 @@ package main
 
 import "net/http"
 
-type networkAPIRouteSpec struct {
+type toolAPIRouteSpec struct {
 	Method string
 	Match  func(string) bool
 }
 
-var networkAPIRoutes = []networkAPIRouteSpec{
-	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/health")},
-	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/client")},
-	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/connectivity/targets")},
-	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/newapi/sites")},
-	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/nav/lines")},
-	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/nav/tools")},
-	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/newapi/model-status")},
-	{Method: http.MethodGet, Match: exactNetworkAPIPath("/api/newapi/overview")},
-	{Method: http.MethodPost, Match: exactNetworkAPIPath("/api/newapi/model-status/test")},
+var toolAPIRoutes = []toolAPIRouteSpec{
+	{Method: http.MethodGet, Match: exactToolAPIPath("/api/health")},
+	{Method: http.MethodGet, Match: exactToolAPIPath("/api/client")},
+	{Method: http.MethodGet, Match: exactToolAPIPath("/api/connectivity/targets")},
+	{Method: http.MethodGet, Match: exactToolAPIPath("/api/newapi/sites")},
+	{Method: http.MethodGet, Match: exactToolAPIPath("/api/nav/lines")},
+	{Method: http.MethodGet, Match: exactToolAPIPath("/api/nav/tools")},
+	{Method: http.MethodGet, Match: exactToolAPIPath("/api/newapi/model-status")},
+	{Method: http.MethodGet, Match: exactToolAPIPath("/api/newapi/overview")},
+	{Method: http.MethodPost, Match: exactToolAPIPath("/api/newapi/model-status/test")},
 }
 
-func exactNetworkAPIPath(path string) func(string) bool {
+func exactToolAPIPath(path string) func(string) bool {
 	return func(got string) bool { return got == path }
 }
 
-func findNetworkAPIPath(path string) (networkAPIRouteSpec, bool) {
-	for _, route := range networkAPIRoutes {
+func findToolAPIPath(path string) (toolAPIRouteSpec, bool) {
+	for _, route := range toolAPIRoutes {
 		if route.Match(path) {
 			return route, true
 		}
 	}
-	return networkAPIRouteSpec{}, false
+	return toolAPIRouteSpec{}, false
 }

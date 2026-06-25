@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var frontendStaticEntryPoints = []string{"/index.html"}
+var statusStaticEntryPoints = []string{"/index.html"}
 var combineStaticEntryPoints = []string{"/index.html"}
 var uiStaticEntryPoints = []string{"/index.html"}
 var navStaticEntryPoints = []string{"/index.html"}
@@ -23,7 +23,7 @@ func serveStatic(w http.ResponseWriter, r *http.Request, path string) {
 	if serveRootActivityStatic(w, r, path) {
 		return
 	}
-	serveFrontendStatic(w, r, path)
+	serveStatusStatic(w, r, path)
 }
 
 func serveUIStatic(w http.ResponseWriter, r *http.Request, path string) bool {
@@ -45,12 +45,12 @@ func serveUIStatic(w http.ResponseWriter, r *http.Request, path string) bool {
 	return true
 }
 
-func serveFrontendStatic(w http.ResponseWriter, r *http.Request, path string) {
+func serveStatusStatic(w http.ResponseWriter, r *http.Request, path string) {
 	if !webutil.IsPublicStaticPath(path) {
 		webutil.WriteStaticNotFound(w, r)
 		return
 	}
-	file, ok := webutil.SafePath(frontendDir, path)
+	file, ok := webutil.SafePath(statusWebDir, path)
 	if !ok {
 		webutil.WriteStaticError(w, "Forbidden", http.StatusForbidden)
 		return
@@ -60,10 +60,10 @@ func serveFrontendStatic(w http.ResponseWriter, r *http.Request, path string) {
 			webutil.WriteStaticNotFound(w, r)
 			return
 		}
-		file = filepath.Join(frontendDir, "index.html")
+		file = filepath.Join(statusWebDir, "index.html")
 		path = "/index.html"
 	}
-	if !isReferencedNetworkBrowserAsset(path) {
+	if !isReferencedToolWebAsset(path) {
 		webutil.WriteStaticNotFound(w, r)
 		return
 	}
@@ -132,9 +132,9 @@ func serveActivityPageAs(w http.ResponseWriter, r *http.Request, path string) {
 	activityApp.ServeHTTP(w, cloned)
 }
 
-func isReferencedNetworkBrowserAsset(path string) bool {
-	return webutil.IsReferencedBrowserAsset(frontendDir, path, frontendStaticEntryPoints) ||
-		webutil.IsReferencedBrowserAsset(combineDir, path, combineStaticEntryPoints)
+func isReferencedToolWebAsset(path string) bool {
+	return webutil.IsReferencedBrowserAsset(statusWebDir, path, statusStaticEntryPoints) ||
+		webutil.IsReferencedBrowserAsset(combineWebDir, path, combineStaticEntryPoints)
 }
 
 func serveFile(w http.ResponseWriter, r *http.Request, file string, noStore bool) {

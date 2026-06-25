@@ -7,14 +7,14 @@
 - `apps/fufu-tool-site`：统一生产服务，复用原 `network-detect` 的状态面板和合卡后端能力。
 - `apps/y2k-nav`：保留为首页导航静态资源模块，被 `fufu-tool-site` 的 `/` 嵌入。
 - `apps/fufu-act`：保留为 activity 后端与 `public/` 前台静态资源模块，被 `fufu-tool-site` 的 `/activity` 和 `/api/admin/*` 等路由嵌入。
-- `apps/network-detect`：历史模块源码保留，生产部署不再单独指向它。
+- `legacy/network-detect`：历史模块源码保留，已从活跃 `apps/`、`go.work` 和生产 Docker context 隔离。
 - `apps/fufu-combine`：已迁移至统一服务与 `packages/go/fufu/combine`，不再独立部署。
 
 ## 未迁移/未提交内容
 
 - 未复制运行数据库，如 `apps/**/data/*.db*`。
 - 不提交 `.env*`、`config.json`、cookie、token 或商城账号密码。
-- `apps/mcy-card-upload/` 若存在本地硬编码凭据，不进入统一前端；集成前必须先改为服务端/env 配置。
+- `tools/mcy-card-upload/` 若存在本地硬编码凭据，不进入统一前端；集成前必须先改为服务端/env 配置。
 
 ## 当前生产入口
 

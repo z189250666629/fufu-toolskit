@@ -105,6 +105,34 @@ test('runModelCellTest toggles testing state and writes success message', async 
   assert.equal(state.modelTestMessage, 'site / model-a 测试完成：ok');
 });
 
+test('runModelCellTest includes preferredUrl when provided', async () => {
+  const state = {
+    testingCells: new Set(),
+    modelTestMessage: '',
+    modelStatus: {
+      models: [{ model: 'model-a', perSite: { site: { status: 'unknown' } } }]
+    }
+  };
+
+  await runModelCellTest({
+    state,
+    siteName: 'site',
+    model: 'model-a',
+    preferredUrl: 'https://api.example.test',
+    postJsonImpl: async (path, body) => {
+      assert.equal(path, '/api/newapi/model-status/test');
+      assert.deepEqual(body, {
+        siteName: 'site',
+        model: 'model-a',
+        group: '',
+        preferredUrl: 'https://api.example.test'
+      });
+      return { cell: { status: 'operational' }, test: { message: 'ok' } };
+    },
+    render: () => {}
+  });
+});
+
 test('runModelCellTest records cooldown and failure message on API error', async () => {
   const state = {
     testingCells: new Set(),

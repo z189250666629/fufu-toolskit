@@ -59,6 +59,7 @@ export async function runModelCellTest({
   siteName,
   model,
   group = '',
+  preferredUrl = '',
   postJsonImpl,
   render
 }) {
@@ -71,7 +72,9 @@ export async function runModelCellTest({
   render();
 
   try {
-    const result = await postJsonImpl('/api/newapi/model-status/test', { siteName, model, group });
+    const body = { siteName, model, group };
+    if (preferredUrl) body.preferredUrl = preferredUrl;
+    const result = await postJsonImpl('/api/newapi/model-status/test', body);
     applyModelTestResultToState(state.modelStatus, siteName, model, result, group);
     state.modelTestMessage = `${siteName} / ${model} 测试完成：${result.test?.message || '测试完成'}`;
   } catch (error) {

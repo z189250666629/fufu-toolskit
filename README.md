@@ -6,7 +6,7 @@
 | --- | --- | ---: | ---: | --- |
 | fufu 工具站 | `apps/fufu-tool-site` | `8080` | `38473` | 首页导航 + API/模型状态 + 合卡 + 活动前台 + 统一管理后台 |
 
-旧的独立生产入口 `y2k-nav:33148`、`fufu-act:18820` 已下线；`apps/y2k-nav` 与 `apps/fufu-act` 仍保留为嵌入式资源模块。`fufu-combine` 已并入合卡模块，入口为 `/combine`。
+旧的独立生产入口 `y2k-nav:33148`、`fufu-act:18820` 已下线；`apps/y2k-nav` 与 `apps/fufu-act` 仍保留为嵌入式资源模块。历史 `network-detect` 源码已归档到 `legacy/network-detect`。本地 MCY 运营脚本放在 `tools/mcy-card-upload`，不属于生产 app。`fufu-combine` 已并入合卡模块，入口为 `/combine`。
 
 ## 路由
 
@@ -22,19 +22,26 @@
 
 ## 需求整理
 
-项目整理先从需求和验收标准开始，详见 `docs/requirements.md`。
+项目整理先从需求和验收标准开始，详见 `docs/requirements.md`；目录归属规则见 `docs/project-structure.md`。
 
 ## 目录结构
 
 ```text
 apps/
   fufu-tool-site/     # 统一生产服务：导航 + status + combine + activity
-    frontend/         # API/模型状态静态前端
-    combine/          # 合卡静态前端
+    config/           # 默认配置样例与非密钥 JSON 配置
+    web/status/       # API/模型状态静态前端
+    web/combine/      # 合卡静态前端
+    ui/               # 统一首页与管理后台 React 源码
   y2k-nav/            # 导航页静态资源模块，被 fufu-tool-site 嵌入
   fufu-act/           # activity 后端与 public 静态资源模块，被 fufu-tool-site 嵌入
-  network-detect/     # 历史模块源码保留，生产不再单独部署
+legacy/
+  network-detect/     # 历史状态面板源码与迁移参考，不属于生产 apps
 packages/go/fufu/     # 共享 Go 包：config/newapi/tokens/combine/activity/auth
+tests/
+  workspace/          # 仓库级 Go workspace/部署结构守护测试
+tools/
+  mcy-card-upload/    # 本地运营脚本；含敏感商城操作，不进入统一前端或 Docker runtime
 scripts/
   start-config.mjs    # 唯一启动目标配置
   start-all.mjs       # 读取集中配置，只启动 fufu-tool-site
@@ -52,9 +59,11 @@ scripts/
 ```powershell
 npm run deps
 npm test
+go test -count=1 ./tests/workspace
 ```
 
 整个项目只保留根目录 `npm test` 一个测试入口；它只启动 `node --test scripts/test-suite.mjs` 这一条根级测试进程。子 package 不再提供 `test` / `test:*` 脚本，root 也不再分开调用各 app 测试或 Go 测试二进制，避免 Windows 反复弹出临时 `*.test.exe` 确认。
+需要额外验证 Go workspace、Dockerfile 嵌入模块和共享包边界时，运行 `go test -count=1 ./tests/workspace`。
 
 ## 本地启动
 

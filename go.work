@@ -4,7 +4,6 @@ use (
 	.
 	./apps/fufu-act
 	./apps/fufu-tool-site
-	./apps/network-detect
 	./apps/y2k-nav
 	./packages/go/fufu
 )

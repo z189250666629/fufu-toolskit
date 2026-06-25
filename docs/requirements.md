@@ -1,6 +1,6 @@
 # fufu-toolskit 需求整理
 
-本文是项目整理的起点。后续目录、模块、接口、后台和部署整理，都要先能对应到这里的需求与验收标准。
+本文是项目整理的起点。后续目录、模块、接口、后台和部署整理，都要先能对应到这里的需求与验收标准；具体目录归属规则见 `docs/project-structure.md`。
 
 ## 谁用，怎么用，达成什么效果
 
@@ -68,8 +68,9 @@
 - 在 `apps/fufu-tool-site` 维护统一生产服务和业务入口。
 - 在 `apps/fufu-act` 维护 activity 模块能力与嵌入资源。
 - 在 `apps/y2k-nav` 维护导航模块的历史资源与交互资源。
-- 在 `apps/network-detect` 保留历史状态面板源码，生产不再单独部署。
+- 在 `legacy/network-detect` 保留历史状态面板源码，生产不再单独部署，也不进入活跃 `go.work` 或生产 Docker context。
 - 在 `packages/go/fufu/*` 维护共享能力。
+- 在 `tools/` 保留本地运营脚本；这类脚本不属于生产 app，也不进入统一前端。
 - 本地验证只使用根级 `npm test`；它只启动 `node --test scripts/test-suite.mjs` 这一条根级测试进程。子 package 不再提供 `test` / `test:*` 脚本，root 也不再分开调用各 app 测试或 Go 测试二进制，避免 Windows 反复弹出临时 `*.test.exe` 确认。
 
 要达成的效果：
@@ -97,7 +98,7 @@
 
 - 不恢复 `y2k-nav`、`fufu-act`、`network-detect` 的独立生产部署。
 - 不新增旧式额外访问密钥变量，除非明确重新设计访问控制。
-- 不把 `apps/mcy-card-upload/` 这类本地敏感工具直接并入前端；若要集成，必须先改成服务端配置和脱敏展示。
+- 不把 `tools/mcy-card-upload/` 这类本地敏感工具直接并入前端；若要集成，必须先改成服务端配置和脱敏展示。
 - 不把所有模块合并成单目录；统一的是入口和运营体验，不是抹掉模块边界。
 
 ## 业务功能清单
@@ -193,7 +194,8 @@
 | `apps/fufu-tool-site` | 统一生产服务、路由整合、统一后台、首页 UI、状态页、合卡入口、activity 嵌入 | 承担所有底层业务算法 |
 | `apps/fufu-act` | 活动后端、抽奖/刮刮卡/补卡接口、activity 前台静态资源 | 独立生产部署、原始管理后台 |
 | `apps/y2k-nav` | 导航模块历史资源、视觉/交互资源 | 独立生产部署 |
-| `apps/network-detect` | 历史状态面板源码与迁移参考 | 独立生产部署 |
+| `legacy/network-detect` | 历史状态面板源码与迁移参考 | 独立生产部署 |
+| `tools/mcy-card-upload` | 本地运营脚本、商城批量操作辅助 | 普通用户前端、生产 Docker runtime |
 | `packages/go/fufu/config` | 配置加载、站点配置归一化 | UI 表现 |
 | `packages/go/fufu/newapi` | NewAPI 客户端与响应处理 | 业务页面路由 |
 | `packages/go/fufu/tokens` | token 查询、校验、变更等共享能力 | 页面渲染 |
@@ -215,7 +217,7 @@
 
 ## 当前风险与待确认
 
-- `apps/network-detect` 保留多少源码作为迁移参考，需要后续按文件粒度再审。
+- `legacy/network-detect` 保留多少源码作为迁移参考，需要后续按文件粒度再审。
 - 原始 activity 管理后台已撤掉；后续只需要确认旧 `/activity-admin` 跳转兼容地址是否也删除。
 - MCY 相关配置已经进入统一后台，但如果要集成本地敏感工具，必须先完成服务端化和脱敏。
 - 如果后续恢复自动补卡，需要重新确认后台常驻 scheduler、库存检测、补卡执行日志和失败重试策略。

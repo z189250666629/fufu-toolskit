@@ -31,12 +31,10 @@ FROM ${RUNTIME_IMAGE}
 WORKDIR /app
 RUN apk add --no-cache ca-certificates wget
 COPY --from=build /out/fufu-tool-site /app/fufu-tool-site
-COPY apps/fufu-tool-site/frontend ./frontend
-COPY apps/fufu-tool-site/combine ./combine
-COPY apps/fufu-tool-site/admin ./admin
+COPY apps/fufu-tool-site/web/status ./web/status
+COPY apps/fufu-tool-site/web/combine ./web/combine
 COPY --from=ui-build /src/apps/fufu-tool-site/ui-dist ./ui-dist
-COPY apps/fufu-tool-site/newapi-managed-api-sites.json ./
-COPY apps/fufu-tool-site/newapi-managed-api-sites.example.json ./
+COPY apps/fufu-tool-site/config ./config
 COPY apps/y2k-nav/index.html ./nav/index.html
 COPY apps/y2k-nav/nav-ui-tokens.css ./nav/nav-ui-tokens.css
 COPY apps/y2k-nav/theme.mjs ./nav/theme.mjs

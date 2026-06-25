@@ -153,3 +153,47 @@ test('activatePanelTab applies panel motion during render', () => {
 
   assert.match(appElement.innerHTML, /model-state-empty motion-enter/);
 });
+
+test('testModelCell passes fastest reachable URL for the selected model site kind', async () => {
+  const { documentRef } = createDomHarness();
+  let received = null;
+  const app = createDashboardApp({
+    documentRef,
+    windowRef: {
+      scrollX: 0,
+      scrollY: 0,
+      scrollTo: () => {},
+      requestAnimationFrame: (callback) => callback()
+    },
+    navigatorRef: { onLine: true },
+    runModelCellTestImpl: async (input) => {
+      received = input;
+      return true;
+    },
+    now: () => new Date('2026-06-10T10:00:00+08:00')
+  });
+
+  app.state.modelStatus = {
+    sites: [
+      { site: { name: '次数fufu', category: 'api' }, groups: ['mix'] },
+      { site: { name: 'token-fufu', category: 'token' }, groups: ['default'] }
+    ],
+    models: []
+  };
+  app.state.connectivity.results = [
+    { groupId: 'api', url: 'https://api-slow.example.test', reachable: true, averageMs: 80 },
+    { groupId: 'api', url: 'https://api-fast.example.test', reachable: true, averageMs: 20 },
+    { groupId: 'api', url: 'https://api-bad.example.test', reachable: false, averageMs: 5 },
+    { groupId: 'token', url: 'https://token-fast.example.test', reachable: true, averageMs: 10 }
+  ];
+
+  await app.testModelCell('次数fufu', 'gpt-a', 'mix');
+
+  assert.equal(received.state, app.state);
+  assert.equal(received.siteName, '次数fufu');
+  assert.equal(received.model, 'gpt-a');
+  assert.equal(received.group, 'mix');
+  assert.equal(received.preferredUrl, 'https://api-fast.example.test');
+  assert.equal(typeof received.postJsonImpl, 'function');
+  assert.equal(typeof received.render, 'function');
+});

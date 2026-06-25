@@ -17,7 +17,7 @@ GitHub Actions 部署环境固定使用 `docker`（持有 n5105 主机的 SSH / 
 ## 阶段
 
 1. `check`：过滤 tag 与 directive。
-2. `verify`：运行 `go test -count=1 .`、根目录脚本守护测试和统一 app 前端/模块测试。
+2. `verify`：安装统一 app 前端依赖，运行根目录 `npm test` 守护测试；需要额外检查 Go workspace 时运行 `go test -count=1 ./tests/workspace`。
 3. `docker`：构建并推送 GHCR 镜像。
 4. `deploy`：SSH 上传 compose/env，执行 `docker compose pull && docker compose up -d --remove-orphans`。
 
@@ -59,6 +59,7 @@ GitHub Actions 部署环境固定使用 `docker`（持有 n5105 主机的 SSH / 
 
 ```powershell
 npm test
+go test -count=1 ./tests/workspace
 
 docker compose -f infra/deploy/fufu-tool-site/docker-compose.yml config --quiet
 ```

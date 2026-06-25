@@ -70,7 +70,10 @@ func managedSiteCacheFileCandidates(root string) []string {
 	if configured != "" {
 		return []string{resolveManagedSiteConfigPath(root, configured)}
 	}
-	candidates := []string{filepath.Join(root, "newapi-managed-api-sites.json")}
+	candidates := []string{
+		filepath.Join(root, "config", "newapi-managed-api-sites.json"),
+		filepath.Join(root, "newapi-managed-api-sites.json"),
+	}
 	if home, err := os.UserHomeDir(); err == nil {
 		candidates = append(candidates, filepath.Join(home, "Downloads", "newapi-manager-config-2026-05-06.json"))
 	}

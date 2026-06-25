@@ -11,7 +11,7 @@ import (
 
 func writeToolSiteFixture(t *testing.T, root string) {
 	t.Helper()
-	for _, dir := range []string{"frontend", "combine", "nav", "admin", filepath.Join("ui-dist", "assets"), filepath.Join("activity", "public")} {
+	for _, dir := range []string{filepath.Join("web", "status"), filepath.Join("web", "combine"), "nav", filepath.Join("ui-dist", "assets"), filepath.Join("activity", "public")} {
 		if err := os.MkdirAll(filepath.Join(root, dir), 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -23,11 +23,10 @@ func writeToolSiteFixture(t *testing.T, root string) {
 		filepath.Join("nav", "latency.mjs"):                    `export function initLatencyProbes() {}`,
 		filepath.Join("ui-dist", "index.html"):                 `<html><title>fufu 工具站</title><body><div id="root">fufu HeroUI shell</div><script type="module" src="/assets/app.js"></script></body></html>`,
 		filepath.Join("ui-dist", "assets", "app.js"):           `import{HeroUIProvider}from"@heroui/react";console.log("fufu heroui app");`,
-		filepath.Join("frontend", "index.html"):                `<html><title>fufu API 状态面板</title><body>状态面板<script type="module" src="/app.js"></script><link rel="stylesheet" href="/styles.css"></body></html>`,
-		filepath.Join("frontend", "app.js"):                    `export const boot = true;`,
-		filepath.Join("frontend", "styles.css"):                `.app{}`,
-		filepath.Join("combine", "index.html"):                 `<html><body>合卡工具</body></html>`,
-		filepath.Join("admin", "index.html"):                   `<html><title>fufu 管理面板</title><body><h1>fufu 管理面板</h1><a href="/status">API/模型状态</a><a href="/combine">合卡工具</a><a href="/activity">活动前台</a><section data-section="newapi-sites">NewAPI 站点配置</section><section data-section="activity-odds">活动日期 整体数学期望值 中奖率</section></body></html>`,
+		filepath.Join("web", "status", "index.html"):           `<html><title>fufu API 状态面板</title><body>状态面板<script type="module" src="/app.js"></script><link rel="stylesheet" href="/styles.css"></body></html>`,
+		filepath.Join("web", "status", "app.js"):               `export const boot = true;`,
+		filepath.Join("web", "status", "styles.css"):           `.app{}`,
+		filepath.Join("web", "combine", "index.html"):          `<html><body>合卡工具</body></html>`,
 		filepath.Join("activity", "public", "index.html"):      `<html><body>活动中心<script src="activity-api.js"></script></body></html>`,
 		filepath.Join("activity", "public", "admin.html"):      `<html><body>ADMIN PANEL<script src="admin-render.js"></script></body></html>`,
 		filepath.Join("activity", "public", "activity-api.js"): `window.activityApi = {};`,
@@ -72,7 +71,6 @@ func TestToolSiteMergedPageRoutes(t *testing.T) {
 		})
 	}
 }
-
 
 func TestActivityFrontendCanBeDisabledFromAdminConfig(t *testing.T) {
 	root := t.TempDir()
