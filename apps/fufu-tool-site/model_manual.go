@@ -29,7 +29,7 @@ func handleModelTest(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, 400, "siteName 和 model 必填")
 		return
 	}
-	ctx := contextWithModelTestClient(r.Context(), clientIP(r))
+	ctx := r.Context()
 	ctx = contextWithModelTestPreferredURL(ctx, body.PreferredURL)
 	result, err := runModelTest(ctx, body.SiteName, body.Model, body.Group)
 	if err != nil {

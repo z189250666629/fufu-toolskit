@@ -12,24 +12,7 @@ func (e *httpError) Error() string { return e.Message }
 
 var runModelTest = testModel
 
-type modelTestClientContextKey struct{}
 type modelTestPreferredURLContextKey struct{}
-
-func contextWithModelTestClient(ctx context.Context, client string) context.Context {
-	client = strings.TrimSpace(client)
-	if client == "" {
-		return ctx
-	}
-	return context.WithValue(ctx, modelTestClientContextKey{}, client)
-}
-
-func modelTestClientFromContext(ctx context.Context) string {
-	if ctx == nil {
-		return ""
-	}
-	client, _ := ctx.Value(modelTestClientContextKey{}).(string)
-	return strings.TrimSpace(client)
-}
 
 func contextWithModelTestPreferredURL(ctx context.Context, preferredURL string) context.Context {
 	preferredURL = strings.TrimSpace(preferredURL)
@@ -65,13 +48,6 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	now := time.Now().Unix()
 	pruneManualTestCache(now)
 	next := now + int64(modelTestCooldown/time.Second)
-	clientCooldownKey := ""
-	if client := modelTestClientFromContext(ctx); client != "" {
-		clientCooldownKey = modelManualClientKey(siteName, client)
-		if until, ok := reserveModelTestCooldown(&testClientCooldowns, clientCooldownKey, now, next); !ok {
-			return nil, &httpError{Status: 429, Message: "该站点模型测试仍在冷却中", NextAllowedAt: until}
-		}
-	}
 	key := modelManualKey(siteName, model, group)
 	if until, ok := reserveModelTestCooldown(&testCooldowns, key, now, next); !ok {
 		return nil, &httpError{Status: 429, Message: "该模型测试仍在冷却中", NextAllowedAt: until}
@@ -91,7 +67,6 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 			lastChannelError = errMsg
 			if err := ctx.Err(); err != nil {
 				clearModelTestCooldownReservation(key, next)
-				clearClientModelTestCooldownReservation(clientCooldownKey, next)
 				return nil, err
 			}
 			continue
@@ -110,7 +85,6 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 		}
 		if err := ctx.Err(); err != nil {
 			clearModelTestCooldownReservation(key, next)
-			clearClientModelTestCooldownReservation(clientCooldownKey, next)
 			return nil, err
 		}
 		if res.OK {
@@ -119,7 +93,6 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	}
 	if !loadedChannels {
 		clearModelTestCooldownReservation(key, next)
-		clearClientModelTestCooldownReservation(clientCooldownKey, next)
 		return nil, &httpError{Status: 502, Message: lastChannelError}
 	}
 	if !foundTestableChannel {
@@ -128,19 +101,12 @@ func testModel(ctx context.Context, siteName, model, group string) (map[string]a
 	}
 	if err := ctx.Err(); err != nil {
 		testCooldowns.Delete(key)
-		if clientCooldownKey != "" {
-			testClientCooldowns.Delete(clientCooldownKey)
-		}
 		return nil, err
 	}
 	rec := testRecord{OK: res.OK, Status: map[bool]string{true: "operational", false: "down"}[res.OK], Group: group, Stream: stream, TestedAt: time.Now().Unix(), Message: truncate(testMessage(res), 180), NextAllowedAt: next}
 	testResults.Store(key, rec)
 	applyManualToCachedStatus(siteName, model, group, rec, next)
 	return map[string]any{"siteName": siteName, "model": model, "group": group, "test": rec}, nil
-}
-
-func modelManualClientKey(siteName, client string) string {
-	return strings.TrimSpace(siteName) + "\x00" + strings.TrimSpace(client)
 }
 
 func reserveModelTestCooldown(cache *sync.Map, key string, now, next int64) (int64, bool) {
@@ -163,10 +129,6 @@ func reserveModelTestCooldown(cache *sync.Map, key string, now, next int64) (int
 
 func clearModelTestCooldownReservation(key string, next int64) {
 	clearManualTestCooldownReservation(&testCooldowns, key, next)
-}
-
-func clearClientModelTestCooldownReservation(key string, next int64) {
-	clearManualTestCooldownReservation(&testClientCooldowns, key, next)
 }
 
 func clearManualTestCooldownReservation(cache *sync.Map, key string, next int64) {
@@ -196,13 +158,6 @@ func pruneManualTestCache(now int64) {
 		if !ok || rec.NextAllowedAt <= now {
 			testResults.Delete(key)
 			testCooldowns.Delete(key)
-		}
-		return true
-	})
-	testClientCooldowns.Range(func(key, value any) bool {
-		until, ok := value.(int64)
-		if !ok || until <= now {
-			testClientCooldowns.Delete(key)
 		}
 		return true
 	})

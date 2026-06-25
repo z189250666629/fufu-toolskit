@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"fufu/newapi"
 )
@@ -100,6 +104,77 @@ func TestTestModelFallsBackToNextConnectivityCandidate(t *testing.T) {
 	}
 	if !strings.Contains(testedPath, "/api/channel/test/7") {
 		t.Fatalf("fallback line was not tested, path=%q", testedPath)
+	}
+}
+
+func TestTestModelAllowsParallelDifferentModelsFromSameClient(t *testing.T) {
+	isolateManagedSiteRuntime(t)
+	siteName := "parallel-site"
+	models := []string{"model-a", "model-b"}
+	for _, modelName := range models {
+		key := modelManualKey(siteName, modelName, "")
+		testCooldowns.Delete(key)
+		testResults.Delete(key)
+		t.Cleanup(func() {
+			testCooldowns.Delete(key)
+			testResults.Delete(key)
+		})
+	}
+
+	var probeHits atomic.Int32
+	bothProbesStarted := make(chan struct{})
+	var closeBoth sync.Once
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/channel/search"):
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "data": []any{
+				map[string]any{"id": 11, "status": channelStatusEnabled, "models": []any{"model-a"}, "groups": []any{"default"}},
+				map[string]any{"id": 12, "status": channelStatusEnabled, "models": []any{"model-b"}, "groups": []any{"default"}},
+			}})
+		case strings.HasPrefix(r.URL.Path, "/api/channel/test/"):
+			if probeHits.Add(1) == 2 {
+				closeBoth.Do(func() { close(bothProbesStarted) })
+			}
+			select {
+			case <-bothProbesStarted:
+				_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+			case <-time.After(2 * time.Second):
+				http.Error(w, "parallel probe did not start", http.StatusGatewayTimeout)
+			}
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.String())
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("NEWAPI_MANAGED_API_SITES", managedSiteConfigJSON(t, siteName, server.URL))
+	type response struct {
+		code int
+		body string
+	}
+	responses := make(chan response, len(models))
+	for _, modelName := range models {
+		modelName := modelName
+		go func() {
+			req := httptest.NewRequest(http.MethodPost, "/api/newapi/model-status/test", strings.NewReader(`{"siteName":"`+siteName+`","model":"`+modelName+`"}`))
+			req.RemoteAddr = "203.0.113.55:5000"
+			rec := httptest.NewRecorder()
+			handleModelTest(rec, req)
+			responses <- response{code: rec.Code, body: rec.Body.String()}
+		}()
+	}
+	for range models {
+		select {
+		case res := <-responses:
+			if res.code != http.StatusOK {
+				t.Fatalf("parallel model test should succeed, status=%d body=%s", res.code, res.body)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("parallel model tests did not finish")
+		}
+	}
+	if got := probeHits.Load(); got != 2 {
+		t.Fatalf("parallel model tests should probe both models, got %d", got)
 	}
 }
 
